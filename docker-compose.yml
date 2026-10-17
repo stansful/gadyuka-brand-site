@@ -1,0 +1,128 @@
+# ГАДЮКА — production stack (VPS). Step-by-step guide: DEPLOY.md.
+#
+#   caddy  :80/:443  → automatic HTTPS for ${DOMAIN}; serves /uploads/* from the volume,
+#                      proxies everything else to app:3000
+#   app    Next.js standalone; connects as the least-privilege role APP_DB_USER (DML only)
+#   db     PostgreSQL 17 (port published on 127.0.0.1 only — used by the image build);
+#          deploy/postgres/initdb creates APP_DB_USER on the first start of an empty volume
+#   tools  one-off tasks (profile "tools"): migrate, seed — as the superuser POSTGRES_USER
+#
+# Variables come from .env next to this file (see DEPLOY.md, section «.env»).
+
+name: gadyuka
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gadyuka}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-gadyuka}
+      # Runtime role of the app (deploy/postgres/initdb/10-app-role.sh)
+      APP_DB_USER: ${APP_DB_USER:-gadyuka_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    # Loopback only: `docker compose build app` connects here (build network: host).
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    shm_size: 128mb
+    logging: *logging
+
+  app:
+    build:
+      context: .
+      target: runner
+      # `next build` prerenders pages from the DB → it must reach db on 127.0.0.1.
+      network: host
+      secrets:
+        - dotenv
+    image: gadyuka-app:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      # Least-privilege role (no DDL, no superuser): a SQL-level bug cannot escalate.
+      DATABASE_URL: postgresql://${APP_DB_USER:-gadyuka_app}:${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}@db:5432/${POSTGRES_DB:-gadyuka}?schema=public
+      # The app never gets the superuser password (env_file would pass it through).
+      POSTGRES_PASSWORD: ""
+      # Migrations need DDL rights → they run in `tools` as POSTGRES_USER (DEPLOY.md, 8 / 9).
+      SKIP_MIGRATIONS: "1"
+      # Fail at `docker compose up` instead of storing reversible IP hashes.
+      IP_HASH_SALT: ${IP_HASH_SALT:?Set IP_HASH_SALT in .env (openssl rand -hex 32)}
+      UPLOAD_DIR: /app/uploads
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    volumes:
+      - uploads:/app/uploads
+    expose:
+      - "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/robots.txt || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    logging: *logging
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - uploads:/srv/uploads:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    logging: *logging
+
+  tools:
+    profiles: ["tools"]
+    build:
+      context: .
+      target: tools
+    image: gadyuka-tools:latest
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gadyuka}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-gadyuka}?schema=public
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *logging
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:
+
+secrets:
+  # .env is mounted into the build step only (Dockerfile: --mount=type=secret,id=dotenv).
+  dotenv:
+    file: ./.env

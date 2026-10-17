@@ -1,0 +1,60 @@
+import type { LeadType } from "@/generated/prisma/enums";
+
+/**
+ * Lead types and lead intents (CTA → form) — ISOMORPHIC and dependency-free.
+ *
+ * Kept apart from src/lib/leads.ts on purpose: the layout-level SmoothScroll (every public page)
+ * and the form read intents, and leads.ts builds zod schemas at module load (~30 KB gzipped),
+ * which must not ship to pages without the form. leads.ts re-exports everything here.
+ */
+
+export const LEAD_TYPES = ["TAILORING", "PARTNERSHIP", "CONTACT"] as const satisfies ReadonlyArray<LeadType>;
+
+export function isLeadType(value: unknown): value is LeadType {
+  return typeof value === "string" && (LEAD_TYPES as ReadonlyArray<string>).includes(value);
+}
+
+/** A CTA's request to the form: preselect `type`, show/prefill `subject` ("" = none). */
+export type LeadIntent = { type: LeadType; subject: string };
+
+/** window CustomEvent dispatched when an in-page CTA with data-lead-type is followed. */
+export const LEAD_INTENT_EVENT = "gadyuka:lead-intent";
+
+/** Query parameters of cross-page CTA links: /?topic=CONTACT&subject=…#lead-form */
+export const LEAD_INTENT_PARAMS = { type: "topic", subject: "subject" } as const;
+
+export const LEAD_SUBJECT_MAX = 160;
+
+/** Whitespace collapsed to single spaces, trimmed, at most LEAD_SUBJECT_MAX characters. */
+function cleanSubject(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.replace(/\s+/g, " ").trim().slice(0, LEAD_SUBJECT_MAX);
+}
+
+/** Validate an intent from untrusted input (DOM data attributes, URL, event detail). */
+export function parseLeadIntent(value: unknown): LeadIntent | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const type: unknown = Reflect.get(value, "type");
+  if (!isLeadType(type)) return null;
+  return { type, subject: cleanSubject(Reflect.get(value, "subject")) };
+}
+
+/** Read an intent from URL search params (?topic=…&subject=…); null when absent/invalid. */
+export function leadIntentFromSearch(search: string): LeadIntent | null {
+  const params = new URLSearchParams(search);
+  const type = params.get(LEAD_INTENT_PARAMS.type);
+  if (type === null) return null;
+  return parseLeadIntent({ type, subject: params.get(LEAD_INTENT_PARAMS.subject) ?? "" });
+}
+
+/** "/en" + intent + "lead-form" → "/en?topic=CONTACT&subject=Order%3A%20…#lead-form" */
+export function leadIntentHref(path: string, intent: LeadIntent, anchor: string): string {
+  const params = new URLSearchParams({ [LEAD_INTENT_PARAMS.type]: intent.type });
+  if (intent.subject) params.set(LEAD_INTENT_PARAMS.subject, intent.subject);
+  return `${path}?${params.toString()}#${anchor}`;
+}
+
+/** "Заказ:" + "Худи «Знак»" → "Заказ: Худи «Знак»" (either part may be empty). */
+export function leadSubject(prefix: string, name: string): string {
+  return [prefix.trim(), name.trim()].filter(Boolean).join(" ").slice(0, LEAD_SUBJECT_MAX);
+}

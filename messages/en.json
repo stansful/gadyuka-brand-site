@@ -1,0 +1,90 @@
+{
+  "common": {
+    "skipToContent": "Skip to content",
+    "mainNavigation": "Main navigation",
+    "languageSwitcher": "Site language",
+    "switchLanguageTo": "Switch language to <lang>{language}</lang>",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "backToTop": "Back to top",
+    "close": "Close",
+    "previous": "Previous",
+    "next": "Next",
+    "loading": "Loading…",
+    "opensInNewTab": "opens in a new tab",
+    "homeLink": "GADYUKA — home",
+    "breadcrumbs": "Breadcrumb",
+    "mobileMenu": "Mobile menu",
+    "footerNavigation": "Footer menu",
+    "collections": "Collections",
+    "imageViewer": "Image viewer",
+    "previousImage": "Previous image",
+    "nextImage": "Next image",
+    "closeViewer": "Close viewer",
+    "galleryPhoto": "Photo {number}",
+    "rating": "Rated {rating} out of 5",
+    "productPhoto": "{product} — photo {number}"
+  },
+  "catalog": {
+    "models": "{count, plural, =0 {new pieces coming soon} one {# piece} other {# pieces}}"
+  },
+  "forms": {
+    "sending": "Sending…",
+    "honeypotLabel": "Leave this field empty",
+    "requiredMark": "required field",
+    "errors": {
+      "required": "This field is required",
+      "invalidEmail": "Please enter a valid email address",
+      "invalidPhone": "Please enter a valid phone number",
+      "contactRequired": "Leave an email or a phone number so we can get back to you",
+      "tooShort": "Too short — at least {min} characters",
+      "tooLong": "Too long — {max} characters max",
+      "rateLimited": "Too many requests in a row. Please try again in a few minutes.",
+      "server": "We couldn't send your request. Please try again or call us.",
+      "network": "No connection to the server. Check your internet and try again.",
+      "invalidForm": "Please check the form fields",
+      "consentRequired": "Please confirm your consent to the processing of personal data",
+      "invalid": "Please check this field",
+      "invalidType": "Unknown request type",
+      "badRequest": "Invalid request. Please reload the page and try again.",
+      "payloadTooLarge": "Too much data in the request. Please shorten your message.",
+      "unsupportedMediaType": "Unsupported request format."
+    },
+    "consent": "I agree to the processing of my personal data to handle this request",
+    "submitDefault": "Send",
+    "successDefault": "Thank you! Your request has been sent — we will get back to you soon.",
+    "sendAnother": "Send another request",
+    "optional": "optional",
+    "contactHint": "Leave an email or a phone number — whichever you prefer",
+    "fields": {
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "message": "Message"
+    },
+    "topicDefault": "Topic",
+    "topics": {
+      "TAILORING": "Made to measure",
+      "PARTNERSHIP": "Partnership",
+      "CONTACT": "A question or something else"
+    },
+    "noscriptInvalid": "Your request was not sent: fill in the required fields (marked *), tick the consent box and send it again."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "text": "This page doesn't exist — it may have been moved or removed.",
+    "backHome": "Back to home",
+    "kicker": "Error 404",
+    "caption": "Dead end. Nothing here but the rain."
+  },
+  "error": {
+    "title": "Something went wrong",
+    "text": "We're on it. Please try reloading the page.",
+    "retry": "Try again",
+    "kicker": "Error",
+    "caption": "Trouble at the printing press."
+  },
+  "media": {
+    "imagePlaceholder": "Image coming soon"
+  }
+}

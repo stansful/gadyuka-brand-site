@@ -1,0 +1,25 @@
+# Local development database for the ГАДЮКА site.
+# Start: npm run db:up   (docker compose -f docker-compose.dev.yml up -d)
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: gadyuka-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gadyuka
+      POSTGRES_PASSWORD: gadyuka
+      POSTGRES_DB: gadyuka
+    ports:
+      # Loopback only: Docker publishes ports past the host firewall, so 0.0.0.0 would
+      # expose this trivially-passworded dev database to the whole LAN / Wi-Fi.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - gadyuka-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gadyuka -d gadyuka"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  gadyuka-db-data:

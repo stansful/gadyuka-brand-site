@@ -1,0 +1,44 @@
+# Build context for the Docker image (see Dockerfile). assets/ stays IN: the seed reads it.
+
+# VCS / editors / OS
+.git
+.gitignore
+.idea
+.vscode
+.claude
+**/.DS_Store
+
+# Secrets — .env is passed to the build as a BuildKit secret, never via the context
+.env
+.env.*
+
+# Dependencies / build output (rebuilt inside the image)
+node_modules
+.next
+out
+build
+coverage
+src/generated
+tsconfig.tsbuildinfo
+next-env.d.ts
+*.log
+
+# Runtime data
+uploads
+backups
+
+# Not needed in the image
+concepts
+old-site-examples
+docs
+*.pdf
+Dockerfile
+.dockerignore
+docker-compose*.yml
+deploy
+Caddyfile
+DEPLOY.md
+README.md
+AGENTS.md
+BRIEF.md
+SIMPLE_SCHEMA.md

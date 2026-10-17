@@ -1,0 +1,73 @@
+/*
+ * Admin-only stylesheet (Tailwind CSS v4). Imported ONLY by src/app/admin/layout.tsx,
+ * a separate root layout, so neither preflight nor utilities reach the public site.
+ * Class detection is limited to the admin sources.
+ */
+@import "tailwindcss" source(none);
+@source "./";
+@source "../../components/admin";
+
+@theme {
+  /* Brand palette (BRIEF.md): black ~60%, beige, blue, grey, red only for destructive / errors */
+  --color-ink: #010101;
+  --color-panel: #0b0b0c;
+  --color-raised: #141416;
+  --color-raised-hi: #1c1c1f;
+  --color-line: #242428;
+  --color-line-strong: #34343a;
+  --color-fg: #ece6dc;
+  --color-muted: #8b8b8b;
+  --color-beige: #e2cca7;
+  --color-beige-hi: #efdfc2;
+  --color-blue: #2a344f;
+  --color-blue-hi: #364368;
+  --color-blue-fg: #b4c1e6;
+  --color-red: #c30022;
+  --color-red-hi: #e0193c;
+  --color-red-fg: #ff8597;
+
+  --font-sans: var(--font-admin), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-ink);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-blue-hi);
+    color: var(--color-fg);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-beige);
+    outline-offset: 2px;
+  }
+
+  dialog::backdrop {
+    background-color: rgb(0 0 0 / 0.72);
+    backdrop-filter: blur(2px);
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.85);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
