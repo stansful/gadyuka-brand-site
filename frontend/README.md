@@ -44,7 +44,7 @@ npm run dev             # http://localhost:3000
 - **Картинки** — «Медиатека». Файлы хранятся в MinIO по ключу `admin/<id>/<uuid>/image.webp`, ссылка `/media/…` — в таблице `Media`.
 - **Интерфейс админки** — `messages/admin/ru.json`. **Демо-контент сида** — `messages`.
 
-Как добавлять новый текст в код — `.claude/skills/site-texts/SKILL.md`. Правила для агентов — `AGENTS.md`.
+Как добавлять новый текст в код — `../.claude`. Правила для агентов — `AGENTS.md`.
 
 ## Скриншоты
 
