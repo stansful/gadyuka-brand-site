@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import type { LandingContent } from "@/lib/content";
 import { SECTION_ANCHORS } from "@/lib/content";
 import { FooterScene } from "./scenes/FooterScene";
-import { NAV } from "./SiteHeader";
+import { NAV } from "./nav";
 
 /** «Конец выпуска. Продолжение следует…», the big wordmark, © + year, the menu and «Наверх». */
 export async function SiteFooter({ content, homePath = "" }: { content: LandingContent; homePath?: string }): Promise<ReactElement> {
@@ -24,9 +24,19 @@ export async function SiteFooter({ content, homePath = "" }: { content: LandingC
         ) : null}
         <span className="ftr__word mask-img m-wordmark" aria-hidden="true" />
         <div className="ftr__row">
-          <p className="ftr__copy">
-            <span data-edit="footer.copyright">{texts["footer.copyright"]}</span> {year}
-          </p>
+          <div className="ftr__legal">
+            <p className="ftr__copy">
+              <span data-edit="footer.copyright">{texts["footer.copyright"]}</span> {year}
+            </p>
+            {texts["footer.trademark"] ? (
+              <p className="ftr__tm">
+                <span className="ftr__tm-mark" aria-hidden="true">
+                  ®
+                </span>
+                <span data-edit="footer.trademark">{texts["footer.trademark"]}</span>
+              </p>
+            ) : null}
+          </div>
           <nav className="ftr__nav" aria-label={t("footerNavigation")}>
             {NAV.map((item) => (
               <a key={item.key} href={`${homePath}#${item.anchor}`} data-edit={item.key}>

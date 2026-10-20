@@ -1,15 +1,11 @@
 "use client";
 
 import { type ReactElement, type ReactNode, useRef } from "react";
-import { hasFinePointer, INTRO_CLASS, motionEnabled, scheduleRefresh } from "../motion/env";
-import { inContext, playWhileVisible, tongueLoop } from "../motion/effects";
+import { hasFinePointer, INTRO_CLASS, liteMotion, motionEnabled, scheduleRefresh } from "../motion/env";
+import { inContext } from "../motion/effects";
 import { gsap, loadScrollTrigger } from "../motion/gsap";
 import { addSafely, useIsomorphicLayoutEffect } from "../motion/useScene";
 
-/** Pivot of the snake's tongue in the logo's SVG user space. */
-const TONGUE_ORIGIN = "586 314";
-/** Intro clock (ms): the tongue starts flicking 1.1 s after it has shot out (noir.css intro-tongue). */
-const TONGUE_LOOP_AT = 2600;
 /** Every keyframes rule of the cover intro is named "intro-…" (noir.css, «COVER INTRO»). */
 const INTRO_PREFIX = "intro-";
 
@@ -25,15 +21,6 @@ function introAnimations(): CSSAnimation[] {
   return document.getAnimations().filter((animation): animation is CSSAnimation => animation instanceof CSSAnimation && animation.animationName.startsWith(INTRO_PREFIX));
 }
 
-/**
- * Time on the intro clock (ms). All intro animations start together at the first paint, so the
- * local time of any of them (delay included) is the time since the intro started.
- */
-function introTime(animations: ReadonlyArray<CSSAnimation>): number {
-  if (animations.length === 0) return Number.POSITIVE_INFINITY;
-  return Math.max(0, ...animations.map((animation) => (typeof animation.currentTime === "number" ? animation.currentTime : 0)));
-}
-
 /** Resolves when every animation has finished (or was cancelled). */
 function settled(animations: ReadonlyArray<Animation>): Promise<void> {
   return Promise.allSettled(animations.map((animation) => animation.finished)).then(() => undefined);
@@ -43,10 +30,13 @@ function settled(animations: ReadonlyArray<Animation>): Promise<void> {
  * Hero «обложка». The intro itself — the frame inked, the snake dripping in, the band and the
  * wordmark stamped, the slogan and captions typed, SFX popped, the hint — is CSS that starts
  * with the first paint (html.is-intro, see noir.css «COVER INTRO»), so the cover never waits
- * for this bundle. This scene adds what comes after: the tongue flicks while the cover is on
- * screen (from 2.6 s on the intro clock), the cover turns away like a page on scroll, the SFX
- * drifts up, a «О нас →» bubble follows the mouse; and it ends the intro (removes is-intro)
- * once its animations have finished. Without motion the server-rendered cover stays as is.
+ * for this bundle; so is the tongue's flick after it (noir.css «tongue flick», a compositor
+ * animation of its own layer). This scene adds what comes after: the cover turns away like a page
+ * on scroll, the SFX drifts up, a «О нас →» bubble follows the mouse over the cover link (not
+ * over the collection plate laid over it: another element, so the cover gets pointerleave); and
+ * it ends the intro (removes is-intro) once its animations have finished. Without motion the
+ * server-rendered cover stays as is. In-app browsers (lite motion) load no ScrollTrigger: the
+ * page turn and the SFX drift are CSS scroll-driven animations there (noir.css «LITE MOTION»).
  */
 export function HeroScene({ children, className, id, labelledBy }: { children: ReactNode; className: string; id: string; labelledBy: string }): ReactElement {
   const ref = useRef<HTMLElement>(null);
@@ -62,11 +52,12 @@ export function HeroScene({ children, className, id, labelledBy }: { children: R
     mountedScenes += 1;
     let disposed = false;
     let frame = 0;
-    let tongueTimer: number | undefined;
+    const lite = liteMotion();
     const ctx = gsap.context(() => undefined, hero);
 
     const splash = q<HTMLElement>(hero, ".splash");
-    const tongue = q<SVGGElement>(hero, ".snake__tongue");
+    // The cover link and the collection plate laid over it turn away together.
+    const cover = q<HTMLElement>(hero, ".splash-wrap") ?? splash;
     const sfx = q<HTMLElement>(hero, ".sfx--hiss");
     const leave = { trigger: hero, start: "top top", end: "bottom top", scrub: 0.4 };
 
@@ -105,26 +96,18 @@ export function HeroScene({ children, className, id, labelledBy }: { children: R
     }
 
     // Scroll-linked parts wait for ScrollTrigger (loaded after mount, gsap.ts): the page-turn
-    // feel when leaving the cover and the tongue loop, which plays while the cover is on screen.
-    const scrolling = loadScrollTrigger();
-    void scrolling.then(
+    // feel when leaving the cover. Lite motion: CSS (no ScrollTrigger at all).
+    const scrolling = lite ? null : loadScrollTrigger();
+    void scrolling?.then(
       inContext(ctx, () => {
-        if (splash) gsap.to(splash, { scale: 0.93, rotation: -1.2, opacity: 0.35, ease: "none", scrollTrigger: leave });
+        if (cover) gsap.to(cover, { scale: 0.93, rotation: -1.2, opacity: 0.35, ease: "none", scrollTrigger: leave });
       }),
       () => undefined,
     );
-    const startTongue = (): void => {
-      void scrolling.then(
-        inContext(ctx, () => {
-          if (tongue) playWhileVisible(hero, tongueLoop(tongue, { svgOrigin: TONGUE_ORIGIN }));
-        }),
-        () => undefined,
-      );
-    };
     // The SFX drifts up with the scroll. Attached after its own intro animation: GSAP reads the
     // element's current transform once, and must not take an in-between frame for its rest state.
     const attachSfx = (): void => {
-      void scrolling.then(
+      void scrolling?.then(
         inContext(ctx, () => {
           if (sfx) gsap.to(sfx, { yPercent: -120, ease: "none", scrollTrigger: leave });
         }),
@@ -138,9 +121,6 @@ export function HeroScene({ children, className, id, labelledBy }: { children: R
       if (disposed) return;
       const played = html.classList.contains(INTRO_CLASS);
       const intro = played ? introAnimations() : [];
-      const now = introTime(intro);
-      if (now < TONGUE_LOOP_AT) tongueTimer = window.setTimeout(startTongue, TONGUE_LOOP_AT - now);
-      else startTongue();
 
       const sfxIntro = intro.filter((animation) => animation.effect instanceof KeyframeEffect && animation.effect.target === sfx);
       void settled(sfxIntro).then(() => {
@@ -155,13 +135,12 @@ export function HeroScene({ children, className, id, labelledBy }: { children: R
         if (played) hero.querySelectorAll<HTMLElement>(".splash__cap").forEach((cap) => (cap.style.transformOrigin = "0% 50%"));
         html.classList.remove(INTRO_CLASS);
       });
-      scheduleRefresh();
+      if (!lite) scheduleRefresh();
     });
 
     return () => {
       disposed = true;
       window.cancelAnimationFrame(frame);
-      window.clearTimeout(tongueTimer);
       ctx.revert();
       mountedScenes -= 1;
       // Never leave the intro state behind us — unless the scene is immediately remounted.

@@ -122,6 +122,13 @@ type LeadValidator = Pick<typeof Leads, "validateLeadInput" | "leadApiResponseSc
 
 let validatorPromise: Promise<LeadValidator> | null = null;
 
+/**
+ * The validator is fetched ahead only after the page has not been scrolled for this long (ms):
+ * the visitor stopped to read near the form, not a pause between two swipes (its chunk takes
+ * ~100 ms to run on a slow phone — a swipe started meanwhile would stall).
+ */
+const VALIDATOR_QUIET_MS = 1000;
+
 /** One shared import for every form on the page; a failed load (offline) can be retried. */
 function loadValidator(): Promise<LeadValidator> {
   validatorPromise ??= import("@/lib/leads").catch((error: unknown) => {
@@ -181,20 +188,53 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
     if (!validator) void ensureValidator().catch(() => undefined);
   };
 
-  // Load the validator once the form is within about a viewport of the screen.
+  // Load the validator once the form is within about a viewport of the screen — and the page
+  // has not been scrolled for a moment (then in an idle period): it comes into range in the
+  // middle of a swipe, and parsing + running its chunk is one long task that would stall it.
+  // Focus / input load it at once anyway (preloadValidator).
   useEffect(() => {
     const root = rootRef.current;
     if (!root || typeof IntersectionObserver === "undefined") return;
+    let quietTimer = 0;
+    let idle = 0;
+    let armed = false;
+    const cancelIdle = (): void => {
+      if (idle && typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(idle);
+      idle = 0;
+    };
+    const load = (): void => {
+      idle = 0;
+      window.removeEventListener("scroll", arm);
+      void ensureValidator().catch(() => undefined);
+    };
+    // Every scroll starts the quiet period again — and drops an idle callback already queued
+    // after the last one: it would otherwise run in an idle gap of the new swipe (or at its
+    // timeout, in the middle of it).
+    function arm(): void {
+      window.clearTimeout(quietTimer);
+      cancelIdle();
+      quietTimer = window.setTimeout(() => {
+        if (typeof window.requestIdleCallback === "function") idle = window.requestIdleCallback(load, { timeout: 2000 });
+        else load();
+      }, VALIDATOR_QUIET_MS);
+    }
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries.some((entry) => entry.isIntersecting)) return;
         observer.disconnect();
-        void ensureValidator().catch(() => undefined);
+        armed = true;
+        window.addEventListener("scroll", arm, { passive: true });
+        arm();
       },
       { rootMargin: "100% 0px" },
     );
     observer.observe(root);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(quietTimer);
+      cancelIdle();
+      if (armed) window.removeEventListener("scroll", arm);
+    };
   }, [ensureValidator]);
 
   // CTA → form: preselect the topic, show the subject and prefill it into an untouched message.

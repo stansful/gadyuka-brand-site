@@ -6,7 +6,6 @@ node_modules/
 .DS_Store
 .idea/
 concepts/
-uploads/
 # Production backups (pg_dump with all lead PII + uploads archives) — never commit them.
 backups/
 

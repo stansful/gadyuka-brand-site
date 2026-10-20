@@ -15,7 +15,7 @@ function stars(rating: number): string {
 }
 
 /**
- * Глава 04 · Отзывы: a comic page of «witness» panels — hooded halftone figure, speech bubble
+ * Глава 07 · Отзывы: a comic page of «witness» panels — hooded halftone figure, speech bubble
  * breaking the frame, the name plate with the rating (if the admin set one).
  */
 export async function ReviewsSection({ content }: { content: LandingContent }): Promise<ReactElement> {

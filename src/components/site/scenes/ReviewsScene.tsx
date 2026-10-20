@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactElement, useRef } from "react";
-import { chapterReveal, genericReveals, retire } from "../motion/effects";
+import { chapterReveal, genericReveals, retire, unseen } from "../motion/effects";
 import { gsap } from "../motion/gsap";
 import { useScene } from "../motion/useScene";
 import { SceneRoot, type SceneProps } from "./SceneRoot";
@@ -15,7 +15,8 @@ export function ReviewsScene(props: SceneProps): ReactElement {
   useScene(ref, (root) => {
     chapterReveal(root);
     genericReveals(root);
-    root.querySelectorAll<HTMLElement>(".say").forEach((say) => {
+    // A late scene (useScene): what the visitor may already have seen stays as rendered.
+    unseen(Array.from(root.querySelectorAll<HTMLElement>(".say"))).forEach((say) => {
       const left = say.classList.contains("say--b") || say.classList.contains("say--c");
       const tl = gsap.timeline({ scrollTrigger: { trigger: say, start: "top 85%", onEnter: retire } });
       tl.fromTo(

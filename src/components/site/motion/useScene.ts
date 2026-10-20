@@ -1,7 +1,8 @@
 "use client";
 
 import { type RefObject, useEffect, useLayoutEffect, useRef } from "react";
-import { motionEnabled } from "./env";
+import { withRevealsOff } from "./effects";
+import { motionEnabled, PENDING_CLASS, SCENE_LATE_ATTR } from "./env";
 import { gsap } from "./gsap";
 import { markSceneReady, scheduleScene } from "./scheduler";
 
@@ -59,7 +60,11 @@ export function useScene<E extends HTMLElement>(ref: RefObject<E | null>, setup:
     const ctx = gsap.context(() => undefined, root);
     const cancel = scheduleScene(root, () => {
       if (ctx.isReverted) return;
-      const result = addSafely(ctx, () => setupRef.current(root, ctx));
+      // A late scene — it came near the screen before its setup (SCENE_LATE_ATTR), or the boot
+      // failsafe dropped the CSS start states (motion-pending is gone: it is never removed
+      // otherwise) — keeps what may already have been seen as rendered (effects.ts unseen()).
+      const late = root.hasAttribute(SCENE_LATE_ATTR) || !document.documentElement.classList.contains(PENDING_CLASS);
+      const result = withRevealsOff(late, () => addSafely(ctx, () => setupRef.current(root, ctx)));
       if (!result.ok) {
         ctx.revert();
         console.error(result.error);

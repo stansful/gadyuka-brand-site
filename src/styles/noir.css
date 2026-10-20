@@ -236,6 +236,12 @@ main:focus { outline: none; }
 .btn[aria-disabled="true"] { cursor: progress; }
 .btn[aria-disabled="true"] .btn__face { transform: none; opacity: .8; }
 
+/* buttons side by side (a little tighter, so two fit a 5-column panel); they wrap under each
+   other where the panel is narrow */
+.btn-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 22px 24px; margin-top: 30px; }
+.btn-row > .btn { margin-top: 0; letter-spacing: .12em; }
+.btn-row .btn__face { padding-left: 20px; padding-right: 20px; }
+
 .link-btn {
   display: inline-flex; align-items: center; gap: .55em; min-height: 44px;
   margin-top: 14px; padding: 12px 18px; border: 0; cursor: pointer;
@@ -250,12 +256,27 @@ main:focus { outline: none; }
 .is-off, .is-off::before, .is-off::after, .is-off *, .is-off *::before, .is-off *::after { animation-play-state: paused !important; }
 
 /* =========================================================
-   SCROLL SPINE (progress snake)
+   SCROLL SPINE — the page's scrollbar: a slithering snake on the right edge
+   (ScrollSpine.tsx: dragging, and the progress where CSS cannot draw it). The native scrollbar of
+   the public pages is hidden while the snake works (html.snake-bar, set by MOTION_BOOT /
+   ScrollSpine: only with JS; MOTION_BOOT takes it off again if the snake's script never runs);
+   the admin has its own root layout and stylesheet and keeps its scrollbars. Inner scrollers
+   (the mobile menu, the covers strip) keep theirs.
    ========================================================= */
+html.snake-bar { scrollbar-width: none; } /* Firefox, Chrome 121+, Safari 18.2+ */
+html.snake-bar::-webkit-scrollbar, html.snake-bar body::-webkit-scrollbar { display: none; width: 0; height: 0; } /* older Chromium / WebKit */
+html:not(.snake-bar) .spine { display: none; }
+
+/* --spine-r: gap to the right edge, --spine-w: the snake's column; below the mobile menu (95) and
+   the lightbox (top layer), hidden while either holds the page (lockScroll: html.scroll-locked) */
 .spine {
-  position: fixed; z-index: 80; right: 10px; top: calc(var(--hdr-h) + 18px); bottom: 26px; width: 22px;
+  --spine-r: 10px; --spine-w: 22px;
+  position: fixed; z-index: 80;
+  right: calc(var(--spine-r) + env(safe-area-inset-right)); top: calc(var(--hdr-h) + 18px); bottom: calc(26px + env(safe-area-inset-bottom));
+  width: var(--spine-w);
   pointer-events: none;
 }
+.spine.is-flat, .scroll-locked .spine { visibility: hidden; }
 .spine__track, .spine__fill { position: absolute; inset: 0; overflow: hidden; }
 .spine__fill { clip-path: inset(0 0 100% 0); }
 .spine__wave {
@@ -263,15 +284,20 @@ main:focus { outline: none; }
   animation: slither 2.6s linear infinite;
 }
 .spine__wave path { fill: none; vector-effect: non-scaling-stroke; }
-.spine__track path { stroke: rgba(139, 139, 139, .45); stroke-width: 1.2; stroke-dasharray: 2 5; }
+.spine__track path { stroke: rgba(139, 139, 139, .45); stroke-width: 1.2; stroke-dasharray: 2 5; transition: stroke .25s; }
 .spine__fill path { stroke: var(--white); stroke-width: 2; }
 /* keep the white snake readable where it crosses the beige newspaper page */
 .spine__fill .spine__wave { filter: drop-shadow(1px 0 0 var(--black)) drop-shadow(-1px 0 0 var(--black)); }
 @keyframes slither { to { transform: translateY(-20%); } }
-.spine__head { position: absolute; left: 50%; top: 0; width: 0; height: 0; will-change: transform; }
+/* (the head's offset along the track: its translate here, its transform from ScrollSpine elsewhere).
+   The head box is as tall as the spine (zero width): its own 100% is the track's length, so the
+   head and the filled body (clip-path in % of the same box) follow every change of the spine's
+   height together — the browser toolbar showing / hiding. Drawn at its top: ::before, the tongue, the grip. */
+.spine__head { position: absolute; left: 50%; top: 0; width: 0; height: 100%; will-change: transform; }
 .spine__head::before {
   content: ""; position: absolute; left: -5px; top: -6px; width: 10px; height: 12px;
   background: var(--white); clip-path: polygon(50% 0, 100% 30%, 80% 100%, 20% 100%, 0 30%);
+  transition: scale .25s var(--ease);
 }
 .spine__head { filter: drop-shadow(0 0 1.5px var(--black)); }
 .spine__tongue {
@@ -282,7 +308,65 @@ main:focus { outline: none; }
   transform-origin: 50% 0; animation: flick 3.2s infinite;
 }
 @keyframes flick { 0%, 82%, 100% { transform: scaleY(.25); } 86% { transform: scaleY(1); } 90% { transform: scaleY(.6); } 94% { transform: scaleY(1); } }
-.spine-x { display: none; }
+/* touch screens: it slithers and flicks while the page scrolls — ScrollSpine sets .is-idle a
+   moment after the scroll stops, so a page the visitor is reading draws no frame for it */
+.spine.is-idle .spine__wave, .spine.is-idle .spine__tongue, .spine.is-flat .spine__wave, .spine.is-flat .spine__tongue { animation-play-state: paused; }
+
+/* Progress drawn by the browser where it has scroll timelines (Chrome 115+, Safari 26+): from the
+   first paint — before hydration, without the app bundle — and with no script while scrolling;
+   ScrollSpine draws it elsewhere. The head travels its own height (100%: the spine's — not 100cqh,
+   which Chrome on Android left stale when the toolbar hid, the head trailing the filled body).
+   Not motion but the scroll position: it runs with reduced motion too, hence !important against
+   the «prefers-reduced-motion» reset at the end of this file. */
+@supports (animation-timeline: scroll()) {
+  .spine__fill, .spine__head {
+    animation-duration: 1ms !important; animation-timing-function: linear !important; animation-fill-mode: both !important;
+    animation-timeline: scroll(root block) !important;
+  }
+  .spine__fill { animation-name: spine-fill !important; }
+  .spine__head { animation-name: spine-head !important; }
+}
+@keyframes spine-fill { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0% 0); } }
+@keyframes spine-head { from { translate: 0 0; } to { translate: 0 100%; } }
+
+/* Hit areas (the only parts that take the pointer). Mouse / trackpad (touch-action: none): the
+   track is the snake's column (22 px), the head a 32 px square around it. Touch screens: both stay
+   in the side gutter (--spine-hit: the gutter, or the snake's column from the edge where that is
+   wider — the iPad's): the track takes no touches (a swipe or a tap at the edge is the page's own
+   scroll) and the head, the gutter's width and 64 px tall (over the tongue too), lets the browser
+   pan as well (touch-action: pan-y) — a finger takes it only after holding it still (ScrollSpine
+   TOUCH_HOLD_MS); grabbed at once, a thumb near the right edge threw the page screens away. */
+.spine__rail, .spine__grip {
+  position: absolute; pointer-events: auto; touch-action: none;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+.spine__rail { top: 0; bottom: 0; left: 0; right: 0; cursor: pointer; }
+.spine__grip { left: -16px; top: -14px; width: 32px; height: 32px; cursor: grab; }
+/* the same query: ScrollSpine TOUCH_HITS_QUERY */
+@media (hover: none), (pointer: coarse) {
+  .spine { --spine-hit: max(var(--side), calc(var(--spine-r) + var(--spine-w))); }
+  .spine__rail { pointer-events: none; }
+  .spine__grip { left: calc(var(--spine-r) + var(--spine-w) / 2 - var(--spine-hit)); top: -28px; width: var(--spine-hit); height: 64px; touch-action: pan-y; }
+}
+/* mouse / trackpad: pointing at the snake (or holding it) brightens its dashes and enlarges the head */
+@media (hover: hover) and (pointer: fine) {
+  .spine:hover .spine__track path, .spine.is-held .spine__track path { stroke: rgba(255, 255, 255, .7); }
+  .spine:hover .spine__head::before, .spine.is-held .spine__head::before { scale: 1.3; }
+}
+/* held by a finger (after the hold on a touch screen): the head grows, as on hover with a mouse */
+.spine.is-held .spine__head::before { scale: 1.3; }
+/* while the snake is held: the grabbing cursor everywhere, no text selection */
+html.spine-drag, html.spine-drag * { cursor: grabbing !important; -webkit-user-select: none !important; user-select: none !important; }
+/* forced colours (Windows high contrast…): the native scrollbar is hidden all the same, so the
+   snake is drawn in the visitor's system colours instead of being forced to the background */
+@media (forced-colors: active) {
+  .spine { forced-color-adjust: none; }
+  .spine .spine__track path, .spine:hover .spine__track path, .spine.is-held .spine__track path { stroke: GrayText; }
+  .spine__fill path { stroke: CanvasText; }
+  .spine__fill .spine__wave, .spine__head { filter: none; }
+  .spine__head::before { background: CanvasText; }
+  .spine__tongue { background: Highlight; }
+}
 
 /* =========================================================
    HEADER
@@ -308,15 +392,21 @@ main:focus { outline: none; }
 .hdr__word { width: 118px; height: 15px; }
 .hdr__tools { display: flex; align-items: center; gap: 10px; margin-left: -12px; }
 
-.nav { margin-left: auto; }
+/* six items on one line with the logo and RU / EN: the type steps down with the width (RESPONSIVE).
+   The labels are edited in the admin: should they ever outgrow the line (a longer label, the
+   fallback font during the swap), the menu is cut at its end instead of pushing RU / EN off the
+   screen and the page into a sideways scroll — the nav may shrink (min-width 0) and clips; the
+   focus ring is drawn inside the link so the clip never cuts it. */
+.nav { margin-left: auto; min-width: 0; overflow: hidden; }
 .nav__list { display: flex; gap: 4px; }
+.nav__link:focus-visible { outline-offset: -3px; }
 .nav__link {
-  position: relative; display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px;
-  font: 600 12px/1 var(--f-body); letter-spacing: .14em; text-transform: uppercase; text-decoration: none;
+  position: relative; display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px;
+  font: 600 12px/1 var(--f-body); letter-spacing: .12em; text-transform: uppercase; text-decoration: none; white-space: nowrap;
   color: rgba(255, 255, 255, .78); transition: color .3s;
 }
 .nav__link::after {
-  content: ""; position: absolute; left: 14px; right: 14px; bottom: 9px; height: 2px;
+  content: ""; position: absolute; left: 12px; right: 12px; bottom: 9px; height: 2px;
   background: currentColor; transform: scaleX(0); transform-origin: right; transition: transform .4s var(--ease);
 }
 .nav__link:hover { color: var(--white); }
@@ -360,22 +450,43 @@ main:focus { outline: none; }
 .mnav__in { position: relative; z-index: 1; max-width: 560px; }
 .mnav__cap { margin-bottom: 18px; rotate: -1deg; }
 .mnav__list li { border-bottom: 1px solid rgba(255, 255, 255, .16); }
+/* six items, the caption and the button fit a 375 × 667 screen without scrolling: the size
+   follows the width and the height of the screen (svh fallbacks: «engines without svh» below) */
 .mnav__list a {
-  display: flex; align-items: baseline; gap: 16px; padding: 18px 2px;
-  font: 700 clamp(24px, 7.4vw, 40px)/1.05 var(--f-display); letter-spacing: .04em; text-transform: uppercase;
+  display: flex; align-items: baseline; gap: 16px; padding: clamp(10px, 1.8svh, 18px) 2px;
+  font: 700 clamp(20px, min(7.4vw, 3.6svh), 40px)/1.05 var(--f-display); letter-spacing: .04em; text-transform: uppercase;
   color: var(--white); text-decoration: none;
 }
 .mnav__no { font-size: 12px; letter-spacing: .2em; color: var(--grey); min-width: 2.2em; }
-.mnav__cta { margin-top: 34px; }
+.mnav__cta { margin-top: clamp(20px, 4svh, 34px); }
 
 /* =========================================================
    HERO — the cover / splash page
    ========================================================= */
 .hero {
   position: relative;
-  height: 100vh; height: 100svh; min-height: 580px;
+  height: 100svh; min-height: 580px;
   padding: calc(var(--hdr-h) + 4px) var(--side) var(--side);
 }
+/* Touch screens and in-app browsers (html.hero-px, motion/in-app.ts HERO_PX_CLASS): the host app
+   resizes a WebView (a collapsing menu, a bottom sheet, the keyboard) and 100svh follows it — the
+   cover would change height mid-swipe and everything below it jump. MOTION_BOOT (motion/boot.ts)
+   sets the height in px instead: taken again on a width change or at the top. */
+.hero-px .hero { height: var(--hero-h, 100svh); }
+/* Engines without svh (old in-app WebViews: Chromium < 108, Safari < 15.4) drop an svh value at
+   parse time — or, inside a var() / font shorthand, at computed-value time: the menu items would
+   lose their padding and fall back to the body font, the cover its height. A plain
+   `height: 100vh; height: 100svh` pair would not do: the CSS minifier (modern browser targets)
+   keeps only the last declaration. */
+@supports not (height: 1svh) {
+  .hero { height: 100vh; }
+  .hero-px .hero { height: var(--hero-h, 100vh); }
+  .page--error { min-height: 100vh; }
+  .mnav__list a { padding: 14px 2px; font: 700 clamp(22px, 7.4vw, 40px)/1.05 var(--f-display); }
+  .mnav__cta { margin-top: 26px; }
+}
+/* the cover link + the collection plate laid over it (links cannot nest); they turn away together */
+.splash-wrap { position: relative; height: 100%; }
 .splash {
   position: relative; display: block; height: 100%;
   color: var(--white); text-decoration: none; isolation: isolate; cursor: pointer;
@@ -419,7 +530,30 @@ main:focus { outline: none; }
   translate: -50% -50%;
 }
 .snake { display: block; width: 100%; height: 100%; color: var(--white); overflow: visible; }
-.snake__tongue { color: var(--red); }
+.snake__tongue, .snake__root { color: var(--red); }
+/* the tongue's own layer over the logo: HeroSection TONGUE_BOX (130 250 470 310) as a share of
+   the logo's viewBox (90 40 1230 2370); the flick pivots on the tongue's root (586 314) */
+.snake-tongue {
+  position: absolute; left: 3.252%; top: 8.861%; width: 38.211%; height: 13.08%;
+  overflow: visible; transform-origin: 97.021% 20.645%;
+}
+/* «tongue flick»: retract (0.14 s power2.in), shoot out turning (0.16 s power2.out), quiver
+   between -5° and 4° (4 × 0.07 s sine.inOut), settle (0.18 s power2.out), then 2.4 s at rest —
+   3.16 s a cycle; the cover's from 3.2 s on the intro clock (1.1 s after it shot out, + 0.6 s),
+   the close-up's 0.6 s after the first paint. The transform of an element that is a layer of its
+   own: the compositor runs it, nothing is repainted. Paused off screen (offscreen-loops.ts). */
+.motion .snake-tongue { animation: tongue-flick 3.16s 3.2s infinite; }
+.motion .closeup__tongue { animation: tongue-flick 3.16s .6s infinite; }
+@keyframes tongue-flick {
+  0% { transform: rotate(0deg) scaleX(1); animation-timing-function: cubic-bezier(.55, .085, .68, .53); }
+  4.43% { transform: rotate(0deg) scaleX(.15); animation-timing-function: cubic-bezier(.25, .46, .45, .94); }
+  9.494% { transform: rotate(-5deg) scaleX(1.06); animation-timing-function: cubic-bezier(.445, .05, .55, .95); }
+  11.709% { transform: rotate(4deg) scaleX(1.06); animation-timing-function: cubic-bezier(.445, .05, .55, .95); }
+  13.924% { transform: rotate(-5deg) scaleX(1.06); animation-timing-function: cubic-bezier(.445, .05, .55, .95); }
+  16.139% { transform: rotate(4deg) scaleX(1.06); animation-timing-function: cubic-bezier(.445, .05, .55, .95); }
+  18.354% { transform: rotate(-5deg) scaleX(1.06); animation-timing-function: cubic-bezier(.25, .46, .45, .94); }
+  24.051%, 100% { transform: rotate(0deg) scaleX(1); }
+}
 .splash__band {
   position: absolute; left: 0; right: 0; top: 50%; z-index: 2;
   translate: 0 -50%;
@@ -443,6 +577,17 @@ main:focus { outline: none; }
 .splash__cap { position: absolute; z-index: 6; }
 .splash__cap--tl { top: clamp(16px, 2.2vw, 30px); left: clamp(16px, 2.2vw, 30px); rotate: -1.5deg; }
 .splash__cap--br { bottom: clamp(56px, 6vw, 84px); right: clamp(16px, 2.2vw, 30px); rotate: 1deg; }
+/* the plate as a button to the collection page: the same plate, an arrow, it lifts off the page */
+.splash__cta {
+  text-decoration: none; cursor: pointer;
+  transition: transform .28s var(--ease), box-shadow .28s var(--ease), background-color .28s var(--ease);
+}
+.splash__cta::before { content: ""; position: absolute; inset: -8px -6px; } /* tap target >= 44 px, the plate keeps its size */
+.splash__go { display: inline-block; margin-left: .55em; transition: transform .28s var(--ease); }
+.splash__cta:hover, .splash__cta:focus-visible { transform: translate(-2px, -3px); box-shadow: 7px 7px 0 var(--blue); background-color: #EBD9BA; }
+.splash__cta:hover .splash__go, .splash__cta:focus-visible .splash__go { transform: translateX(4px); }
+.splash__cta:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--blue); transition-duration: .08s; }
+.splash__cta:focus-visible { outline-offset: 4px; }
 .splash__corner {
   position: absolute; z-index: 6; top: clamp(16px, 2.2vw, 30px); right: clamp(16px, 2.2vw, 30px);
   display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right;
@@ -560,19 +705,40 @@ main:focus { outline: none; }
    the scenes set first (src/components/site/motion/effects.ts), so content is never painted
    finished, hidden at setup and animated in again. Failsafe: the class goes 4 s after `load`
    when the app bundle never ran. */
-.motion-pending.motion [data-scene-pending] .chapter__sheet { opacity: 1; }
-.motion-pending.motion [data-scene-pending] [data-wipe]:not([data-wipe-now]) { clip-path: inset(0% 100% 0% 0%); }
-.motion-pending.motion [data-scene-pending] [data-wipe="right"]:not([data-wipe-now]) { clip-path: inset(0% 0% 0% 100%); }
-.motion-pending.motion [data-scene-pending] [data-wipe="up"]:not([data-wipe-now]) { clip-path: inset(100% 0% 0% 0%); }
-.motion-pending.motion [data-scene-pending] [data-wipe="down"]:not([data-wipe-now]) { clip-path: inset(0% 0% 100% 0%); }
-.motion-pending.motion [data-scene-pending] [data-wipe="diag"]:not([data-wipe-now]) { clip-path: polygon(0% 0%, 0% 0%, 0% 0%); }
-.motion-pending.motion [data-scene-pending] [data-reveal],
-.motion-pending.motion [data-scene-pending] .cover,
-.motion-pending.motion [data-scene-pending] .coupon { opacity: 0; }
-.motion-pending.motion [data-scene-pending] .say { clip-path: inset(0% 100% 0% 0%); }
-.motion-pending.motion [data-scene-pending] .say--b, .motion-pending.motion [data-scene-pending] .say--c { clip-path: inset(0% 0% 0% 100%); }
-.motion-pending.motion [data-scene-pending] .ftr__word { clip-path: inset(0% 100% 0% 0%); }
-.motion-pending.motion [data-scene-pending] .ftr__tbc { opacity: 0; }
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) .chapter__sheet { opacity: 1; }
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) [data-wipe]:not([data-wipe-now]) { clip-path: inset(0% 100% 0% 0%); }
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) [data-wipe="right"]:not([data-wipe-now]) { clip-path: inset(0% 0% 0% 100%); }
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) [data-wipe="up"]:not([data-wipe-now]) { clip-path: inset(100% 0% 0% 0%); }
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) [data-wipe="down"]:not([data-wipe-now]) { clip-path: inset(0% 0% 100% 0%); }
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) [data-wipe="diag"]:not([data-wipe-now]) { clip-path: polygon(0% 0%, 0% 0%, 0% 0%); }
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) [data-reveal],
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) .cover,
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) .coupon { opacity: 0; }
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) .say { clip-path: inset(0% 100% 0% 0%); }
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) .say--b, .motion-pending.motion [data-scene-pending]:not([data-scene-late]) .say--c { clip-path: inset(0% 0% 0% 100%); }
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) .ftr__word { clip-path: inset(0% 100% 0% 0%); }
+.motion-pending.motion [data-scene-pending]:not([data-scene-late]) .ftr__tbc { opacity: 0; }
+
+/* LITE MOTION — in-app browsers (html.motion-lite, motion/in-app.ts): no scroll scenes, the page
+   is drawn in its final state (no start states: no motion-pending). What the scenes did on the
+   way out of view is redone where it costs nothing on the main thread: the red band's endless
+   run as a CSS marquee (the GSAP loop: xPercent -50 in 42 s; no speed-up with the swipe), and,
+   with scroll-driven animations, the cover turning away like a page (HeroScene: scale .93,
+   -1.2°, opacity .35 while the cover scrolls off), its SFX drifting up (-120 %) and the band's
+   drift (xPercent 2 → -2 while it crosses the screen). Colour on centred photos: motion/lite.ts. */
+.motion-lite .band__track { animation: marquee 42s linear infinite; }
+@supports (animation-timeline: view()) {
+  /* inset 0: the default (auto) would take the header's scroll-padding off the viewport; the
+     scenes' ScrollTrigger ranges ("top top" …) are against the bare viewport */
+  .motion-lite .hero { view-timeline: --cover block; view-timeline-inset: 0px; }
+  .motion-lite .splash-wrap { animation: lite-cover-turn 1ms linear both; animation-timeline: --cover; animation-range: exit-crossing 0% exit-crossing 100%; }
+  .motion-lite .sfx--hiss { animation: lite-sfx-drift 1ms linear both; animation-timeline: --cover; animation-range: exit-crossing 0% exit-crossing 100%; }
+  .motion-lite .band { view-timeline: --band block; view-timeline-inset: 0px; }
+  .motion-lite .band__rot { animation: lite-band-drift 1ms linear both; animation-timeline: --band; animation-range: cover 0% cover 100%; }
+}
+@keyframes lite-cover-turn { to { scale: .93; rotate: -1.2deg; opacity: .35; } }
+@keyframes lite-sfx-drift { to { translate: 0 -120%; } }
+@keyframes lite-band-drift { from { translate: 2% 0; } to { translate: -2% 0; } }
 
 /* First-viewport panels of the collection page (data-wipe-now="<order>"): the ink wipe and the
    photo settle of panelWipes (effects.ts), run by CSS from the first paint instead of after
@@ -592,21 +758,21 @@ main:focus { outline: none; }
 /* Chapters of the landing are rendered only when near the viewport (content-visibility: auto):
    no style / layout / paint / image or font requests for the rest of the page at load. Until a
    chapter was rendered once its height is an estimate per chapter and breakpoint (measured;
-   the order of the chapters comes from the DB, so they are keyed by id); `auto` then keeps its
-   real height (SmoothScroll renders each chapter once after load, in idle time, to learn it).
+   they are keyed by id); `auto` then keeps its real height. A chapter is rendered when it nears
+   the viewport — below it while scrolling down, so the change moves nothing on screen; above it
+   only after a deep link, when scroll anchoring keeps the screen still. Nothing renders chapters
+   ahead of time: forcing that (collapsing and regrowing them in idle time) changed the height of
+   chapters above the screen, mid-swipe in a WebView. Anchor scrolls follow the target as it
+   moves (SmoothScroll tweenScroll).
    The paint containment that comes with it clips at the border box: the news page's torn
    edges stick out 13 px (overflow-clip-margin). Hero, red band and footer are not chapters.
    Only in engines with scroll anchoring (@supports overflow-anchor): a chapter above the screen
    that is rendered for the first time (after a deep link) changes its height from the estimate
    to the real one, and only scroll anchoring keeps the content on screen from moving then —
    Safari (no scroll anchoring) lays the chapters out normally. */
-/* Art held back (the two rules below): an empty mask, never `none` — `mask-image: none` is no
+/* Art held back (the gate's rules below): an empty mask, never `none` — `mask-image: none` is no
    mask at all, and .mask-img would paint as a solid block of its colour. A gradient requests
    nothing. */
-/* rendered off screen only to learn its height (chapter-sizes.ts): its CSS images are not
-   fetched then — they load when the chapter nears the screen */
-main > section.page[data-warming] .mask-img { --src: linear-gradient(#0000, #0000); }
-main > section.page[data-warming] .say__fig { background-image: none; }
 /* Near-viewport gate (motion/boot.ts NEAR_GATE, production, JS only): a chapter or the footer
    not yet near the viewport ([data-near]: 1.5 screens ahead for a chapter, half a screen for the
    footer) requests neither its brand art nor the hand-lettering face, however early the browser
@@ -620,9 +786,10 @@ html.near-gate :is(main > section.page[id], .ftr):not([data-near]),
 html.near-gate .glyph-warm { --f-letter: "Shantell Sans Fallback", var(--font-montserrat), system-ui, sans-serif; }
 @supports (overflow-anchor: auto) {
   main > section.page[id] { content-visibility: auto; contain-intrinsic-block-size: auto 1400px; overflow-clip-margin: 14px; }
-  /* content height estimates (border box measured at 390 / 768 / 1440 px, minus the padding) */
+  /* content height estimates (border box measured at 390 / 768 / 1440 px, minus the padding;
+     ru, then en — its text runs shorter) */
   #catalog { contain-intrinsic-block-size: auto 1450px; }
-  #about { contain-intrinsic-block-size: auto 1705px; }
+  #about { contain-intrinsic-block-size: auto 1780px; }
   #tailoring { contain-intrinsic-block-size: auto 1860px; }
   #reviews { contain-intrinsic-block-size: auto 1705px; }
   #news { contain-intrinsic-block-size: auto 1295px; }
@@ -630,6 +797,15 @@ html.near-gate .glyph-warm { --f-letter: "Shantell Sans Fallback", var(--font-mo
   #offers { contain-intrinsic-block-size: auto 1185px; }
   #partners { contain-intrinsic-block-size: auto 1070px; }
   #contacts { contain-intrinsic-block-size: auto 1370px; }
+  html:lang(en) #catalog { contain-intrinsic-block-size: auto 1447px; }
+  html:lang(en) #about { contain-intrinsic-block-size: auto 1672px; }
+  html:lang(en) #tailoring { contain-intrinsic-block-size: auto 1677px; }
+  html:lang(en) #reviews { contain-intrinsic-block-size: auto 1676px; }
+  html:lang(en) #news { contain-intrinsic-block-size: auto 1269px; }
+  html:lang(en) #gallery { contain-intrinsic-block-size: auto 1052px; }
+  html:lang(en) #offers { contain-intrinsic-block-size: auto 1081px; }
+  html:lang(en) #partners { contain-intrinsic-block-size: auto 1001px; }
+  html:lang(en) #contacts { contain-intrinsic-block-size: auto 1324px; }
   @media (min-width: 700px) {
     #catalog { contain-intrinsic-block-size: auto 2105px; }
     #about { contain-intrinsic-block-size: auto 1710px; }
@@ -640,6 +816,15 @@ html.near-gate .glyph-warm { --f-letter: "Shantell Sans Fallback", var(--font-mo
     #offers { contain-intrinsic-block-size: auto 1010px; }
     #partners { contain-intrinsic-block-size: auto 825px; }
     #contacts { contain-intrinsic-block-size: auto 1295px; }
+    html:lang(en) #catalog { contain-intrinsic-block-size: auto 2129px; }
+    html:lang(en) #about { contain-intrinsic-block-size: auto 1621px; }
+    html:lang(en) #tailoring { contain-intrinsic-block-size: auto 1195px; }
+    html:lang(en) #reviews { contain-intrinsic-block-size: auto 1155px; }
+    html:lang(en) #news { contain-intrinsic-block-size: auto 1651px; }
+    html:lang(en) #gallery { contain-intrinsic-block-size: auto 909px; }
+    html:lang(en) #offers { contain-intrinsic-block-size: auto 854px; }
+    html:lang(en) #partners { contain-intrinsic-block-size: auto 736px; }
+    html:lang(en) #contacts { contain-intrinsic-block-size: auto 1270px; }
   }
   @media (min-width: 1024px) {
     #catalog { contain-intrinsic-block-size: auto 1525px; }
@@ -651,6 +836,15 @@ html.near-gate .glyph-warm { --f-letter: "Shantell Sans Fallback", var(--font-mo
     #offers { contain-intrinsic-block-size: auto 1175px; }
     #partners { contain-intrinsic-block-size: auto 1070px; }
     #contacts { contain-intrinsic-block-size: auto 1125px; }
+    html:lang(en) #catalog { contain-intrinsic-block-size: auto 1546px; }
+    html:lang(en) #about { contain-intrinsic-block-size: auto 1564px; }
+    html:lang(en) #tailoring { contain-intrinsic-block-size: auto 1280px; }
+    html:lang(en) #reviews { contain-intrinsic-block-size: auto 1553px; }
+    html:lang(en) #news { contain-intrinsic-block-size: auto 1005px; }
+    html:lang(en) #gallery { contain-intrinsic-block-size: auto 1459px; }
+    html:lang(en) #offers { contain-intrinsic-block-size: auto 1037px; }
+    html:lang(en) #partners { contain-intrinsic-block-size: auto 962px; }
+    html:lang(en) #contacts { contain-intrinsic-block-size: auto 1126px; }
   }
 }
 .folio {
@@ -882,7 +1076,7 @@ a.series-tabs__tab:not(.is-active) { border: 1.5px solid rgba(255, 255, 255, .55
 .closeup__ink, .closeup__tongue { position: absolute; inset: 0; }
 .closeup__ink { color: var(--black); }
 .closeup__tongue { color: var(--red); transform-origin: 52.6% 57%; }
-.closeup__cap { position: absolute; z-index: 5; left: clamp(14px, 1.6vw, 22px); bottom: clamp(14px, 1.6vw, 22px); max-width: min(80%, 40ch); rotate: -1deg; }
+.closeup__cap { position: absolute; z-index: 5; right: clamp(14px, 1.6vw, 22px); bottom: clamp(14px, 1.6vw, 22px); max-width: min(80%, 40ch); rotate: -1deg; }
 .sfx--tss { right: 5%; top: 9%; rotate: -8deg; }
 
 /* =========================================================
@@ -1284,6 +1478,27 @@ a.slot__name::before { content: ""; position: absolute; inset: -14px -10px; } /*
   font-size: 13px; color: var(--grey);
 }
 .ftr__copy { font: 700 12px/1 var(--f-display); letter-spacing: .24em; color: var(--white); }
+/* © and, under it, the trademark notice — a small-caps line with a beige stamped ® like the
+   narration plates. */
+.ftr__legal { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; text-align: left; }
+.ftr__tm {
+  display: flex; align-items: center; gap: 10px; max-width: 30em;
+  font: 600 10px/1.45 var(--f-display); letter-spacing: .16em; text-transform: uppercase; color: var(--grey);
+}
+/* From tablet up the row stays one line — ©/®, menu, «Наверх»: the menu takes the space between
+   and wraps its own items when it runs short, so «Наверх» never drops onto a line of its own. */
+@media (min-width: 700px) {
+  .ftr__row { flex-wrap: nowrap; }
+  .ftr__legal { flex: 0 1 auto; max-width: 300px; }
+  .ftr__nav { flex: 1 1 auto; min-width: 0; justify-content: center; }
+  .ftr__top { flex: none; }
+}
+.ftr__tm > span:last-child { text-wrap: balance; }
+.ftr__tm-mark {
+  flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px;
+  background: var(--beige); color: var(--black); box-shadow: 2px 2px 0 var(--blue);
+  font: 700 12px/1 var(--f-body); letter-spacing: 0; rotate: -4deg;
+}
 .ftr__nav { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .ftr__nav a, .ftr__top {
   display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; color: var(--grey);
@@ -1309,7 +1524,7 @@ a.slot__name::before { content: ""; position: absolute; inset: -14px -10px; } /*
 .covers--page .cover__more { flex: 1 1 auto; }
 .covers--page .cover__card { aspect-ratio: 2 / 3; }
 
-.page--error { min-height: 100vh; min-height: 100svh; padding-top: var(--hdr-h); }
+.page--error { min-height: 100svh; padding-top: var(--hdr-h); }
 .err-panel { grid-column: span 7; display: flex; flex-direction: column; align-items: flex-start; }
 .err-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 28px; }
 .err-actions .link-btn { margin-top: 30px; }
@@ -1323,9 +1538,15 @@ a.slot__name::before { content: ""; position: absolute; inset: -14px -10px; } /*
 /* =========================================================
    RESPONSIVE
    ========================================================= */
+@media (max-width: 1299px) {
+  .nav__link { padding: 0 9px; font-size: 11px; letter-spacing: .1em; }
+  .nav__link::after { left: 9px; right: 9px; }
+}
 @media (max-width: 1180px) {
-  .nav__link { padding: 0 10px; letter-spacing: .1em; }
-  .nav__link::after { left: 10px; right: 10px; }
+  .hdr__in { gap: 16px; }
+  .nav__list { gap: 2px; }
+  .nav__link { padding: 0 7px; font-size: 10px; letter-spacing: .06em; }
+  .nav__link::after { left: 7px; right: 7px; bottom: 11px; }
 }
 
 @media (max-width: 1023px) {
@@ -1334,9 +1555,10 @@ a.slot__name::before { content: ""; position: absolute; inset: -14px -10px; } /*
   .burger { display: block; }
   .lang { border-left: 0; padding-left: 0; }
   .hdr__tools { margin-left: auto; }
-  .spine { display: none; }
-  .spine-x { display: block; position: fixed; z-index: 99; left: 0; right: 0; top: var(--hdr-h); height: 2px; pointer-events: none; }
-  .spine-x span { display: block; height: 100%; background: var(--white); transform: scaleX(0); transform-origin: 0 50%; }
+  /* the snake narrower, in the side gutter (--side is 16 px on a phone), from just under the header */
+  .spine { --spine-r: 1px; --spine-w: 14px; top: calc(var(--hdr-h) + 10px); }
+  /* deep links land the product covers with their ink frame (drawn 9 px outside the box) in view */
+  .cover[id] { scroll-margin-top: 12px; }
 
   .intro, .series-card { grid-column: 1 / -1; }
   .say--a, .say--b, .say--c, .say--d { grid-column: span 6; }
@@ -1421,6 +1643,8 @@ a.slot__name::before { content: ""; position: absolute; inset: -14px -10px; } /*
   .lb__next { right: calc(50% - 64px); }
   .lb__img { width: min(var(--w, 1240px), calc(100vw - 28px), calc((100dvh - 236px) * var(--ar, 1.5))); }
   .ftr__row { justify-content: center; text-align: center; }
+  .ftr__legal { align-items: center; text-align: center; flex-basis: 100%; }
+  .ftr__tm { max-width: 26em; }
   .ftr__nav { justify-content: center; }
   .err-mark { min-height: 200px; }
 }

@@ -44,11 +44,18 @@ describe("seed copy", () => {
 });
 
 describe("chapters", () => {
-  it("follow the owner's order: Каталог → О нас → Индивидуальный пошив → Отзывы …", () => {
-    expect(CHAPTER_ORDER.slice(0, 4)).toEqual(["catalog", "about", "tailoring", "reviews"]);
+  it("follow the owner's order: Каталог → О нас → Пошив → Спецпредложения → Новости → Галерея → Отзывы → Партнёры → Контакты", () => {
+    expect(CHAPTER_ORDER).toEqual(["catalog", "about", "tailoring", "offers", "news", "gallery", "reviews", "partners", "contacts"]);
     expect(chapterNumber("about")).toBe("02");
     expect(chapterNumber("tailoring")).toBe("03");
+    expect(chapterNumber("offers")).toBe("04");
+    expect(chapterNumber("reviews")).toBe("07");
     expect(chapterNumber("contacts")).toBe("09");
+  });
+
+  it("are listed in the admin «Контент» in the same order", () => {
+    const listed = CONTENT_SECTIONS.map((section) => section.id).filter((id) => CHAPTER_ORDER.some((chapter) => chapter === id));
+    expect(listed).toEqual([...CHAPTER_ORDER]);
   });
 
   it("are all anchored sections with content in the admin", () => {

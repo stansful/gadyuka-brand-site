@@ -1,5 +1,5 @@
 import { fragmentId } from "../locale-switch";
-import { SCENE_PENDING_ATTR } from "./env";
+import { liteMotion, SCENE_LATE_ATTR, SCENE_PENDING_ATTR } from "./env";
 import { loadScrollTrigger } from "./gsap";
 
 /**
@@ -19,6 +19,9 @@ import { loadScrollTrigger } from "./gsap";
  * Until its setup ran, a scene root keeps SCENE_PENDING_ATTR, under which CSS draws the start
  * states (noir.css). The boot failsafe (MOTION_BOOT, 4 s after `load`) stays armed until the
  * plugins are in: only then can the scenes take over their start states.
+ *
+ * In-app browsers (lite motion, in-app.ts) never set a scene up: the page is drawn in its final
+ * state (no start states were drawn: no `motion-pending` there) and ScrollTrigger is not loaded.
  */
 
 type Job = {
@@ -94,6 +97,7 @@ function scrollPluginsReady(): Promise<boolean> {
 /** ScrollTrigger could not be loaded: no scene can run — show them all as server-rendered. */
 function giveUp(): void {
   failed = true;
+  window.__gadyukaSettled = true;
   for (const job of [...urgent, ...queue, ...watched.values()]) {
     job.done = true;
     markSceneReady(job.root);
@@ -121,6 +125,9 @@ async function pump(): Promise<void> {
       job.run();
       await yieldToMain();
     }
+    // The scenes near the screen when the app came up are set up: MOTION_BOOT's late gate stops
+    // marking (from now on the scheduler sets scenes up ahead of the screen itself).
+    window.__gadyukaSettled = true;
   } finally {
     pumping = false;
   }
@@ -172,7 +179,7 @@ export function titleFonts(root: ParentNode): Promise<void> {
  * Returns the cancel function (unmount): a scene not set up yet is dropped from the queue.
  */
 export function scheduleScene(root: HTMLElement, run: () => void): () => void {
-  if (failed) {
+  if (failed || liteMotion()) {
     markSceneReady(root);
     return () => undefined;
   }
@@ -182,7 +189,8 @@ export function scheduleScene(root: HTMLElement, run: () => void): () => void {
     // handled where it is awaited (pump), a failed import is retried there.
     loadScrollTrigger().catch(() => undefined);
   }
-  const job: Job = { root, prepare: () => titleFonts(root), run, done: false };
+  // A late scene splits no title the visitor has seen: it does not hold the queue for the fonts.
+  const job: Job = { root, prepare: () => (root.hasAttribute(SCENE_LATE_ATTR) ? Promise.resolve() : titleFonts(root)), run, done: false };
   if (typeof IntersectionObserver === "undefined") {
     enqueue(job, false);
   } else {
@@ -205,5 +213,7 @@ declare global {
   interface Window {
     /** Set once the scroll scenes can run — the scroll plugins are in (the boot failsafe then stays off). */
     __gadyukaApp?: boolean;
+    /** Set once the first round of scene setups is done (or the scenes gave up): MOTION_BOOT's late gate stops. */
+    __gadyukaSettled?: boolean;
   }
 }

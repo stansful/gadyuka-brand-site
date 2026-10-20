@@ -1,34 +1,13 @@
 import { getMessages } from "next-intl/server";
 import type { ReactElement } from "react";
 import { localeNames, locales } from "@/i18n/locales";
-import type { LandingContent, TextKey } from "@/lib/content";
+import type { LandingContent } from "@/lib/content";
 import { LEAD_FORM_ANCHOR, SECTION_ANCHORS } from "@/lib/content";
 import { localizedPath } from "@/lib/seo/site-url";
 import { HeaderClient, type NavItem } from "./chrome/HeaderClient";
 import { splitLanguageTemplate, type LanguageSwitcherProps } from "./labels";
+import { ACTIVE_MAP, NAV } from "./nav";
 import { ScrollSpine } from "./chrome/ScrollSpine";
-
-/** Main menu (same order as the chapters on the page): Главная, Каталог, О нас, Индивидуальный пошив, Контакты. */
-export const NAV: ReadonlyArray<{ key: TextKey; anchor: string }> = [
-  { key: "header.nav.home", anchor: SECTION_ANCHORS.hero },
-  { key: "header.nav.catalog", anchor: SECTION_ANCHORS.catalog },
-  { key: "header.nav.about", anchor: SECTION_ANCHORS.about },
-  { key: "header.nav.tailoring", anchor: SECTION_ANCHORS.tailoring },
-  { key: "header.nav.contacts", anchor: SECTION_ANCHORS.contacts },
-];
-
-/**
- * Section id → highlighted menu item. Chapters between «Индивидуальный пошив» and «Контакты»
- * (reviews, news, gallery, offers, partners) have no menu item, so nothing is highlighted
- * there — the highlight only ever moves forward through the menu.
- */
-const ACTIVE_MAP: Readonly<Record<string, string | null>> = {
-  [SECTION_ANCHORS.hero]: SECTION_ANCHORS.hero,
-  [SECTION_ANCHORS.catalog]: SECTION_ANCHORS.catalog,
-  [SECTION_ANCHORS.about]: SECTION_ANCHORS.about,
-  [SECTION_ANCHORS.tailoring]: SECTION_ANCHORS.tailoring,
-  [SECTION_ANCHORS.contacts]: SECTION_ANCHORS.contacts,
-};
 
 /**
  * Skip link, reading-progress snake and the fixed header (menu + language switcher + mobile

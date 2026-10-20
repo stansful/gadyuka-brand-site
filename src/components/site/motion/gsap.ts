@@ -23,6 +23,15 @@ export function loadScrollTrigger(): Promise<ScrollTriggerPlugin> {
   loading ??= Promise.all([import("gsap/ScrollTrigger"), import("gsap/SplitText")]).then(
     ([scroll, split]) => {
       gsap.registerPlugin(scroll.ScrollTrigger, split.SplitText);
+      // ScrollTrigger's automatic refreshes are full ones (the window scrolled to 0 and back), and
+      // `load` / DOMContentLoaded are forced — they run even mid-swipe. None on touch screens:
+      // there every refresh goes through scheduleRefresh (env.ts / refresh-gate.ts: only once the
+      // page is still), which SmoothScroll calls for `load`, page-height changes, a width change
+      // and a big height change (keyboard, split screen). Mouse / trackpad keep visibilitychange
+      // and resize (GSAP defers those to its scrollEnd itself). Inline matchMedia: env.ts imports
+      // this module.
+      const touch = !window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+      scroll.ScrollTrigger.config({ autoRefreshEvents: touch ? "none" : "visibilitychange,resize" });
       plugins = { ScrollTrigger: scroll.ScrollTrigger, SplitText: split.SplitText };
       return scroll.ScrollTrigger;
     },

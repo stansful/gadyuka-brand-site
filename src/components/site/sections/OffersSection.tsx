@@ -56,7 +56,7 @@ async function CouponButton({
 }
 
 /**
- * Глава 07 · Специальные предложения: the noir red tape, then each published offer as a
+ * Глава 04 · Специальные предложения: the noir red tape, then each published offer as a
  * cut-out coupon. A coupon button leads to the form (topic from its link, the offer as the
  * subject) or to its own link.
  */

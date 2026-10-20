@@ -26,10 +26,10 @@ export const CONTENT_SECTIONS = [
   { id: "catalog", label: "Каталог" },
   { id: "about", label: "О нас" },
   { id: "tailoring", label: "Индивидуальный пошив" },
-  { id: "reviews", label: "Отзывы" },
+  { id: "offers", label: "Специальные предложения" },
   { id: "news", label: "Новости и события" },
   { id: "gallery", label: "Галерея" },
-  { id: "offers", label: "Специальные предложения" },
+  { id: "reviews", label: "Отзывы" },
   { id: "partners", label: "Партнёры" },
   { id: "contacts", label: "Контакты и форма" },
   { id: "footer", label: "Подвал" },
@@ -42,7 +42,8 @@ export type SectionId = (typeof CONTENT_SECTIONS)[number]["id"];
 export { LEAD_FORM_ANCHOR, SECTION_ANCHORS } from "./anchors";
 
 /**
- * Landing chapters in page order: «Глава 01» = catalog … «Глава 09» = contacts.
+ * Landing chapters in page order (the owner's): «Глава 01» = catalog, 02 about, [the red band],
+ * 03 tailoring, 04 offers, 05 news, 06 gallery, 07 reviews, 08 partners, «Глава 09» = contacts.
  * Chapter numbers, folios («— 02 —») and the red band position are derived from this list,
  * so they always follow the actual order of the sections.
  */
@@ -50,10 +51,10 @@ export const CHAPTER_ORDER = [
   "catalog",
   "about",
   "tailoring",
-  "reviews",
+  "offers",
   "news",
   "gallery",
-  "offers",
+  "reviews",
   "partners",
   "contacts",
 ] as const satisfies ReadonlyArray<SectionId>;
@@ -82,6 +83,7 @@ export const CONTENT_BLOCKS = {
   "header.nav.catalog": { section: "header", kind: "TEXT", label: "Меню: Каталог", required: true },
   "header.nav.about": { section: "header", kind: "TEXT", label: "Меню: О нас", required: true },
   "header.nav.tailoring": { section: "header", kind: "TEXT", label: "Меню: Индивидуальный пошив", required: true },
+  "header.nav.offers": { section: "header", kind: "TEXT", label: "Меню: Специальное предложение", required: true },
   "header.nav.contacts": { section: "header", kind: "TEXT", label: "Меню: Контакты", required: true },
   "header.menuCaption": { section: "header", kind: "TEXT", label: "Мобильное меню: подпись над пунктами" },
   "header.cta": { section: "header", kind: "TEXT", label: "Мобильное меню: кнопка «Оставить заявку» (ведёт к форме)", required: true },
@@ -91,7 +93,11 @@ export const CONTENT_BLOCKS = {
   "hero.subtitle": { section: "hero", kind: "TEXT", label: "Продолжение H1 (скрыто, после тире)" },
   "hero.slogan": { section: "hero", kind: "TEXT", label: "Слоган под вордмарком" },
   "hero.captionTop": { section: "hero", kind: "TEXT", label: "Подпись-плашка слева вверху" },
-  "hero.captionBottom": { section: "hero", kind: "TEXT", label: "Подпись-плашка справа внизу" },
+  "hero.captionBottom": {
+    section: "hero",
+    kind: "TEXT",
+    label: "Плашка справа внизу — кнопка: ведёт на первую опубликованную коллекцию (первую по порядку в разделе «Коллекции»)",
+  },
   "hero.issue": { section: "hero", kind: "TEXT", label: "Сезон / выпуск в углу обложки (крупно)" },
   "hero.issueMeta": { section: "hero", kind: "TEXT", label: "Строка под сезоном (город · год)" },
   "hero.sfx": { section: "hero", kind: "TEXT", label: "Звукоподражание на обложке" },
@@ -122,7 +128,8 @@ export const CONTENT_BLOCKS = {
   "about.imageCaption": { section: "about", kind: "TEXT", label: "Плашка на фото" },
   "about.sfx": { section: "about", kind: "TEXT", label: "Звукоподражание на фото" },
   "about.text": { section: "about", kind: "RICHTEXT", label: "Текст" },
-  "about.cta": { section: "about", kind: "TEXT", label: "Кнопка «Отзывы покупателей»", required: true },
+  "about.cta": { section: "about", kind: "TEXT", label: "Кнопка «Отзывы покупателей» (ведёт к отзывам)", required: true },
+  "about.partnersCta": { section: "about", kind: "TEXT", label: "Кнопка «Партнёры бренда» (ведёт к партнёрам)", required: true },
   "about.advantages.0.title": { section: "about", kind: "TEXT", label: "Преимущество 1: заголовок" },
   "about.advantages.0.text": { section: "about", kind: "TEXT", label: "Преимущество 1: текст" },
   "about.advantages.1.title": { section: "about", kind: "TEXT", label: "Преимущество 2: заголовок" },
@@ -219,6 +226,7 @@ export const CONTENT_BLOCKS = {
   "footer.end": { section: "footer", kind: "TEXT", label: "Плашка над «Продолжение следует…»" },
   "footer.tbc": { section: "footer", kind: "TEXT", label: "«Продолжение следует…»" },
   "footer.copyright": { section: "footer", kind: "TEXT", label: "Копирайт (год добавляется автоматически)" },
+  "footer.trademark": { section: "footer", kind: "TEXT", label: "Строка о товарном знаке под подвалом (пусто в обоих языках — не показывать; пустой EN покажет русский текст)" },
   "footer.top": { section: "footer", kind: "TEXT", label: "Ссылка «Наверх»", required: true },
 
   // ── common ───────────────────────────────────────────────────────────────

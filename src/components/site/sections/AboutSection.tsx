@@ -14,7 +14,10 @@ const ADVANTAGES: ReadonlyArray<{ title: TextKey; text: TextKey; className: stri
   { title: "about.advantages.2.title", text: "about.advantages.2.text", className: "panel panel--blue point scales" },
 ];
 
-/** Глава 02 · О нас — «Преимущества бренда Гадюка»: photo panel, text + «Отзывы покупателей», three advantages, the snake close-up. */
+/**
+ * Глава 02 · О нас — «Преимущества бренда Гадюка»: photo panel, text + «Отзывы покупателей» and
+ * «Партнёры бренда», three advantages, the snake close-up.
+ */
 export function AboutSection({ content }: { content: LandingContent }): ReactElement {
   const { texts, images } = content;
   return (
@@ -52,11 +55,19 @@ export function AboutSection({ content }: { content: LandingContent }): ReactEle
 
           <div className="panel panel--ink a-text" data-wipe="left">
             <RichText text={texts["about.text"]} editKey="about.text" className="lead" />
-            <a className="btn btn--blue" href={`#${SECTION_ANCHORS.reviews}`}>
-              <span className="btn__face">
-                <span data-edit="about.cta">{texts["about.cta"]}</span> <span aria-hidden="true">↓</span>
-              </span>
-            </a>
+            {/* «Партнёры бренда» has no menu item: this is the way to that chapter from «О нас». */}
+            <div className="btn-row">
+              <a className="btn btn--blue" href={`#${SECTION_ANCHORS.reviews}`}>
+                <span className="btn__face">
+                  <span data-edit="about.cta">{texts["about.cta"]}</span> <span aria-hidden="true">↓</span>
+                </span>
+              </a>
+              <a className="btn btn--blue" href={`#${SECTION_ANCHORS.partners}`}>
+                <span className="btn__face">
+                  <span data-edit="about.partnersCta">{texts["about.partnersCta"]}</span> <span aria-hidden="true">↓</span>
+                </span>
+              </a>
+            </div>
           </div>
 
           {ADVANTAGES.map((item, index) => (

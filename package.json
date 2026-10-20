@@ -9,7 +9,7 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "postbuild": "node scripts/clean-standalone-env.mjs",
-    "start": "next start --port 3000",
+    "start": "next start --port 3001",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",

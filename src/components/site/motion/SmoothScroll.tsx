@@ -5,15 +5,16 @@ import { useEffect } from "react";
 import { SECTION_ANCHORS } from "@/lib/content/anchors";
 import { LEAD_INTENT_EVENT, parseLeadIntent } from "@/lib/lead-intent";
 import { fragmentId } from "../locale-switch";
-import { learnChapterSizes } from "./chapter-sizes";
 import { layoutTop } from "./dom-utils";
-import { motionEnabled, scheduleRefresh } from "./env";
+import { hasFinePointer, isTouchScreen, liteMotion, motionEnabled, onRefreshed, scheduleRefresh, trackScrollActivity } from "./env";
 import { NAVIGATE_EVENT } from "./events";
-import { gsap, loadedScrollTrigger, loadScrollTrigger } from "./gsap";
+import { gsap, loadScrollTrigger } from "./gsap";
 import { setLenis } from "./lenis-store";
+import { startLiteMotion } from "./lite";
 import { pauseLoopsOffscreen } from "./offscreen-loops";
-
-const easeOutQuart = (t: number): number => 1 - Math.pow(1 - t, 4);
+import { heightChangeNeedsRefresh } from "./refresh-gate";
+import { clampScroll, pageScroll, tweenScroll, USER_SCROLL_EVENTS } from "./scroll-tween";
+import { visitorActed } from "./tap-guard";
 
 /**
  * The header offset comes from CSS: html { scroll-padding-top: var(--hdr-h) } (+ scroll-margin
@@ -22,12 +23,6 @@ const easeOutQuart = (t: number): number => 1 - Math.pow(1 - t, 4);
  */
 const UNDER_HEADER_PX = 2;
 
-/** Things the visitor does that end the deep-link alignment (they are scrolling on their own). */
-const USER_SCROLL_EVENTS = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
-
-/** Duration of an anchor scroll (s), with Lenis and without. */
-const ANCHOR_DURATION = 1.5;
-
 /**
  * Lenis only smooths wheel scrolling (smoothWheel; touch is never smoothed), so it runs for
  * mouse / trackpad visitors only. Touch screens scroll natively: no non-passive wheel / touch
@@ -35,50 +30,16 @@ const ANCHOR_DURATION = 1.5;
  */
 const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
 
-/** Document y the page scrolls to for `el`: its layout top minus the header (scroll-padding) and its scroll-margin. */
-function anchorScrollTop(el: HTMLElement): number {
+/** The header (scroll-padding of <html>) + the element's scroll-margin: what an anchor scroll leaves above `el`. */
+function anchorInset(el: HTMLElement): number {
   const padding = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
   const margin = Number.parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
-  return Math.max(0, layoutTop(el) - padding - margin);
+  return padding + margin;
 }
 
-function maxScroll(): number {
-  return Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-}
-
-/**
- * Anchor scroll without Lenis (touch screens): the same curve as Lenis' scrollTo (1.5 s
- * easeOutQuart) drawn with window.scrollTo, stopped as soon as the visitor scrolls, taps or
- * presses a key. Returns the cancel function.
- */
-function tweenWindowScroll(top: number, onDone: () => void): () => void {
-  const from = window.scrollY;
-  const to = Math.min(Math.max(0, top), maxScroll());
-  let frame = 0;
-  const stop = (): void => {
-    window.cancelAnimationFrame(frame);
-    frame = 0;
-    for (const type of USER_SCROLL_EVENTS) window.removeEventListener(type, stop);
-  };
-  if (Math.abs(to - from) < 1) {
-    onDone();
-    return stop;
-  }
-  let start: number | null = null;
-  const step = (now: number): void => {
-    start ??= now;
-    const t = Math.min(1, (now - start) / (ANCHOR_DURATION * 1000));
-    window.scrollTo({ top: from + (to - from) * easeOutQuart(t), behavior: "instant" });
-    if (t < 1) {
-      frame = window.requestAnimationFrame(step);
-    } else {
-      stop();
-      onDone();
-    }
-  };
-  frame = window.requestAnimationFrame(step);
-  for (const type of USER_SCROLL_EVENTS) window.addEventListener(type, stop, { passive: true });
-  return stop;
+/** Document y the page scrolls to for `el`: its layout top minus the header (scroll-padding) and its scroll-margin. */
+function anchorScrollTop(el: HTMLElement): number {
+  return Math.max(0, layoutTop(el) - anchorInset(el));
 }
 
 /**
@@ -87,18 +48,23 @@ function tweenWindowScroll(top: number, onDone: () => void): () => void {
  * - Lenis drives the scroll (gsap.ticker → lenis.raf, lenis 'scroll' → ScrollTrigger.update;
  *   both are imported after mount, see below),
  *   only when motion is enabled and the pointer is a mouse / trackpad; touch screens and
- *   prefers-reduced-motion scroll natively (anchor jumps on touch are tweened with the same
- *   curve, tweenWindowScroll).
- * - Same-page anchor links scroll with the header offset, move focus to the target and
- *   update the hash. Links carrying data-lead-type / data-lead-subject (CTA → form) also
- *   dispatch a LeadIntent the form listens to (topic preselect + subject prefill).
- * - ScrollTrigger positions follow the page height: it refreshes on load / resize only, but
- *   the page also grows and shrinks at runtime (the lead form swapped for its success
- *   message, topic fields, <details> opening) — a ResizeObserver on <body> schedules a refresh.
+ *   prefers-reduced-motion scroll natively.
+ * - Same-page anchor links scroll with the header offset (scroll-tween.ts tweenScroll — through
+ *   Lenis when it runs, else window.scrollTo), move focus to the target and update the hash.
+ *   Links carrying data-lead-type / data-lead-subject (CTA → form) also dispatch a LeadIntent the
+ *   form listens to (topic preselect + subject prefill).
+ * - ScrollTrigger positions follow the page height: it refreshes on resize only, but the page
+ *   also grows and shrinks at runtime (chapters rendered for the first time — content-visibility
+ *   estimates —, the lead form swapped for its success message, topic fields, <details>
+ *   opening) — a ResizeObserver on <body> schedules a refresh, the safe kind (env.ts: after the
+ *   swipe, never during it). A touch screen's viewport-height-only change (an in-app toolbar or
+ *   the cover's 100svh following it) is left to ScrollTrigger, which ignores it there.
+ * - In-app browsers (motion-lite, in-app.ts): no Lenis, no ScrollTrigger; motion/lite.ts.
  */
 export function SmoothScroll(): null {
   useEffect(() => {
     const motion = motionEnabled();
+    const lite = motion && liteMotion();
     let lenis: Lenis | null = null;
     let disposed = false;
     let cancelLenisStart = (): void => undefined;
@@ -106,8 +72,9 @@ export function SmoothScroll(): null {
 
     // Lenis is not part of the page's first JS: imported once the page is up (first idle
     // moment), mouse / trackpad only. Until then the wheel scrolls natively and anchors use
-    // the window tween — the same curve.
-    if (motion && window.matchMedia(FINE_POINTER_QUERY).matches) {
+    // the window tween — the same curve. Never in lite motion: an in-app browser with a mouse
+    // or trackpad (a tablet, ChromeOS) scrolls natively too, and ScrollTrigger stays unloaded.
+    if (motion && !lite && window.matchMedia(FINE_POINTER_QUERY).matches) {
       const startLenis = (): void => {
         void import("lenis").then(
           ({ default: LenisClass }) => {
@@ -136,54 +103,112 @@ export function SmoothScroll(): null {
         cancelLenisStart = () => window.clearTimeout(timer);
       }
     }
-    // The cover rain, the ticker and the tape stop while off screen.
+    // The cover rain, the ticker, the tape and the tongue flicks stop while off screen.
     const resumeLoops = pauseLoopsOffscreen();
-    // Chapters skipped by content-visibility learn their real height once, in idle time.
-    const stopLearning = learnChapterSizes();
+    const stopLite = lite ? startLiteMotion() : (): void => undefined;
 
+    // Set by a touch screen's resize that kept the width, for the rendering update it happens in:
+    // the body's own resize is observed later in that update (the second frame callback clears it).
+    let heightOnlyResize = false;
+    let viewportWidth = window.innerWidth;
+    /** The viewport height of the last resize refresh requested on a touch screen. */
+    let measuredViewportHeight = window.innerHeight;
+    let clearResizeFrame = 0;
+    const onResize = (): void => {
+      const widthChanged = window.innerWidth !== viewportWidth;
+      viewportWidth = window.innerWidth;
+      // Touch screens: ScrollTrigger's own resize refresh is off (gsap.ts) — a width change
+      // (rotation, split screen) or a big height change (a WebView's keyboard: what GSAP's
+      // ignoreMobileResize lets through, > 25 %) is re-measured here, through the still-page gate.
+      if (
+        isTouchScreen() &&
+        (widthChanged || Math.abs(window.innerHeight - measuredViewportHeight) > window.innerHeight * 0.25)
+      ) {
+        measuredViewportHeight = window.innerHeight;
+        scheduleRefresh();
+      }
+      if (widthChanged || hasFinePointer()) return;
+      heightOnlyResize = true;
+      window.cancelAnimationFrame(clearResizeFrame);
+      clearResizeFrame = window.requestAnimationFrame(() => {
+        clearResizeFrame = window.requestAnimationFrame(() => {
+          heightOnlyResize = false;
+        });
+      });
+    };
     // Trigger start/end positions are measured at refresh; when the document height changes
     // (and not the viewport — ScrollTrigger handles resizes itself) they must be re-measured,
     // or reveals below the change fire too early / too late / never (past the new max scroll).
     let lastHeight = document.body.offsetHeight;
+    /** The height the last requested refresh will measure (refresh-gate.ts: touch screens skip small changes). */
+    let refreshedHeight = lastHeight;
+    // Every refresh (whoever asked for it) measured the page as it is: the height threshold counts
+    // from there. A full one dispatches ScrollTrigger's "refresh"; a touch screen's trigger-by-
+    // trigger re-measure (env.ts refreshEach) is announced by onRefreshed.
+    const rebaseHeight = (): void => {
+      refreshedHeight = document.body.offsetHeight;
+    };
+    let stopRebase = (): void => undefined;
+    if (motion && !lite) {
+      trackScrollActivity();
+      const stopTouchRebase = onRefreshed(rebaseHeight);
+      stopRebase = stopTouchRebase;
+      void loadScrollTrigger().then(
+        (plugin) => {
+          if (disposed) return;
+          plugin.addEventListener("refresh", rebaseHeight);
+          stopRebase = () => {
+            stopTouchRebase();
+            plugin.removeEventListener("refresh", rebaseHeight);
+          };
+        },
+        () => undefined,
+      );
+    }
     const heightObserver =
-      motion && typeof ResizeObserver !== "undefined"
+      motion && !lite && typeof ResizeObserver !== "undefined"
         ? new ResizeObserver(() => {
             const height = document.body.offsetHeight;
             if (height === lastHeight) return;
             lastHeight = height;
+            // Touch screens: the body follows a viewport-height-only resize (an in-app toolbar
+            // collapsing, the cover's 100svh with it) — ScrollTrigger ignores those resizes there
+            // (ignoreMobileResize); a refresh for them would only redo the same positions.
+            if (heightOnlyResize) return;
+            // Touch screens: a few px of late font / image layout are not worth a refresh (each
+            // one is a chance to undo a swipe); bigger changes (the lead form's success) still are.
+            if (!heightChangeNeedsRefresh(isTouchScreen(), height, refreshedHeight)) return;
+            refreshedHeight = height;
             scheduleRefresh();
           })
         : null;
     heightObserver?.observe(document.body);
+    if (heightObserver) window.addEventListener("resize", onResize);
 
     let cancelTween = (): void => undefined;
-    /**
-     * After a smooth anchor scroll: chapters passed on the way may have been rendered for the
-     * first time (content-visibility) and moved the target — land on it exactly.
-     */
+    /** The page's scroll position, through Lenis while it runs (the instance in `lenis`, published by setLenis). */
+    const port = pageScroll;
+    /** Safety net after an anchor scroll (the tween already follows the target): land on it exactly. */
     const settleOn = (el: HTMLElement): void => {
-      const top = Math.min(anchorScrollTop(el) + UNDER_HEADER_PX, maxScroll());
-      if (Math.abs(window.scrollY - top) <= 2) return;
-      if (lenis) lenis.scrollTo(top, { immediate: true, force: true });
-      else window.scrollTo({ top, behavior: "instant" });
+      const top = clampScroll(anchorScrollTop(el) + UNDER_HEADER_PX);
+      if (Math.abs(port.read() - top) <= 2) return;
+      port.write(top);
     };
     const goTo = (el: HTMLElement): void => {
       const isTop = el.id === SECTION_ANCHORS.hero || el.id === "main";
       cancelTween();
-      if (lenis) {
-        lenis.scrollTo(isTop ? 0 : el, {
-          offset: isTop ? 0 : UNDER_HEADER_PX,
-          duration: ANCHOR_DURATION,
-          easing: easeOutQuart,
-          force: true,
-          onComplete: () => {
-            if (!isTop) settleOn(el);
-          },
-        });
-      } else if (motion) {
-        cancelTween = tweenWindowScroll(isTop ? 0 : anchorScrollTop(el) + UNDER_HEADER_PX, () => {
-          if (!isTop) settleOn(el);
-        });
+      if (motion) {
+        if (isTop) {
+          cancelTween = tweenScroll(port, () => 0, () => undefined);
+        } else {
+          // The header inset does not change during the tween: read once, the layout top per frame.
+          const inset = anchorInset(el);
+          cancelTween = tweenScroll(
+            port,
+            () => Math.max(0, layoutTop(el) - inset) + UNDER_HEADER_PX,
+            () => settleOn(el),
+          );
+        }
       } else if (isTop) {
         window.scrollTo({ top: 0, behavior: "auto" });
       } else {
@@ -217,8 +242,11 @@ export function SmoothScroll(): null {
     // Deep links (/catalog/…#product-…, /#lead-form, a language switch to "/en#reviews"): the
     // browser jumps to the target by its box INCLUDING transforms, and the reveal scenes lower
     // items (covers, coupons) for their drop-in — so the jump could land up to ~90 px too far,
-    // under the header. Re-align to the untransformed position until the visitor scrolls.
-    let userScrolled = false;
+    // under the header. Re-align to the untransformed position until the visitor scrolls — or has
+    // already acted before hydration (MOTION_BOOT notes it from the first script: a cold in-app
+    // browser hydrates seconds after the visitor's first swipes, and a re-alignment then would
+    // throw the page back to the fragment mid-fling).
+    let userScrolled = visitorActed();
     const onUserScroll = (): void => {
       userScrolled = true;
     };
@@ -235,8 +263,10 @@ export function SmoothScroll(): null {
     const frame = window.requestAnimationFrame(alignToHash);
     void document.fonts.ready.then(alignToHash);
 
+    // Positions measured before the late images / fonts: re-measured once the page has loaded,
+    // the safe way (after the visitor's swipe, if one is going on — env.ts scheduleRefresh).
     const onLoad = (): void => {
-      loadedScrollTrigger()?.refresh();
+      scheduleRefresh();
       alignToHash();
     };
 
@@ -251,8 +281,11 @@ export function SmoothScroll(): null {
       document.removeEventListener("click", onClick);
       window.removeEventListener("load", onLoad);
       heightObserver?.disconnect();
+      stopRebase();
+      window.removeEventListener("resize", onResize);
+      window.cancelAnimationFrame(clearResizeFrame);
       resumeLoops();
-      stopLearning();
+      stopLite();
       disposed = true;
       cancelLenisStart();
       if (lenis) {

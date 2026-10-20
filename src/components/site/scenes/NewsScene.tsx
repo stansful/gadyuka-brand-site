@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactElement, useRef } from "react";
-import { panelWipes, retire } from "../motion/effects";
+import { panelWipes, retire, unseen } from "../motion/effects";
 import { gsap, splitText } from "../motion/gsap";
 import { useScene } from "../motion/useScene";
 import { SceneRoot, type SceneProps } from "./SceneRoot";
@@ -12,7 +12,8 @@ export function NewsScene(props: SceneProps): ReactElement {
   useScene(ref, (root, ctx) => {
     panelWipes(root, ctx);
     const cols = root.querySelector(".gazette__cols");
-    root.querySelectorAll<HTMLElement>(".story").forEach((story, i) => {
+    // A late scene (useScene): what the visitor may already have seen stays as rendered.
+    unseen(Array.from(root.querySelectorAll<HTMLElement>(".story"))).forEach((story, i) => {
       gsap.from(story, {
         y: 50,
         opacity: 0,
@@ -23,7 +24,7 @@ export function NewsScene(props: SceneProps): ReactElement {
       });
     });
     const title = root.querySelector<HTMLElement>(".gazette__title");
-    if (title) {
+    if (title && unseen([title]).length > 0) {
       // autoSplit: the masked lines are re-measured (and the reveal rebuilt at its progress)
       // after a resize, a rotation or a late font swap, until the reveal has finished.
       splitText().create(title, {

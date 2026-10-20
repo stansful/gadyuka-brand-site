@@ -1,4 +1,5 @@
 import type { ReactElement, ReactNode } from "react";
+import { ScrollSpine } from "./chrome/ScrollSpine";
 
 type ErrorPageProps = {
   kicker: string;
@@ -16,11 +17,13 @@ type ErrorPageProps = {
 /**
  * Error / not-found page in the noir-comic language: a minimal masthead with the logo, a chapter
  * opening («Ошибка 404», inked title, narration plate) and an ink panel with the way back.
- * Static markup only (works from both the server not-found and the client error boundary).
+ * Static markup (works from both the server not-found and the client error boundary) + the scroll
+ * snake, the scrollbar of every public page (noir.css hides the native one).
  */
 export function ErrorPage({ kicker, title, caption, text, mark, action, homeHref, homeLabel }: ErrorPageProps): ReactElement {
   return (
     <>
+      <ScrollSpine />
       <header className="hdr is-solid">
         <div className="hdr__in">
           <a className="hdr__logo" href={homeHref} aria-label={homeLabel}>

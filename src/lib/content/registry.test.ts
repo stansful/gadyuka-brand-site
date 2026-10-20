@@ -66,6 +66,8 @@ describe("content registry ↔ site ↔ seed", () => {
     for (const chapter of CHAPTER_ORDER) expect(isRequiredKey(`${chapter}.title`), chapter).toBe(true);
     expect(TEXT_KEYS.filter((key) => key.startsWith("header.nav.")).every(isRequiredKey)).toBe(true);
     expect(isRequiredKey("hero.title")).toBe(true);
+    expect(isRequiredKey("header.nav.offers")).toBe(true);
+    expect(isRequiredKey("about.partnersCta")).toBe(true); // a button whose only other content is an aria-hidden arrow
     expect(isRequiredKey("offers.fine")).toBe(false); // «пусто — не показывать»
     expect(IMAGE_KEYS.some(isRequiredKey)).toBe(false);
   });

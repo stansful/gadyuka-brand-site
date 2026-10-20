@@ -20,6 +20,7 @@ export const CONTENT_COPY: Record<TextKey, Copy> = {
   "header.nav.catalog": { ru: "Каталог", en: "Catalog" },
   "header.nav.about": { ru: "О нас", en: "About" },
   "header.nav.tailoring": { ru: "Индивидуальный пошив", en: "Made to Measure" },
+  "header.nav.offers": { ru: "Специальное предложение", en: "Special offer" },
   "header.nav.contacts": { ru: "Контакты", en: "Contact" },
   "header.menuCaption": { ru: "Содержание выпуска", en: "In this issue" },
   "header.cta": { ru: "Оставить заявку", en: "Send a request" },
@@ -78,6 +79,7 @@ export const CONTENT_COPY: Record<TextKey, Copy> = {
     en: "Our brand offers stylish, comfortable clothing with original, in-house design. We pay close attention to quality and detail so you feel confident and look sharp. Choosing GADYUKA means choosing quality and individuality.",
   },
   "about.cta": { ru: "Отзывы покупателей", en: "Customer reviews" },
+  "about.partnersCta": { ru: "Партнёры бренда", en: "Brand partners" },
   "about.advantages.0.title": { ru: "Авторские модели", en: "Original designs" },
   "about.advantages.0.text": {
     ru: "Каждую модель мы разрабатываем сами — без банальных дизайнов.",
@@ -242,6 +244,10 @@ export const CONTENT_COPY: Record<TextKey, Copy> = {
   "footer.end": { ru: "Конец выпуска.", en: "End of issue." },
   "footer.tbc": { ru: "Продолжение следует…", en: "To be continued…" },
   "footer.copyright": { ru: "© ГАДЮКА", en: "© GADYUKA" },
+  "footer.trademark": {
+    ru: "Все права на товарный знак защищены и зарегистрированы",
+    en: "GADYUKA is a registered trademark. All rights reserved.",
+  },
   "footer.top": { ru: "Наверх", en: "Back to top" },
 
   // ── common ───────────────────────────────────────────────────────────────

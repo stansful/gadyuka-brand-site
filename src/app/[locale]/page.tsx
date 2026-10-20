@@ -24,7 +24,7 @@ import { TailoringSection } from "@/components/site/sections/TailoringSection";
 /**
  * The landing — design «Нуар-комикс» (concepts/01-noir-comic): a comic issue. The cover, then
  * the chapters in CHAPTER_ORDER (Каталог → О нас → [red «ГАДЮКА» band] → Индивидуальный пошив
- * → Отзывы → … → Контакты). Everything visible comes from getLanding() (ContentBlocks +
+ * → Специальные предложения → Новости → Галерея → Отзывы → Партнёры → Контакты). Everything visible comes from getLanding() (ContentBlocks +
  * entities); sections are server components, animations live in small client scenes.
  */
 

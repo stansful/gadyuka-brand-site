@@ -13,6 +13,38 @@ import { hasFinePointer } from "./env";
 
 type Ctx = gsap.Context;
 
+/**
+ * True while a "late" scene is set up (useScene): its root came near the screen before the setup
+ * could run (SCENE_LATE_ATTR — the app bundle still loading on a cold visit, the visitor already
+ * scrolling), or the boot failsafe had dropped the CSS start states. Its content is drawn as
+ * server-rendered, so what the visitor may already have seen must not be hidden again and played
+ * in under the finger — see unseen().
+ */
+let revealsSuppressed = false;
+
+/**
+ * The elements of `list` whose one-shot reveal may run. In a late scene that is only those still
+ * below the fold at setup: their start state is written while they are off screen (nobody sees
+ * it) and they reveal as usual; the ones on screen or above stay as rendered. Elsewhere: all.
+ * (A per-element decision: one scene root can span many screens — the collection page.)
+ */
+export function unseen<T extends Element>(list: T[]): T[] {
+  if (!revealsSuppressed || list.length === 0) return list;
+  const fold = window.innerHeight;
+  return list.filter((el) => el.getBoundingClientRect().top >= fold);
+}
+
+/** Runs `fn` (a scene setup) with late-scene reveals (unseen()) when `late`. */
+export function withRevealsOff<T>(late: boolean, fn: () => T): T {
+  const previous = revealsSuppressed;
+  revealsSuppressed = late;
+  try {
+    return fn();
+  } finally {
+    revealsSuppressed = previous;
+  }
+}
+
 /** Runs `fn` inside the context, so late tweens are reverted with it. */
 export function inContext<A extends unknown[]>(ctx: Ctx, fn: (...args: A) => void): (...args: A) => void {
   return (...args: A) => {
@@ -70,26 +102,6 @@ export function typeIn(el: HTMLElement, at: number, tl: gsap.core.Timeline): voi
     at,
   );
   tl.call(() => el.classList.add("is-typing"), undefined, at + 0.2);
-}
-
-/** Forked tongue flick: retract, shoot out, quiver, settle — repeated while visible. */
-export function tongueLoop(el: Element, vars: gsap.TweenVars = {}): gsap.core.Timeline {
-  const tl = gsap.timeline({ repeat: -1, repeatDelay: 2.4, paused: true, delay: 0.6 });
-  tl.to(el, { scaleX: 0.15, duration: 0.14, ease: "power2.in", ...vars })
-    .to(el, { scaleX: 1.06, rotation: -5, duration: 0.16, ease: "power2.out", ...vars })
-    .to(el, { rotation: 4, duration: 0.07, yoyo: true, repeat: 3, ease: "sine.inOut", ...vars })
-    .to(el, { scaleX: 1, rotation: 0, duration: 0.18, ease: "power2.out", ...vars });
-  return tl;
-}
-
-/** Plays `loop` only while `trigger` is on screen. */
-export function playWhileVisible(trigger: Element, loop: gsap.core.Timeline): void {
-  scrollTrigger().create({
-    trigger,
-    start: "top bottom",
-    end: "bottom top",
-    onToggle: (self) => (self.isActive ? loop.play() : loop.pause()),
-  });
 }
 
 const WIPES = {
@@ -154,7 +166,7 @@ const TITLE_INK_TO: gsap.TweenVars = { yPercent: 0, rotation: 0, duration: 0.95,
  * (words then wrap inside a line mask and pushed-down chars show through the next row).
  */
 export function chapterReveal(root: ParentNode): void {
-  for (const chapter of $$(".chapter", root)) {
+  for (const chapter of unseen($$(".chapter", root))) {
     const title = chapter.querySelector<HTMLElement>(".chapter__title");
     const sheet = chapter.querySelector<HTMLElement>(".chapter__sheet");
     const no = chapter.querySelector<HTMLElement>(".chapter__no");
@@ -190,7 +202,7 @@ export function chapterReveal(root: ParentNode): void {
 export function panelWipes(root: ParentNode, ctx: Ctx): void {
   // [data-wipe-now]: first-viewport panels of the collection page, wiped in by CSS from the
   // first paint (noir.css) with the same geometry and timing.
-  const panels = $$("[data-wipe]:not([data-wipe-now])", root);
+  const panels = unseen($$("[data-wipe]:not([data-wipe-now])", root));
   if (panels.length === 0) return;
   const { fresh, passed, notAbove, onScreen } = createRevealTracker();
   // All reads first (one layout), then the writes: no forced style recalc per panel.
@@ -229,7 +241,7 @@ export function panelWipes(root: ParentNode, ctx: Ctx): void {
  * its end value.
  */
 export function genericReveals(root: ParentNode): void {
-  const els = $$("[data-reveal]", root);
+  const els = unseen($$("[data-reveal]", root));
   if (els.length === 0) return;
   // Start state for all at once, then a to() each: no computed-style read per element.
   gsap.set(els, { y: 40, opacity: 0 });
@@ -254,7 +266,7 @@ export function dropIn(
   clearInstant: string,
   fromLayout = false,
 ): void {
-  const items = $$(selector, root);
+  const items = unseen($$(selector, root));
   if (items.length === 0) return;
   const { fresh, passed, notAbove, onScreen } = createRevealTracker();
   gsap.set(items, from);
@@ -282,7 +294,9 @@ export function dropIn(
 
 /** Comic SFX words: pop in, then drift up with the scroll. */
 export function sfxPop(root: ParentNode): void {
-  for (const sfx of $$(".page .sfx", root)) {
+  // A late scene leaves the SFX already seen where they were rendered (no pop, and no drift that
+  // would move a visible SFX at setup).
+  for (const sfx of unseen($$(".page .sfx", root))) {
     gsap.from(sfx, { scale: 0, rotation: -35, opacity: 0, duration: 0.8, ease: "back.out(3)", scrollTrigger: { trigger: sfx, start: "top 85%", onEnter: retire } });
     gsap.to(sfx, {
       yPercent: -60,
