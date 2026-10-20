@@ -1,31 +1,50 @@
-import { getMessages } from "next-intl/server";
-import type { ReactElement } from "react";
-import type { LandingContent } from "@/lib/content";
-import { LEAD_FORM_ANCHOR, SECTION_ANCHORS, chapterNumber } from "@/lib/content";
-import { leadFormCopyFromTexts } from "@/lib/leads";
-import { socialLabel } from "../format";
-import { LeadForm } from "../LeadForm";
-import { RichText } from "../RichText";
-import { ChapterScene } from "../scenes/ChapterScene";
-import { ChapterHeader, Folio } from "./parts";
+import { getMessages } from 'next-intl/server';
 
-/** Глава 09 · Контакты: contacts from «Настройки» and the site's lead form — «Письмо в редакцию». */
+import type { LandingContent } from '@/lib/content';
+import { LEAD_FORM_ANCHOR, SECTION_ANCHORS, chapterNumber } from '@/lib/content';
+
+import type { ReactElement } from 'react';
+
+import { socialLabel } from '../format';
+import { leadFormCopy } from '../lead-form-copy';
+import { LeadForm } from '../LeadForm';
+import { RichText } from '../RichText';
+import { ChapterScene } from '../scenes/ChapterScene';
+import { ChapterHeader, Folio } from './parts';
+
+/**
+ * Глава 09 · Контакты: contacts from «Настройки», the published social links (SocialLink rows:
+ * own label or the default name of the type) and the site's lead form — «Письмо в редакцию».
+ */
 export async function ContactsSection({ content }: { content: LandingContent }): Promise<ReactElement> {
-  const { texts, settings, locale } = content;
-  const { forms } = await getMessages();
-  const phoneHref = settings.phone.replace(/[^\d+]/g, "");
+  const { texts, settings, socials, locale } = content;
+  const { forms } = await getMessages({ locale });
+  const newTabHint = texts['common.opensInNewTab'];
+  const phoneHref = settings.phone.replace(/[^\d+]/g, '');
   return (
-    <ChapterScene id={SECTION_ANCHORS.contacts} className="page" labelledBy="contacts-title" folio={chapterNumber("contacts")}>
+    <ChapterScene
+      id={SECTION_ANCHORS.contacts}
+      className="page"
+      labelledBy="contacts-title"
+      folio={chapterNumber('contacts')}
+    >
       <div className="wrap">
-        <ChapterHeader chapter="contacts" texts={texts} titleKey="contacts.title" narrationKey="contacts.narration" headingId="contacts-title" />
+        <ChapterHeader
+          chapter="contacts"
+          texts={texts}
+          locale={locale}
+          titleKey="contacts.title"
+          narrationKey="contacts.narration"
+          headingId="contacts-title"
+        />
 
         <div className="grid grid--contacts">
           <div className="panel panel--ink c-info dots" data-wipe="left">
-            <RichText text={texts["contacts.text"]} editKey="contacts.text" className="lead" />
+            <RichText text={texts['contacts.text']} editKey="contacts.text" className="lead" />
             <dl className="cdl" data-entity="SiteSettings" data-entity-id="1">
               {settings.phone ? (
                 <div>
-                  <dt data-edit="contacts.phoneLabel">{texts["contacts.phoneLabel"]}</dt>
+                  <dt data-edit="contacts.phoneLabel">{texts['contacts.phoneLabel']}</dt>
                   <dd>
                     <a href={`tel:${phoneHref}`} data-field="phone">
                       {settings.phone}
@@ -35,7 +54,7 @@ export async function ContactsSection({ content }: { content: LandingContent }):
               ) : null}
               {settings.email ? (
                 <div>
-                  <dt data-edit="contacts.emailLabel">{texts["contacts.emailLabel"]}</dt>
+                  <dt data-edit="contacts.emailLabel">{texts['contacts.emailLabel']}</dt>
                   <dd>
                     <a href={`mailto:${settings.email}`} data-field="email">
                       {settings.email}
@@ -45,17 +64,25 @@ export async function ContactsSection({ content }: { content: LandingContent }):
               ) : null}
               {settings.address ? (
                 <div>
-                  <dt data-edit="contacts.addressLabel">{texts["contacts.addressLabel"]}</dt>
+                  <dt data-edit="contacts.addressLabel">{texts['contacts.addressLabel']}</dt>
                   <dd data-field="address">{settings.address}</dd>
                 </div>
               ) : null}
-              {settings.socials.length > 0 ? (
+              {socials.length > 0 ? (
                 <div>
-                  <dt data-edit="contacts.socialsLabel">{texts["contacts.socialsLabel"]}</dt>
+                  <dt data-edit="contacts.socialsLabel">{texts['contacts.socialsLabel']}</dt>
                   <dd className="cdl__soc">
-                    {settings.socials.map((social, index) => (
-                      <a key={`${social.type}-${index}`} href={social.url} target="_blank" rel="noopener noreferrer" data-field="socials">
-                        {socialLabel(social)}
+                    {socials.map(social => (
+                      <a
+                        key={social.id}
+                        href={social.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-entity="SocialLink"
+                        data-entity-id={social.id}
+                      >
+                        {socialLabel(social, texts)}
+                        {newTabHint ? <span className="sr-only"> {newTabHint}</span> : null}
                       </a>
                     ))}
                   </dd>
@@ -66,12 +93,12 @@ export async function ContactsSection({ content }: { content: LandingContent }):
 
           <div className="panel panel--paper letter" id={LEAD_FORM_ANCHOR} data-wipe="right">
             <p className="letter__to" data-edit="contacts.form.to">
-              {texts["contacts.form.to"]}
+              {texts['contacts.form.to']}
             </p>
             <h3 className="letter__title" data-edit="contacts.form.title">
-              {texts["contacts.form.title"]}
+              {texts['contacts.form.title']}
             </h3>
-            <LeadForm locale={locale} copy={leadFormCopyFromTexts(texts)} labels={forms} />
+            <LeadForm locale={locale} copy={leadFormCopy(texts, locale)} labels={forms} />
           </div>
         </div>
       </div>

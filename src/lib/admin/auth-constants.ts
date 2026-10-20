@@ -4,7 +4,7 @@
  * so it is safe to load from src/proxy.ts.
  */
 
-export const ADMIN_COOKIE_NAME = "gadyuka_admin";
+export const ADMIN_COOKIE_NAME = 'gadyuka_admin';
 /** The cookie is only sent to /admin/** (pages, actions and admin route handlers). */
-export const ADMIN_COOKIE_PATH = "/admin";
-export const ADMIN_LOGIN_PATH = "/admin/login";
+export const ADMIN_COOKIE_PATH = '/admin';
+export const ADMIN_LOGIN_PATH = '/admin/login';

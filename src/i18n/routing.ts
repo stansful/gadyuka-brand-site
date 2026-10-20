@@ -1,5 +1,6 @@
-import { defineRouting } from "next-intl/routing";
-import { defaultLocale, locales } from "./locales";
+import { defineRouting } from 'next-intl/routing';
+
+import { defaultLocale, locales } from './locales';
 
 /**
  * ru is the default locale and has no prefix ("/"), other locales are prefixed ("/en").
@@ -9,6 +10,6 @@ import { defaultLocale, locales } from "./locales";
 export const routing = defineRouting({
   locales,
   defaultLocale,
-  localePrefix: "as-needed",
+  localePrefix: 'as-needed',
   localeDetection: false,
 });

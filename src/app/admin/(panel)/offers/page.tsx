@@ -1,38 +1,39 @@
-import { Plus } from "lucide-react";
-import type { Metadata } from "next";
-import Link from "next/link";
-import type { ReactElement } from "react";
-import { EntityList } from "@/components/admin/lists/EntityList";
-import { buttonClasses } from "@/components/admin/ui/Button";
-import { PageHeader } from "@/components/admin/ui/layout";
-import { listOffersAdmin } from "@/lib/admin/queries";
+import { Plus } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
 
-export const metadata: Metadata = { title: "Спецпредложения" };
+import { EntityList } from '@/components/admin/lists/EntityList';
+import { buttonClasses } from '@/components/admin/ui/Button';
+import { PageHeader } from '@/components/admin/ui/layout';
+import { adminPageMetadata } from '@/lib/admin/i18n-server';
+import { listOffersAdmin } from '@/lib/admin/queries';
+
+import type { Metadata } from 'next';
+import type { ReactElement } from 'react';
+
+export function generateMetadata(): Promise<Metadata> {
+  return adminPageMetadata('offers.title');
+}
 
 export default async function ListPage(): Promise<ReactElement> {
-  const rows = await listOffersAdmin();
+  const [rows, t] = await Promise.all([listOffersAdmin(), getTranslations('admin.offers')]);
   const addLink = (
-    <Link href="/admin/offers/new" className={buttonClasses("primary")}>
+    <Link href="/admin/offers/new" className={buttonClasses('primary')}>
       <Plus className="size-4" aria-hidden />
-      Новое предложение
+      {t('add')}
     </Link>
   );
   return (
     <>
-      <PageHeader
-        title="Спецпредложения"
-        description="Акции и скидки. Истёкшие предложения автоматически скрываются с сайта."
-        actions={
-          <>
-            {addLink}
-          </>
-        }
-      />
+      <PageHeader title={t('title')} description={t('description')} actions={<>{addLink}</>} />
       <EntityList
         entity="offer"
         rows={rows}
-        nounAccusative="предложение"
-        empty={{ title: "Спецпредложений пока нет", description: "Акции и скидки появятся в разделе «Специальные предложения».", action: addLink }}
+        empty={{
+          title: t('empty'),
+          description: t('emptyHint'),
+          action: addLink,
+        }}
       />
     </>
   );

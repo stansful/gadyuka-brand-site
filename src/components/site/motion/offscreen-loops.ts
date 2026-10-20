@@ -1,4 +1,4 @@
-import { INTRO_CLASS } from "./env";
+import { INTRO_CLASS } from './env';
 
 /**
  * Infinite CSS loops (the cover rain and hint arrow, the news ticker, the offers tape, the tongue
@@ -18,13 +18,14 @@ import { INTRO_CLASS } from "./env";
  */
 
 /** Elements whose infinite loops (own or descendants') pause while off screen. */
-const LOOPS = ".splash__rain, .splash__hint-arrow, .ticker, .tape, .snake-tongue, .closeup__tongue, .motion-lite .band__track";
+const LOOPS =
+  '.splash__rain, .splash__hint-arrow, .ticker, .tape, .snake-tongue, .closeup__tongue, .motion-lite .band__track';
 
-export const OFF_CLASS = "is-off";
+export const OFF_CLASS = 'is-off';
 
 /** Starts watching the page's loops; returns the cleanup. No-op without IntersectionObserver. */
 export function pauseLoopsOffscreen(): () => void {
-  if (typeof IntersectionObserver === "undefined") return () => undefined;
+  if (typeof IntersectionObserver === 'undefined') return () => undefined;
   const targets = document.querySelectorAll(LOOPS);
   if (targets.length === 0) return () => undefined;
   const html = document.documentElement;
@@ -33,29 +34,29 @@ export function pauseLoopsOffscreen(): () => void {
     target.classList.toggle(OFF_CLASS, offscreen.has(target) && !html.classList.contains(INTRO_CLASS));
   };
   const observer = new IntersectionObserver(
-    (entries) => {
+    entries => {
       for (const entry of entries) {
         if (entry.isIntersecting) offscreen.delete(entry.target);
         else offscreen.add(entry.target);
         apply(entry.target);
       }
     },
-    { rootMargin: "200px 0px" },
+    { rootMargin: '200px 0px' },
   );
-  targets.forEach((target) => observer.observe(target));
+  targets.forEach(target => observer.observe(target));
   // The intro's end (HeroScene removes the class): pause what went off screen meanwhile.
   const introEnd =
-    html.classList.contains(INTRO_CLASS) && typeof MutationObserver !== "undefined"
+    html.classList.contains(INTRO_CLASS) && typeof MutationObserver !== 'undefined'
       ? new MutationObserver((_records, watcher) => {
           if (html.classList.contains(INTRO_CLASS)) return;
           watcher.disconnect();
           targets.forEach(apply);
         })
       : null;
-  introEnd?.observe(html, { attributes: true, attributeFilter: ["class"] });
+  introEnd?.observe(html, { attributes: true, attributeFilter: ['class'] });
   return () => {
     observer.disconnect();
     introEnd?.disconnect();
-    targets.forEach((target) => target.classList.remove(OFF_CLASS));
+    targets.forEach(target => target.classList.remove(OFF_CLASS));
   };
 }

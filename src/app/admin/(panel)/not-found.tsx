@@ -1,16 +1,20 @@
-import Link from "next/link";
-import type { ReactElement } from "react";
-import { buttonClasses } from "@/components/admin/ui/Button";
-import { EmptyState } from "@/components/admin/ui/layout";
+import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
 
-export default function AdminNotFound(): ReactElement {
+import { buttonClasses } from '@/components/admin/ui/Button';
+import { EmptyState } from '@/components/admin/ui/layout';
+
+import type { ReactElement } from 'react';
+
+export default async function AdminNotFound(): Promise<ReactElement> {
+  const t = await getTranslations('admin.notFound');
   return (
     <EmptyState
-      title="Страница не найдена"
-      description="Возможно, запись уже удалили или адрес набран с ошибкой."
+      title={t('title')}
+      description={t('text')}
       action={
-        <Link href="/admin" className={buttonClasses("outline", "sm")}>
-          На дашборд
+        <Link href="/admin" className={buttonClasses('outline', 'sm')}>
+          {t('toDashboard')}
         </Link>
       }
     />

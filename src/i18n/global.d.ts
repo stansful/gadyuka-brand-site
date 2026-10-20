@@ -1,7 +1,7 @@
-import type { Locale } from "./locales";
-import type { Messages } from "./request";
+import type { Locale } from './locales';
+import type { Messages } from './request';
 
-declare module "next-intl" {
+declare module 'next-intl' {
   interface AppConfig {
     Locale: Locale;
     Messages: Messages;

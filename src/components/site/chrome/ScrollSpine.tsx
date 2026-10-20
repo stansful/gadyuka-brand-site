@@ -1,14 +1,15 @@
-"use client";
+'use client';
 
-import { type ReactElement, useEffect, useLayoutEffect, useRef } from "react";
-import { hasFinePointer, motionEnabled } from "../motion/env";
-import { pageScroll, tweenScroll } from "../motion/scroll-tween";
-import { pageMoving } from "../motion/tap-guard";
-import { SCROLLBAR_CLASS, SCROLLBAR_READY_CLASS, SNAKE_OFF_CLASS } from "./snake-bar";
-import { dragScroll, grabOffset, scrollProgress, type SpineTrack, stillPress, TOUCH_HOLD_MS } from "./spine-math";
+import { type ReactElement, useEffect, useLayoutEffect, useRef } from 'react';
+
+import { hasFinePointer, motionEnabled } from '../motion/env';
+import { pageScroll, tweenScroll } from '../motion/scroll-tween';
+import { pageMoving } from '../motion/tap-guard';
+import { SCROLLBAR_CLASS, SCROLLBAR_READY_CLASS, SNAKE_OFF_CLASS } from './snake-bar';
+import { dragScroll, grabOffset, scrollProgress, type SpineTrack, stillPress, TOUCH_HOLD_MS } from './spine-math';
 
 const WAVE =
-  "M12 0 C22 25 22 25 12 50 S2 75 12 100 S22 125 12 150 S2 175 12 200 S22 225 12 250 S2 275 12 300 S22 325 12 350 S2 375 12 400 S22 425 12 450 S2 475 12 500";
+  'M12 0 C22 25 22 25 12 50 S2 75 12 100 S22 125 12 150 S2 175 12 200 S22 225 12 250 S2 275 12 300 S22 325 12 350 S2 375 12 400 S22 425 12 450 S2 475 12 500';
 
 function Wave(): ReactElement {
   return (
@@ -19,15 +20,15 @@ function Wave(): ReactElement {
 }
 
 /** noir.css: the slither and the tongue flick are paused (touch screens, between scrolls). */
-const IDLE_CLASS = "is-idle";
+const IDLE_CLASS = 'is-idle';
 /** How long after the last scroll event the snake comes to rest on a touch screen (ms). */
 const REST_MS = 250;
 /** noir.css: the page does not scroll — no snake (and nothing to drag). */
-const FLAT_CLASS = "is-flat";
+const FLAT_CLASS = 'is-flat';
 /** noir.css: the snake is held (drawn as on hover). */
-const HELD_CLASS = "is-held";
+const HELD_CLASS = 'is-held';
 /** noir.css: on <html> while the snake is held — no text selection, the grabbing cursor everywhere. */
-const DRAG_CLASS = "spine-drag";
+const DRAG_CLASS = 'spine-drag';
 /** A press on the track glides the page there in this time (s): the anchor tween, shorter. */
 const TRACK_GLIDE_S = 0.7;
 /**
@@ -35,7 +36,7 @@ const TRACK_GLIDE_S = 0.7;
  * takes no touches at all and the head lets the browser pan (touch-action: pan-y) — a finger takes
  * it only after holding it still for TOUCH_HOLD_MS.
  */
-const TOUCH_HITS_QUERY = "(hover: none), (pointer: coarse)";
+const TOUCH_HITS_QUERY = '(hover: none), (pointer: coarse)';
 
 /** iPhone / iPad (iPadOS Safari poses as a Mac, but has touch points): WebKit's touch scrolling rules. */
 function isWebKitTouch(): boolean {
@@ -45,7 +46,7 @@ function isWebKitTouch(): boolean {
 
 /** noir.css draws the progress itself where this holds (the same @supports: scroll-driven CSS animations). */
 function cssDrawsProgress(): boolean {
-  return typeof CSS !== "undefined" && CSS.supports("animation-timeline", "scroll()");
+  return typeof CSS !== 'undefined' && CSS.supports('animation-timeline', 'scroll()');
 }
 
 /** A pointer holding the snake: its id, whether it is a finger, its last viewport y, and where it holds the head (px below its centre). */
@@ -125,10 +126,10 @@ export function ScrollSpine(): ReactElement {
       timer = window.setTimeout(rest, REST_MS);
     };
     spine.classList.add(IDLE_CLASS);
-    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       window.clearTimeout(timer);
-      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener('scroll', onScroll);
       spine.classList.remove(IDLE_CLASS);
     };
   }, []);
@@ -165,7 +166,7 @@ export function ScrollSpine(): ReactElement {
       scrollTop = pageScroll.read();
       scheduleDraw();
     };
-    if (!cssProgress) window.addEventListener("scroll", onScroll, { passive: true });
+    if (!cssProgress) window.addEventListener('scroll', onScroll, { passive: true });
 
     // ── Dragging ─────────────────────────────────────────────────────────────────────────
     let hold: Hold | null = null;
@@ -214,7 +215,8 @@ export function ScrollSpine(): ReactElement {
       stopGlide = tweenScroll(pageScroll, () => dragScroll(track, glideY, 0, max), landed, {
         duration: TRACK_GLIDE_S,
         // the press that started it (pointerdown, then touchstart on a touch screen) does not stop it
-        ignore: (e) => (e.type === "pointerdown" || e.type === "touchstart") && e.target instanceof Node && spine.contains(e.target),
+        ignore: e =>
+          (e.type === 'pointerdown' || e.type === 'touchstart') && e.target instanceof Node && spine.contains(e.target),
         onInterrupt: landed,
       });
     };
@@ -224,18 +226,18 @@ export function ScrollSpine(): ReactElement {
       hold = null;
       root.classList.remove(DRAG_CLASS);
       spine.classList.remove(HELD_CLASS);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerEnd);
-      window.removeEventListener("pointercancel", onPointerEnd);
-      window.removeEventListener("blur", release);
-      window.removeEventListener("contextmenu", onContextMenu);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerEnd);
+      window.removeEventListener('pointercancel', onPointerEnd);
+      window.removeEventListener('blur', release);
+      window.removeEventListener('contextmenu', onContextMenu);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
     function onPointerMove(event: PointerEvent): void {
       if (!hold || event.pointerId !== hold.id) return;
       // A mouse / pen moving with its button up: its release went elsewhere (a context menu took
       // it, it happened outside the window) — the hold is over, the page must not follow the hover.
-      if (event.pointerType !== "touch" && (event.buttons & 1) === 0) {
+      if (event.pointerType !== 'touch' && (event.buttons & 1) === 0) {
         release();
         return;
       }
@@ -247,7 +249,7 @@ export function ScrollSpine(): ReactElement {
       if (!hold || event.pointerId !== hold.id) return;
       // Cancelled: the browser or the OS took the pointer (an edge gesture, an incoming call, palm
       // rejection) — the press on the track did not happen, the page does not glide on.
-      if (event.type === "pointercancel") stopGlide();
+      if (event.type === 'pointercancel') stopGlide();
       release();
     }
     function onContextMenu(event: MouseEvent): void {
@@ -257,11 +259,18 @@ export function ScrollSpine(): ReactElement {
       else release();
     }
     function onVisibilityChange(): void {
-      if (document.visibilityState === "hidden") release();
+      if (document.visibilityState === 'hidden') release();
     }
 
     /** Takes the head: from now on the pointer drags the page (window listeners, capture). */
-    const startHold = (pointerId: number, touch: boolean, y: number, gliding: boolean, offset: number, captor: Element): Hold => {
+    const startHold = (
+      pointerId: number,
+      touch: boolean,
+      y: number,
+      gliding: boolean,
+      offset: number,
+      captor: Element,
+    ): Hold => {
       const current: Hold = { id: pointerId, touch, y, offset, gliding };
       hold = current;
       try {
@@ -271,12 +280,12 @@ export function ScrollSpine(): ReactElement {
       }
       root.classList.add(DRAG_CLASS);
       spine.classList.add(HELD_CLASS);
-      window.addEventListener("pointermove", onPointerMove);
-      window.addEventListener("pointerup", onPointerEnd);
-      window.addEventListener("pointercancel", onPointerEnd);
-      window.addEventListener("blur", release);
-      window.addEventListener("contextmenu", onContextMenu);
-      document.addEventListener("visibilitychange", onVisibilityChange);
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerEnd);
+      window.addEventListener('pointercancel', onPointerEnd);
+      window.addEventListener('blur', release);
+      window.addEventListener('contextmenu', onContextMenu);
+      document.addEventListener('visibilitychange', onVisibilityChange);
       return current;
     };
 
@@ -284,9 +293,9 @@ export function ScrollSpine(): ReactElement {
       if (!press) return;
       window.clearTimeout(press.timer);
       press = null;
-      window.removeEventListener("pointermove", onPressMove);
-      window.removeEventListener("pointerup", onPressEnd);
-      window.removeEventListener("pointercancel", onPressEnd);
+      window.removeEventListener('pointermove', onPressMove);
+      window.removeEventListener('pointerup', onPressEnd);
+      window.removeEventListener('pointercancel', onPressEnd);
     };
     function onPressMove(event: PointerEvent): void {
       if (!press || event.pointerId !== press.id) return;
@@ -320,9 +329,9 @@ export function ScrollSpine(): ReactElement {
         }
       }, TOUCH_HOLD_MS);
       press = { id, x: event.clientX, y: event.clientY, lastY: event.clientY, timer };
-      window.addEventListener("pointermove", onPressMove);
-      window.addEventListener("pointerup", onPressEnd);
-      window.addEventListener("pointercancel", onPressEnd);
+      window.addEventListener('pointermove', onPressMove);
+      window.addEventListener('pointerup', onPressEnd);
+      window.addEventListener('pointercancel', onPressEnd);
     };
     // Once a finger holds the head, its moves are the drag's, not the page's own scroll (the head
     // lets the browser pan — touch-action: pan-y — so a plain swipe on it still scrolls the page).
@@ -349,7 +358,7 @@ export function ScrollSpine(): ReactElement {
       stopGlide();
       release();
       endPress();
-      if (event.pointerType === "touch" && touchHits.matches) {
+      if (event.pointerType === 'touch' && touchHits.matches) {
         // A finger on a touch screen: only the head, and only once held still (startPress).
         if (onHead) startPress(event);
         return;
@@ -357,7 +366,14 @@ export function ScrollSpine(): ReactElement {
       // No text selection, no focus move, no compatibility mouse events.
       event.preventDefault();
       const offset = onHead ? grabOffset(track, scrollProgress(pageScroll.read(), max), event.clientY) : 0;
-      const current = startHold(event.pointerId, event.pointerType === "touch", event.clientY, !onHead, offset, onHead ? grip : rail);
+      const current = startHold(
+        event.pointerId,
+        event.pointerType === 'touch',
+        event.clientY,
+        !onHead,
+        offset,
+        onHead ? grip : rail,
+      );
       if (onHead) {
         // Grabbed: the page holds still under the pointer (stops a wheel glide of Lenis).
         scheduleWrite(event.clientY, offset);
@@ -370,24 +386,24 @@ export function ScrollSpine(): ReactElement {
 
     // The page grows / shrinks at runtime (lead form success, <details>, chapters rendered for the
     // first time) and the spine follows the viewport: both are re-measured after layout.
-    const resizeObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
     if (resizeObserver) {
       resizeObserver.observe(document.body);
       resizeObserver.observe(spine);
     } else {
       measure();
-      window.addEventListener("resize", measure);
+      window.addEventListener('resize', measure);
     }
-    spine.addEventListener("pointerdown", onPointerDown);
-    grip.addEventListener("touchmove", onTouchMove, { passive: false });
-    spine.addEventListener("lostpointercapture", onLostCapture);
+    spine.addEventListener('pointerdown', onPointerDown);
+    grip.addEventListener('touchmove', onTouchMove, { passive: false });
+    spine.addEventListener('lostpointercapture', onLostCapture);
     return () => {
       resizeObserver?.disconnect();
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", onScroll);
-      spine.removeEventListener("pointerdown", onPointerDown);
-      grip.removeEventListener("touchmove", onTouchMove);
-      spine.removeEventListener("lostpointercapture", onLostCapture);
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', onScroll);
+      spine.removeEventListener('pointerdown', onPointerDown);
+      grip.removeEventListener('touchmove', onTouchMove);
+      spine.removeEventListener('lostpointercapture', onLostCapture);
       release();
       endPress();
       stopGlide();

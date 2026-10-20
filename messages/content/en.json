@@ -1,0 +1,138 @@
+{
+  "adminUser": {
+    "name": "Administrator"
+  },
+  "menu": {
+    "home": "Home",
+    "catalog": "Catalog",
+    "about": "About",
+    "tailoring": "Made to Measure",
+    "offers": "Special offer",
+    "contacts": "Contact"
+  },
+  "collections": {
+    "menya-zapomnyat": {
+      "title": "They Will Remember Me",
+      "description": "Hoodies carrying GADYUKA's tattoo graphics: the snake coiled around the «Г», a face-on snake head, scales, and an oversized head across the back. The slogan «They Will Remember Me» is on every piece."
+    }
+  },
+  "products": {
+    "hoodie-white-logo": {
+      "title": "Sign Hoodie — White",
+      "description": "A white hoodie bearing the brand's signature mark: an engraved snake, jaws open, coiled around the letter «Г». Finished with «ГАДЮКА / They Will Remember Me» at the hem.",
+      "details": "Print: the logo — snake and letter «Г»\n«ГАДЮКА / They Will Remember Me» lettering at the hem\nSignature hang tag with the red tongue\nAsk about fabric and sizes when ordering"
+    },
+    "hoodie-white-head": {
+      "title": "Face-On Hoodie — White",
+      "description": "A white hoodie with the snake's head face-on: open jaws, fangs and fine tattoo linework. A stare no one forgets.",
+      "details": "Print: face-on snake head\n«ГАДЮКА / They Will Remember Me» lettering at the hem\nSignature hang tag with the red tongue\nAsk about fabric and sizes when ordering"
+    },
+    "hoodie-white-scales": {
+      "title": "Scales Hoodie — White",
+      "description": "A white hoodie with a snake-scale pattern — GADYUKA's signature element, drawn in an engraving style.",
+      "details": "Print: snake scales\n«ГАДЮКА / They Will Remember Me» lettering at the hem\nSignature hang tag with the red tongue\nAsk about fabric and sizes when ordering"
+    },
+    "hoodie-black-back": {
+      "title": "Head Hoodie — Black",
+      "description": "A black hoodie with an oversized snake head across the entire back. The statement piece for those who will be remembered.",
+      "details": "Print: oversized snake head on the back\nColour: black\nSignature hang tag with the red tongue\nAsk about fabric and sizes when ordering"
+    }
+  },
+  "reviews": {
+    "seed-review-1": {
+      "author": "Sergey",
+      "role": "customer",
+      "text": "GADYUKA offers unique designs that are perfect for big-city life. Very happy with my purchase!"
+    },
+    "seed-review-2": {
+      "author": "Anna",
+      "role": "customer",
+      "text": "The hoodie fits beautifully, and the snake print gets noticed wherever I go."
+    },
+    "seed-review-3": {
+      "author": "Dmitry",
+      "role": "made-to-measure client",
+      "text": "I ordered a hoodie to my own measurements — the team helped with fabric and fit. The result exceeded my expectations."
+    }
+  },
+  "news": {
+    "kollekciya-menya-zapomnyat-v-kataloge": {
+      "title": "«They Will Remember Me» is now in the catalog",
+      "excerpt": "Four hoodies with signature tattoo graphics: the mark, a face-on snake head, scales and an oversized head on the back.",
+      "body": "«They Will Remember Me» is now in the catalog. Four hoodies with GADYUKA's engraving-style graphics — from the signature mark to an oversized snake head across the back.\n\nEvery piece arrives in a numbered signature box with the red-tongue hang tag."
+    },
+    "pop-up-v-krasnodare": {
+      "title": "GADYUKA pop-up in Krasnodar",
+      "excerpt": "Try the hoodies on, meet the team and talk made-to-measure. Date and venue coming soon.",
+      "body": "We're preparing a pop-up in Krasnodar: try on pieces from «They Will Remember Me», meet the team and talk through a made-to-measure order.\n\nDate and venue will be announced in our news and on social media."
+    }
+  },
+  "gallery": {
+    "seed-gallery-1": {
+      "caption": "The viper's head — the brand's engraving-style artwork"
+    },
+    "seed-gallery-2": {
+      "caption": "Woven logo label"
+    },
+    "seed-gallery-3": {
+      "caption": "Signature hang tag with the red tongue"
+    },
+    "seed-gallery-4": {
+      "caption": "GADYUKA wordmark on red"
+    },
+    "seed-gallery-5": {
+      "caption": "Forked-tongue label"
+    },
+    "seed-gallery-6": {
+      "caption": "Signature style elements"
+    }
+  },
+  "offers": {
+    "seed-offer-1": {
+      "title": "10% off made-to-measure",
+      "text": "Request a made-to-measure piece before the end of the year and get 10% off. Ask our team for details.",
+      "badge": "−10%",
+      "ctaLabel": "Submit a request"
+    },
+    "seed-offer-2": {
+      "title": "Gift packaging",
+      "text": "Every hoodie comes in a numbered signature box. We'll gift-wrap your purchase at no extra cost.",
+      "badge": "Gift",
+      "ctaLabel": "Get in touch"
+    }
+  },
+  "partners": {
+    "seed-partner-1": {
+      "name": "Partner 01",
+      "description": "Tattoo studio — partner logo goes here (placeholder)"
+    },
+    "seed-partner-2": {
+      "name": "Partner 02",
+      "description": "Print & embroidery — partner slot (placeholder)"
+    },
+    "seed-partner-3": {
+      "name": "Partner 03",
+      "description": "Concept store — partner slot (placeholder)"
+    }
+  },
+  "settings": {
+    "address": "Krasnodar, Russia (placeholder address — set it in the admin)",
+    "seoTitle": "GADYUKA — designer streetwear from Krasnodar",
+    "seoDescription": "Streetwear with original designs and tattoo graphics: hoodies from the «They Will Remember Me» collection and made-to-measure tailoring. Krasnodar."
+  },
+  "mediaAlt": {
+    "hoodieWhiteLogo": "White hoodie with the GADYUKA logo — a snake coiled around the letter «Г»",
+    "hoodieWhiteHead": "White hoodie with a face-on snake head print",
+    "hoodieWhiteScales": "White hoodie with a snake-scale print",
+    "hoodieBlackBack": "Black hoodie, back view — an oversized snake head",
+    "packaging": "Signature «They Will Remember Me. Krasnodar» boxes numbered 01, 03, 04",
+    "hangtag": "GADYUKA hang tag with the red forked tongue",
+    "labelLogo": "Woven GADYUKA logo label",
+    "labelTongue": "Woven label with the snake's forked tongue",
+    "lekalaRack": "A rack of sewing patterns in the workshop",
+    "wordmarkOnBlack": "GADYUKA wordmark on black",
+    "wordmarkPatternRed": "Repeating GADYUKA wordmark on red",
+    "styleElements": "Brand elements: the snake's head, forked tongue and scales",
+    "snakeHeadCloseup": "The viper's head in profile — the brand's engraving-style artwork"
+  }
+}

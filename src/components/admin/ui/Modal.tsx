@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
-import { clsx } from "clsx";
-import { X } from "lucide-react";
-import { useEffect, useId, useRef, useSyncExternalStore, type ReactElement, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { clsx } from 'clsx';
+import { X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { useEffect, useId, useRef, useSyncExternalStore, type ReactElement, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 export type ModalProps = {
   open: boolean;
@@ -12,16 +13,16 @@ export type ModalProps = {
   description?: ReactNode;
   children?: ReactNode;
   footer?: ReactNode;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   /** Prevent closing with Esc / backdrop (e.g. while uploading). */
   locked?: boolean;
 };
 
-const widths: Record<NonNullable<ModalProps["size"]>, string> = {
-  sm: "max-w-md",
-  md: "max-w-xl",
-  lg: "max-w-3xl",
-  xl: "max-w-6xl",
+const widths: Record<NonNullable<ModalProps['size']>, string> = {
+  sm: 'max-w-md',
+  md: 'max-w-xl',
+  lg: 'max-w-3xl',
+  xl: 'max-w-6xl',
 };
 
 const noopSubscribe = (): (() => void) => () => {};
@@ -51,7 +52,17 @@ export function Modal(props: ModalProps): ReactElement | null {
   return isClient ? createPortal(<ModalDialog {...props} />, document.body) : null;
 }
 
-function ModalDialog({ open, onClose, title, description, children, footer, size = "md", locked = false }: ModalProps): ReactElement {
+function ModalDialog({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  footer,
+  size = 'md',
+  locked = false,
+}: ModalProps): ReactElement {
+  const t = useTranslations('admin.ui');
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -68,22 +79,22 @@ function ModalDialog({ open, onClose, title, description, children, footer, size
       ref={dialogRef}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
-      onCancel={(event) => {
+      onCancel={event => {
         event.preventDefault();
         if (!locked) onClose();
       }}
       onClose={() => {
         if (open) onClose();
       }}
-      onClick={(event) => {
+      onClick={event => {
         if (event.target === event.currentTarget && !locked) onClose();
       }}
-      onSubmit={(event) => {
+      onSubmit={event => {
         // Never let a form inside the dialog submit a form that renders the dialog.
         event.stopPropagation();
       }}
       className={clsx(
-        "m-auto max-h-[min(90dvh,900px)] w-[calc(100%-2rem)] overflow-hidden rounded-xl border border-line-strong bg-panel p-0 text-fg shadow-2xl",
+        'm-auto max-h-[min(90dvh,900px)] w-[calc(100%-2rem)] overflow-hidden rounded-xl border border-line-strong bg-panel p-0 text-fg shadow-2xl',
         widths[size],
       )}
     >
@@ -105,13 +116,17 @@ function ModalDialog({ open, onClose, title, description, children, footer, size
               onClick={onClose}
               disabled={locked}
               className="-m-1 rounded-md p-1 text-muted hover:bg-raised-hi hover:text-fg disabled:opacity-40"
-              aria-label="Закрыть"
+              aria-label={t('close')}
             >
               <X className="size-5" aria-hidden />
             </button>
           </header>
           {children ? <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div> : null}
-          {footer ? <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3">{footer}</footer> : null}
+          {footer ? (
+            <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3">
+              {footer}
+            </footer>
+          ) : null}
         </div>
       ) : null}
     </dialog>

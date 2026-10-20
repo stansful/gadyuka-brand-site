@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
-import { type ReactElement, useRef } from "react";
-import { chapterReveal, coverTilt, dropIn, litWhenCentred, panelWipes } from "../motion/effects";
-import { useScene } from "../motion/useScene";
-import { SceneRoot, type SceneProps } from "./SceneRoot";
+import { type ReactElement, useRef } from 'react';
+
+import { chapterReveal, coverTilt, dropIn, litWhenCentred, panelWipes } from '../motion/effects';
+import { useScene } from '../motion/useScene';
+import { SceneRoot, type SceneProps } from './SceneRoot';
 
 /**
  * «Каталог» (landing chapter and the collection page): chapter header, ink-wipe panels,
@@ -18,13 +19,13 @@ export function CatalogScene(props: SceneProps): ReactElement {
     dropIn(
       root,
       ctx,
-      ".cover",
+      '.cover',
       { y: 90, rotation: 4, opacity: 0 },
-      { y: 0, rotation: 0, opacity: 1, duration: 1.1, stagger: 0.12, ease: "power3.out" },
-      "all",
+      { y: 0, rotation: 0, opacity: 1, duration: 1.1, stagger: 0.12, ease: 'power3.out' },
+      'all',
     );
     coverTilt(root, ctx);
-    litWhenCentred(root, ".cover__card", "top 70%", "bottom 30%");
+    litWhenCentred(root, '.cover__card', 'top 70%', 'bottom 30%');
   });
   return <SceneRoot sceneRef={ref} {...props} />;
 }

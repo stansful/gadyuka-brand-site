@@ -1,6 +1,6 @@
-import { loadedScrollTrigger, type ScrollTriggerPlugin } from "./gsap";
-import { LITE_CLASS } from "./in-app";
-import { refreshDecision } from "./refresh-gate";
+import { loadedScrollTrigger, type ScrollTriggerPlugin } from './gsap';
+import { LITE_CLASS } from './in-app';
+import { refreshDecision } from './refresh-gate';
 
 /**
  * Motion environment (client only).
@@ -11,9 +11,9 @@ import { refreshDecision } from "./refresh-gate";
  * fully visible, native scrolling, no scrub.
  */
 
-export const MOTION_CLASS = "motion";
+export const MOTION_CLASS = 'motion';
 /** Set by INTRO_BOOT (boot.ts) while the cover's CSS intro runs; removed by the hero scene. */
-export const INTRO_CLASS = "is-intro";
+export const INTRO_CLASS = 'is-intro';
 /**
  * Set by MOTION_BOOT (boot.ts) together with `motion`: the scroll scenes' start states are drawn
  * by CSS (noir.css, "scene start states") for every scene root still marked SCENE_PENDING_ATTR,
@@ -21,18 +21,18 @@ export const INTRO_CLASS = "is-intro";
  * class (4 s after `load`, when the app bundle or the scroll plugins have not arrived by then);
  * the scenes clear their own marks.
  */
-export const PENDING_CLASS = "motion-pending";
+export const PENDING_CLASS = 'motion-pending';
 
-export { SCENE_LATE_ATTR, SCENE_PENDING_ATTR } from "./scene-attrs";
+export { SCENE_LATE_ATTR, SCENE_PENDING_ATTR } from './scene-attrs';
 
-const REDUCED_QUERY = "(prefers-reduced-motion: reduce)";
+const REDUCED_QUERY = '(prefers-reduced-motion: reduce)';
 
 export function prefersReducedMotion(): boolean {
-  return typeof window !== "undefined" && window.matchMedia(REDUCED_QUERY).matches;
+  return typeof window !== 'undefined' && window.matchMedia(REDUCED_QUERY).matches;
 }
 
 export function motionEnabled(): boolean {
-  if (typeof document === "undefined") return false;
+  if (typeof document === 'undefined') return false;
   return document.documentElement.classList.contains(MOTION_CLASS) && !prefersReducedMotion();
 }
 
@@ -42,12 +42,12 @@ export function motionEnabled(): boolean {
  * motion/lite.ts only.
  */
 export function liteMotion(): boolean {
-  return typeof document !== "undefined" && document.documentElement.classList.contains(LITE_CLASS);
+  return typeof document !== 'undefined' && document.documentElement.classList.contains(LITE_CLASS);
 }
 
 /** Mouse / trackpad (tilt, cursor bubble); touch screens get the "lit when centred" variant. */
 export function hasFinePointer(): boolean {
-  return typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  return typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 }
 
 let refreshTimer: number | undefined;
@@ -65,7 +65,7 @@ let touchSeen = false;
  * compositor momentum, Lenis only smooths the wheel).
  */
 export function isTouchScreen(): boolean {
-  return typeof window !== "undefined" && (touchSeen || !hasFinePointer());
+  return typeof window !== 'undefined' && (touchSeen || !hasFinePointer());
 }
 
 /**
@@ -75,7 +75,7 @@ export function isTouchScreen(): boolean {
  * swipes before the first refresh request count too.
  */
 export function trackScrollActivity(): void {
-  if (tracking || typeof window === "undefined") return;
+  if (tracking || typeof window === 'undefined') return;
   tracking = true;
   const onTouch = (event: TouchEvent): void => {
     touchSeen = true;
@@ -94,17 +94,17 @@ export function trackScrollActivity(): void {
       if (end instanceof TouchEvent) onTouch(end);
       done.abort();
     };
-    target.addEventListener("touchend", onEnd, { passive: true, signal: done.signal });
-    target.addEventListener("touchcancel", onEnd, { passive: true, signal: done.signal });
+    target.addEventListener('touchend', onEnd, { passive: true, signal: done.signal });
+    target.addEventListener('touchcancel', onEnd, { passive: true, signal: done.signal });
   };
   const onScroll = (): void => {
     lastActivity = performance.now();
   };
   const options = { passive: true, capture: true } as const;
-  window.addEventListener("touchstart", onTouchStart, options);
-  window.addEventListener("touchend", onTouch, options);
-  window.addEventListener("touchcancel", onTouch, options);
-  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener('touchstart', onTouchStart, options);
+  window.addEventListener('touchend', onTouch, options);
+  window.addEventListener('touchcancel', onTouch, options);
+  window.addEventListener('scroll', onScroll, { passive: true });
 }
 
 /** Called after a touch screen's re-measure (refreshEach) — ScrollTrigger dispatches "refresh" only for a full one. */
@@ -140,8 +140,8 @@ function runRefresh(): void {
     stillForMs: performance.now() - lastActivity,
     hidden: document.hidden,
   });
-  if (decision.kind === "wait") refreshTimer = window.setTimeout(runRefresh, decision.ms);
-  else if (decision.kind === "now") refreshEach(scrollTrigger);
+  if (decision.kind === 'wait') refreshTimer = window.setTimeout(runRefresh, decision.ms);
+  else if (decision.kind === 'now') refreshEach(scrollTrigger);
   else scrollTrigger.refresh(true);
 }
 
@@ -154,7 +154,7 @@ function runRefresh(): void {
  *    at all (refreshEach).
  */
 export function scheduleRefresh(): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   trackScrollActivity();
   window.clearTimeout(refreshTimer);
   refreshTimer = window.setTimeout(runRefresh, 120);

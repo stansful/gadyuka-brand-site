@@ -1,13 +1,14 @@
-"use client";
+'use client';
 
-import { type ReactElement, type ReactNode, useRef } from "react";
-import { hasFinePointer, INTRO_CLASS, liteMotion, motionEnabled, scheduleRefresh } from "../motion/env";
-import { inContext } from "../motion/effects";
-import { gsap, loadScrollTrigger } from "../motion/gsap";
-import { addSafely, useIsomorphicLayoutEffect } from "../motion/useScene";
+import { type ReactElement, type ReactNode, useRef } from 'react';
+
+import { inContext } from '../motion/effects';
+import { hasFinePointer, INTRO_CLASS, liteMotion, motionEnabled, scheduleRefresh } from '../motion/env';
+import { gsap, loadScrollTrigger } from '../motion/gsap';
+import { addSafely, useIsomorphicLayoutEffect } from '../motion/useScene';
 
 /** Every keyframes rule of the cover intro is named "intro-…" (noir.css, «COVER INTRO»). */
-const INTRO_PREFIX = "intro-";
+const INTRO_PREFIX = 'intro-';
 
 /** Mounted hero scenes (React StrictMode mounts, unmounts and remounts effects in dev). */
 let mountedScenes = 0;
@@ -18,12 +19,17 @@ function q<T extends Element>(root: ParentNode, selector: string): T | null {
 
 /** The cover intro's CSS animations still running or waiting for their delay. */
 function introAnimations(): CSSAnimation[] {
-  return document.getAnimations().filter((animation): animation is CSSAnimation => animation instanceof CSSAnimation && animation.animationName.startsWith(INTRO_PREFIX));
+  return document
+    .getAnimations()
+    .filter(
+      (animation): animation is CSSAnimation =>
+        animation instanceof CSSAnimation && animation.animationName.startsWith(INTRO_PREFIX),
+    );
 }
 
 /** Resolves when every animation has finished (or was cancelled). */
 function settled(animations: ReadonlyArray<Animation>): Promise<void> {
-  return Promise.allSettled(animations.map((animation) => animation.finished)).then(() => undefined);
+  return Promise.allSettled(animations.map(animation => animation.finished)).then(() => undefined);
 }
 
 /**
@@ -38,7 +44,17 @@ function settled(animations: ReadonlyArray<Animation>): Promise<void> {
  * server-rendered cover stays as is. In-app browsers (lite motion) load no ScrollTrigger: the
  * page turn and the SFX drift are CSS scroll-driven animations there (noir.css «LITE MOTION»).
  */
-export function HeroScene({ children, className, id, labelledBy }: { children: ReactNode; className: string; id: string; labelledBy: string }): ReactElement {
+export function HeroScene({
+  children,
+  className,
+  id,
+  labelledBy,
+}: {
+  children: ReactNode;
+  className: string;
+  id: string;
+  labelledBy: string;
+}): ReactElement {
   const ref = useRef<HTMLElement>(null);
 
   useIsomorphicLayoutEffect(() => {
@@ -55,21 +71,21 @@ export function HeroScene({ children, className, id, labelledBy }: { children: R
     const lite = liteMotion();
     const ctx = gsap.context(() => undefined, hero);
 
-    const splash = q<HTMLElement>(hero, ".splash");
+    const splash = q<HTMLElement>(hero, '.splash');
     // The cover link and the collection plate laid over it turn away together.
-    const cover = q<HTMLElement>(hero, ".splash-wrap") ?? splash;
-    const sfx = q<HTMLElement>(hero, ".sfx--hiss");
-    const leave = { trigger: hero, start: "top top", end: "bottom top", scrub: 0.4 };
+    const cover = q<HTMLElement>(hero, '.splash-wrap') ?? splash;
+    const sfx = q<HTMLElement>(hero, '.sfx--hiss');
+    const leave = { trigger: hero, start: 'top top', end: 'bottom top', scrub: 0.4 };
 
     // addSafely: a throw inside the setup must not corrupt GSAP's current context.
     const result = addSafely(ctx, () => {
       if (!splash) return undefined;
 
       // cursor bubble
-      const cursor = q<HTMLElement>(hero, ".splash__cursor");
+      const cursor = q<HTMLElement>(hero, '.splash__cursor');
       if (!cursor || !hasFinePointer()) return undefined;
-      const xTo = gsap.quickTo(cursor, "x", { duration: 0.45, ease: "power3.out" });
-      const yTo = gsap.quickTo(cursor, "y", { duration: 0.45, ease: "power3.out" });
+      const xTo = gsap.quickTo(cursor, 'x', { duration: 0.45, ease: 'power3.out' });
+      const yTo = gsap.quickTo(cursor, 'y', { duration: 0.45, ease: 'power3.out' });
       const enter = inContext(ctx, () => {
         gsap.to(cursor, { opacity: 1, scale: 1, duration: 0.3 });
       });
@@ -81,13 +97,13 @@ export function HeroScene({ children, className, id, labelledBy }: { children: R
         xTo(event.clientX - r.left + 26);
         yTo(event.clientY - r.top + 26);
       };
-      splash.addEventListener("pointerenter", enter);
-      splash.addEventListener("pointerleave", exit);
-      splash.addEventListener("pointermove", move);
+      splash.addEventListener('pointerenter', enter);
+      splash.addEventListener('pointerleave', exit);
+      splash.addEventListener('pointermove', move);
       return () => {
-        splash.removeEventListener("pointerenter", enter);
-        splash.removeEventListener("pointerleave", exit);
-        splash.removeEventListener("pointermove", move);
+        splash.removeEventListener('pointerenter', enter);
+        splash.removeEventListener('pointerleave', exit);
+        splash.removeEventListener('pointermove', move);
       };
     });
     if (!result.ok) {
@@ -100,7 +116,7 @@ export function HeroScene({ children, className, id, labelledBy }: { children: R
     const scrolling = lite ? null : loadScrollTrigger();
     void scrolling?.then(
       inContext(ctx, () => {
-        if (cover) gsap.to(cover, { scale: 0.93, rotation: -1.2, opacity: 0.35, ease: "none", scrollTrigger: leave });
+        if (cover) gsap.to(cover, { scale: 0.93, rotation: -1.2, opacity: 0.35, ease: 'none', scrollTrigger: leave });
       }),
       () => undefined,
     );
@@ -109,7 +125,7 @@ export function HeroScene({ children, className, id, labelledBy }: { children: R
     const attachSfx = (): void => {
       void scrolling?.then(
         inContext(ctx, () => {
-          if (sfx) gsap.to(sfx, { yPercent: -120, ease: "none", scrollTrigger: leave });
+          if (sfx) gsap.to(sfx, { yPercent: -120, ease: 'none', scrollTrigger: leave });
         }),
         () => undefined,
       );
@@ -122,7 +138,9 @@ export function HeroScene({ children, className, id, labelledBy }: { children: R
       const played = html.classList.contains(INTRO_CLASS);
       const intro = played ? introAnimations() : [];
 
-      const sfxIntro = intro.filter((animation) => animation.effect instanceof KeyframeEffect && animation.effect.target === sfx);
+      const sfxIntro = intro.filter(
+        animation => animation.effect instanceof KeyframeEffect && animation.effect.target === sfx,
+      );
       void settled(sfxIntro).then(() => {
         if (!disposed) attachSfx();
       });
@@ -132,7 +150,8 @@ export function HeroScene({ children, className, id, labelledBy }: { children: R
       // pivoting on their left edge.
       void settled(intro).then(() => {
         if (disposed) return;
-        if (played) hero.querySelectorAll<HTMLElement>(".splash__cap").forEach((cap) => (cap.style.transformOrigin = "0% 50%"));
+        if (played)
+          hero.querySelectorAll<HTMLElement>('.splash__cap').forEach(cap => (cap.style.transformOrigin = '0% 50%'));
         html.classList.remove(INTRO_CLASS);
       });
       if (!lite) scheduleRefresh();

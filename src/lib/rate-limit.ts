@@ -1,6 +1,6 @@
-import "server-only";
-import { createHmac } from "node:crypto";
-import { isIP } from "node:net";
+import 'server-only';
+import { createHmac } from 'node:crypto';
+import { isIP } from 'node:net';
 
 /**
  * Lead rate limiting.
@@ -33,7 +33,7 @@ export const LEAD_NOTIFY_CEILING = {
 export const IP_HASH_SALT_MIN_LENGTH = 16;
 
 /** Used only outside production when IP_HASH_SALT is not configured (a warning is logged once). */
-const DEV_FALLBACK_SALT = "gadyuka-ip-hash-dev-only-salt";
+const DEV_FALLBACK_SALT = 'gadyuka-ip-hash-dev-only-salt';
 
 let warnedAboutSalt = false;
 
@@ -41,9 +41,9 @@ export class IpHashSaltError extends Error {
   constructor() {
     super(
       `IP_HASH_SALT is missing or shorter than ${IP_HASH_SALT_MIN_LENGTH} characters — refusing to hash client IPs in production. ` +
-        "Set a random value (openssl rand -hex 32) in .env and restart.",
+        'Set a random value (openssl rand -hex 32) in .env and restart.',
     );
-    this.name = "IpHashSaltError";
+    this.name = 'IpHashSaltError';
   }
 }
 
@@ -52,19 +52,21 @@ export class IpHashSaltError extends Error {
  * or too short (fail closed). Dev/test: falls back to a built-in salt with one warning.
  */
 export function getIpHashSalt(env: { IP_HASH_SALT?: string; NODE_ENV?: string } = process.env): string {
-  const salt = env.IP_HASH_SALT?.trim() ?? "";
+  const salt = env.IP_HASH_SALT?.trim() ?? '';
   if (salt.length >= IP_HASH_SALT_MIN_LENGTH) return salt;
-  if (env.NODE_ENV === "production") throw new IpHashSaltError();
+  if (env.NODE_ENV === 'production') throw new IpHashSaltError();
   if (!warnedAboutSalt) {
     warnedAboutSalt = true;
-    console.warn("[rate-limit] IP_HASH_SALT is not set (or too short) — using a dev-only salt. Set a random value in .env.");
+    console.warn(
+      '[rate-limit] IP_HASH_SALT is not set (or too short) — using a dev-only salt. Set a random value in .env.',
+    );
   }
   return salt || DEV_FALLBACK_SALT;
 }
 
 /** HMAC-SHA256(key = salt, message = ip), hex. Deterministic for the same IP + salt. */
 export function hashIp(ip: string, salt: string): string {
-  return createHmac("sha256", salt).update(ip.trim().toLowerCase(), "utf8").digest("hex");
+  return createHmac('sha256', salt).update(ip.trim().toLowerCase(), 'utf8').digest('hex');
 }
 
 const MAX_IP_LENGTH = 64;
@@ -75,7 +77,7 @@ function cleanIp(value: string | null | undefined): string | null {
   // "[2001:db8::1]:443" → "2001:db8::1"; "203.0.113.7:51234" → "203.0.113.7"
   const bracketed = /^\[([^\]]+)\](?::\d+)?$/.exec(ip);
   if (bracketed?.[1]) ip = bracketed[1];
-  else if (/^\d{1,3}(?:\.\d{1,3}){3}:\d+$/.test(ip)) ip = ip.slice(0, ip.lastIndexOf(":"));
+  else if (/^\d{1,3}(?:\.\d{1,3}){3}:\d+$/.test(ip)) ip = ip.slice(0, ip.lastIndexOf(':'));
   if (ip.length === 0 || ip.length > MAX_IP_LENGTH || !/^[0-9a-fA-F:.]+$/.test(ip)) return null;
   return ip;
 }
@@ -91,18 +93,23 @@ function ipv6Hextets(ip: string): number[] | null {
     if (a === undefined || b === undefined || c === undefined || d === undefined) return null;
     tail.push((a << 8) | b, (c << 8) | d);
     address = address.slice(0, v4.index);
-    if (address.endsWith(":") && !address.endsWith("::")) address = address.slice(0, -1);
+    if (address.endsWith(':') && !address.endsWith('::')) address = address.slice(0, -1);
   }
-  const halves = address.split("::");
+  const halves = address.split('::');
   if (halves.length > 2) return null;
   const parse = (part: string | undefined): number[] =>
-    part ? part.split(":").filter((group) => group.length > 0).map((group) => Number.parseInt(group, 16)) : [];
+    part
+      ? part
+          .split(':')
+          .filter(group => group.length > 0)
+          .map(group => Number.parseInt(group, 16))
+      : [];
   const head = parse(halves[0]);
   const rest = [...parse(halves[1]), ...tail];
   const missing = 8 - head.length - rest.length;
   if (missing < 0 || (halves.length === 1 && missing !== 0)) return null;
   const groups = [...head, ...new Array<number>(missing).fill(0), ...rest];
-  return groups.length === 8 && groups.every((group) => Number.isInteger(group) && group >= 0 && group <= 0xffff)
+  return groups.length === 8 && groups.every(group => Number.isInteger(group) && group >= 0 && group <= 0xffff)
     ? groups
     : null;
 }
@@ -116,13 +123,16 @@ export function rateLimitNetwork(ip: string): string {
   if (isIP(clean) !== 6) return clean;
   const groups = ipv6Hextets(clean);
   if (!groups) return clean;
-  const mapped = groups.slice(0, 5).every((group) => group === 0) && groups[5] === 0xffff;
+  const mapped = groups.slice(0, 5).every(group => group === 0) && groups[5] === 0xffff;
   if (mapped) {
     const high = groups[6] ?? 0;
     const low = groups[7] ?? 0;
     return `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`;
   }
-  return `${groups.slice(0, 4).map((group) => group.toString(16)).join(":")}::/64`;
+  return `${groups
+    .slice(0, 4)
+    .map(group => group.toString(16))
+    .join(':')}::/64`;
 }
 
 /**
@@ -133,11 +143,11 @@ export function rateLimitNetwork(ip: string): string {
  * Also used for the admin login throttle (src/lib/admin/auth.ts).
  */
 export function getClientIp(headers: Headers): string | null {
-  const realIp = cleanIp(headers.get("x-real-ip"));
+  const realIp = cleanIp(headers.get('x-real-ip'));
   if (realIp) return realIp;
-  const forwarded = headers.get("x-forwarded-for");
+  const forwarded = headers.get('x-forwarded-for');
   if (forwarded) {
-    const parts = forwarded.split(",");
+    const parts = forwarded.split(',');
     const last = cleanIp(parts[parts.length - 1]);
     if (last) return last;
   }
@@ -147,7 +157,7 @@ export function getClientIp(headers: Headers): string | null {
 /** Rate-limit key of a request (unknown IPs share one bucket). Throws IpHashSaltError (production). */
 export function rateLimitKey(headers: Headers, salt: string = getIpHashSalt()): string {
   const ip = getClientIp(headers);
-  return hashIp(ip ? rateLimitNetwork(ip) : "unknown", salt);
+  return hashIp(ip ? rateLimitNetwork(ip) : 'unknown', salt);
 }
 
 /** Counts leads with this ipHash created at or after `since`. */

@@ -1,20 +1,31 @@
-"use client";
+'use client';
 
-import type Lenis from "lenis";
-import { useEffect } from "react";
-import { SECTION_ANCHORS } from "@/lib/content/anchors";
-import { LEAD_INTENT_EVENT, parseLeadIntent } from "@/lib/lead-intent";
-import { fragmentId } from "../locale-switch";
-import { layoutTop } from "./dom-utils";
-import { hasFinePointer, isTouchScreen, liteMotion, motionEnabled, onRefreshed, scheduleRefresh, trackScrollActivity } from "./env";
-import { NAVIGATE_EVENT } from "./events";
-import { gsap, loadScrollTrigger } from "./gsap";
-import { setLenis } from "./lenis-store";
-import { startLiteMotion } from "./lite";
-import { pauseLoopsOffscreen } from "./offscreen-loops";
-import { heightChangeNeedsRefresh } from "./refresh-gate";
-import { clampScroll, pageScroll, tweenScroll, USER_SCROLL_EVENTS } from "./scroll-tween";
-import { visitorActed } from "./tap-guard";
+import { useEffect } from 'react';
+
+import { SECTION_ANCHORS } from '@/lib/content/anchors';
+import { LEAD_INTENT_EVENT, parseLeadIntent } from '@/lib/lead-intent';
+
+import type Lenis from 'lenis';
+
+import { fragmentId } from '../locale-switch';
+import { layoutTop } from './dom-utils';
+import {
+  hasFinePointer,
+  isTouchScreen,
+  liteMotion,
+  motionEnabled,
+  onRefreshed,
+  scheduleRefresh,
+  trackScrollActivity,
+} from './env';
+import { NAVIGATE_EVENT } from './events';
+import { gsap, loadScrollTrigger } from './gsap';
+import { setLenis } from './lenis-store';
+import { startLiteMotion } from './lite';
+import { pauseLoopsOffscreen } from './offscreen-loops';
+import { heightChangeNeedsRefresh } from './refresh-gate';
+import { clampScroll, pageScroll, tweenScroll, USER_SCROLL_EVENTS } from './scroll-tween';
+import { visitorActed } from './tap-guard';
 
 /**
  * The header offset comes from CSS: html { scroll-padding-top: var(--hdr-h) } (+ scroll-margin
@@ -28,7 +39,7 @@ const UNDER_HEADER_PX = 2;
  * mouse / trackpad visitors only. Touch screens scroll natively: no non-passive wheel / touch
  * listeners, no per-frame Lenis work, no scroll-start delay while the page boots.
  */
-const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
+const FINE_POINTER_QUERY = '(hover: hover) and (pointer: fine)';
 
 /** The header (scroll-padding of <html>) + the element's scroll-margin: what an anchor scroll leaves above `el`. */
 function anchorInset(el: HTMLElement): number {
@@ -76,7 +87,7 @@ export function SmoothScroll(): null {
     // or trackpad (a tablet, ChromeOS) scrolls natively too, and ScrollTrigger stays unloaded.
     if (motion && !lite && window.matchMedia(FINE_POINTER_QUERY).matches) {
       const startLenis = (): void => {
-        void import("lenis").then(
+        void import('lenis').then(
           ({ default: LenisClass }) => {
             if (disposed) return;
             const instance = new LenisClass({ lerp: 0.1, smoothWheel: true });
@@ -86,8 +97,8 @@ export function SmoothScroll(): null {
             setLenis(instance);
             // ScrollTrigger (loaded for the scenes) follows Lenis' scroll.
             void loadScrollTrigger().then(
-              (plugin) => {
-                if (!disposed && lenis === instance) instance.on("scroll", plugin.update);
+              plugin => {
+                if (!disposed && lenis === instance) instance.on('scroll', plugin.update);
               },
               () => undefined,
             );
@@ -95,7 +106,7 @@ export function SmoothScroll(): null {
           (error: unknown) => console.error(error),
         );
       };
-      if (typeof window.requestIdleCallback === "function") {
+      if (typeof window.requestIdleCallback === 'function') {
         const idle = window.requestIdleCallback(startLenis, { timeout: 1500 });
         cancelLenisStart = () => window.cancelIdleCallback(idle);
       } else {
@@ -154,19 +165,19 @@ export function SmoothScroll(): null {
       const stopTouchRebase = onRefreshed(rebaseHeight);
       stopRebase = stopTouchRebase;
       void loadScrollTrigger().then(
-        (plugin) => {
+        plugin => {
           if (disposed) return;
-          plugin.addEventListener("refresh", rebaseHeight);
+          plugin.addEventListener('refresh', rebaseHeight);
           stopRebase = () => {
             stopTouchRebase();
-            plugin.removeEventListener("refresh", rebaseHeight);
+            plugin.removeEventListener('refresh', rebaseHeight);
           };
         },
         () => undefined,
       );
     }
     const heightObserver =
-      motion && !lite && typeof ResizeObserver !== "undefined"
+      motion && !lite && typeof ResizeObserver !== 'undefined'
         ? new ResizeObserver(() => {
             const height = document.body.offsetHeight;
             if (height === lastHeight) return;
@@ -183,7 +194,7 @@ export function SmoothScroll(): null {
           })
         : null;
     heightObserver?.observe(document.body);
-    if (heightObserver) window.addEventListener("resize", onResize);
+    if (heightObserver) window.addEventListener('resize', onResize);
 
     let cancelTween = (): void => undefined;
     /** The page's scroll position, through Lenis while it runs (the instance in `lenis`, published by setLenis). */
@@ -195,11 +206,15 @@ export function SmoothScroll(): null {
       port.write(top);
     };
     const goTo = (el: HTMLElement): void => {
-      const isTop = el.id === SECTION_ANCHORS.hero || el.id === "main";
+      const isTop = el.id === SECTION_ANCHORS.hero || el.id === 'main';
       cancelTween();
       if (motion) {
         if (isTop) {
-          cancelTween = tweenScroll(port, () => 0, () => undefined);
+          cancelTween = tweenScroll(
+            port,
+            () => 0,
+            () => undefined,
+          );
         } else {
           // The header inset does not change during the tween: read once, the layout top per frame.
           const inset = anchorInset(el);
@@ -210,19 +225,27 @@ export function SmoothScroll(): null {
           );
         }
       } else if (isTop) {
-        window.scrollTo({ top: 0, behavior: "auto" });
+        window.scrollTo({ top: 0, behavior: 'auto' });
       } else {
-        el.scrollIntoView({ behavior: "auto", block: "start" });
+        el.scrollIntoView({ behavior: 'auto', block: 'start' });
       }
-      if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+      if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
       el.focus({ preventScroll: true });
     };
 
     const onClick = (event: MouseEvent): void => {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
       if (!(event.target instanceof Element)) return;
       const link = event.target.closest<HTMLAnchorElement>("a[href*='#']");
-      if (!link || (link.target && link.target !== "_self")) return;
+      if (!link || (link.target && link.target !== '_self')) return;
       const url = new URL(link.href, window.location.href);
       if (url.origin !== window.location.origin || url.pathname !== window.location.pathname || !url.hash) return;
       const id = decodeURIComponent(url.hash.slice(1));
@@ -231,12 +254,12 @@ export function SmoothScroll(): null {
       event.preventDefault();
 
       if (link.dataset.leadType) {
-        const intent = parseLeadIntent({ type: link.dataset.leadType, subject: link.dataset.leadSubject ?? "" });
+        const intent = parseLeadIntent({ type: link.dataset.leadType, subject: link.dataset.leadSubject ?? '' });
         if (intent) window.dispatchEvent(new CustomEvent(LEAD_INTENT_EVENT, { detail: intent }));
       }
       window.dispatchEvent(new Event(NAVIGATE_EVENT));
       goTo(target);
-      window.history.replaceState(window.history.state, "", `#${id}`);
+      window.history.replaceState(window.history.state, '', `#${id}`);
     };
 
     // Deep links (/catalog/…#product-…, /#lead-form, a language switch to "/en#reviews"): the
@@ -253,12 +276,12 @@ export function SmoothScroll(): null {
     const alignToHash = (): void => {
       if (userScrolled) return;
       const id = fragmentId(window.location.hash);
-      const target = id && id !== SECTION_ANCHORS.hero && id !== "main" ? document.getElementById(id) : null;
+      const target = id && id !== SECTION_ANCHORS.hero && id !== 'main' ? document.getElementById(id) : null;
       if (!target) return;
       const top = anchorScrollTop(target);
       if (Math.abs(window.scrollY - top) < 2) return;
       if (lenis) lenis.scrollTo(top, { immediate: true, force: true });
-      else window.scrollTo({ top, behavior: "instant" });
+      else window.scrollTo({ top, behavior: 'instant' });
     };
     const frame = window.requestAnimationFrame(alignToHash);
     void document.fonts.ready.then(alignToHash);
@@ -271,18 +294,18 @@ export function SmoothScroll(): null {
     };
 
     for (const type of USER_SCROLL_EVENTS) window.addEventListener(type, onUserScroll, { passive: true, once: true });
-    document.addEventListener("click", onClick);
-    window.addEventListener("load", onLoad);
+    document.addEventListener('click', onClick);
+    window.addEventListener('load', onLoad);
     return () => {
       window.cancelAnimationFrame(frame);
       cancelTween();
       userScrolled = true; // a pending fonts.ready callback must not scroll an unmounted page
       for (const type of USER_SCROLL_EVENTS) window.removeEventListener(type, onUserScroll);
-      document.removeEventListener("click", onClick);
-      window.removeEventListener("load", onLoad);
+      document.removeEventListener('click', onClick);
+      window.removeEventListener('load', onLoad);
       heightObserver?.disconnect();
       stopRebase();
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener('resize', onResize);
       window.cancelAnimationFrame(clearResizeFrame);
       resumeLoops();
       stopLite();

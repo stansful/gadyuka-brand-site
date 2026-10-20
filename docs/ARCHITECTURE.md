@@ -2,70 +2,95 @@
 
 Решения владельца (16.10.2026): VPS в Финляндии · Next.js + встроенная админка · PostgreSQL + Prisma · TypeScript строго без `any` · SEO · языки EN + RU (расширяемо до любых) · заявки → Telegram-бот + список в админке · админка пока открыта всем · коллекция «Меня запомнят» (никогда не «первая»).
 
+Решения 20.10.2026: весь текст — в `messages/*.json` и из них сидом в БД (правится в админке) · картинки — в S3 (MinIO) · меню, соцсети, шкала звёзд отзывов — данные в БД · ESLint заменён на oxlint + oxfmt.
+
 ## Стек
-| Слой | Выбор |
-|---|---|
-| Фреймворк | Next.js 16 (App Router, Turbopack, `output: "standalone"`), React 19 |
-| Язык | TypeScript `strict` + `noUncheckedIndexedAccess`; ESLint `@typescript-eslint/no-explicit-any: error` |
-| БД | PostgreSQL 17, Prisma 7 (`prisma.config.ts`, генератор `prisma-client`, драйвер-адаптер `@prisma/adapter-pg`) |
-| Валидация | zod 4 — на всех границах (формы, server actions, JSON-поля из БД) |
-| i18n | next-intl 4: локали `ru` (по умолчанию, без префикса: `/`) и `en` (`/en`). Список локалей — один массив в `src/i18n/locales.ts`; добавить язык = добавить код + заполнить переводы в админке |
-| Картинки | загрузка на сервер в `UPLOAD_DIR` (volume), `sharp` → webp + размеры; раздача через `/uploads/...` (Caddy в проде, route handler как запасной путь); `next/image` |
-| Анимации (публичная часть) | GSAP 3.13 + ScrollTrigger + SplitText, Lenis — из npm |
-| Админка UI | Tailwind CSS v4 (только в админке), серверные компоненты + server actions |
-| Тесты | Vitest для бизнес-логики (валидация заявок, форматирование Telegram, локализация, загрузки) |
-| Деплой | Docker Compose: `app` (Next standalone) + `db` (postgres:17) + `caddy` (HTTPS, раздача `/uploads`) |
+
+- **Фреймворк:** Next.js 16 (App Router, Cache Components, Turbopack, `output: "standalone"`), React 19.
+- **Язык:** TypeScript `strict` + `noUncheckedIndexedAccess`; линтер oxlint (`.oxlintrc.json`), форматтер oxfmt (`.oxfmtrc.json`).
+- **БД:** PostgreSQL 17, Prisma 7 (`prisma.config.ts`, генератор `prisma-client`, драйвер-адаптер `@prisma/adapter-pg`).
+- **Валидация:** zod 4 на всех границах (формы, server actions, JSON-поля из БД, env).
+- **i18n:** next-intl 4. Локали `ru` (по умолчанию, без префикса: `/`) и `en` (`/en`), список — `src/i18n/locales.ts`. Тексты сайта — `messages/{ru,en}.json` → таблица `Message`; тексты админки — `messages/admin/ru.json`.
+- **Картинки:** загрузка в админке → `sharp` → WebP (≤ 2400 px) → S3/MinIO (`@aws-sdk/client-s3`), ссылка `/media/<key>` с того же домена; `next/image`.
+- **Анимации (публичная часть):** GSAP + ScrollTrigger + SplitText, Lenis.
+- **Админка UI:** Tailwind CSS v4 (только в админке), серверные компоненты + server actions.
+- **Тесты:** Vitest — бизнес-логика, валидация, локализация, медиа, регрессия «нет захардкоженного текста».
+- **Деплой:** Docker Compose — `app` (Next standalone) + `db` (postgres:17) + `minio` (`pgsty/minio`, форк MinIO: официальный образ больше не публикуется) + `caddy` (HTTPS). Подробно — `DEPLOY.md`.
 
 ## Структура
+
 ```
-prisma/schema.prisma, prisma/migrations/, prisma/seed.ts   — модель и сид из BRIEF.md (ru + en)
-prisma.config.ts
-src/i18n/{locales.ts,routing.ts,request.ts,navigation.ts}
-src/proxy.ts                         — next-intl (в Next 16 middleware → proxy)
-src/app/[locale]/layout.tsx, page.tsx — лендинг (дизайн — выбранный концепт из concepts/)
-src/app/[locale]/catalog/[slug]/      — страница коллекции (SEO)
+messages/{ru,en}.json                 — тексты сайта (дефолты + набор ключей + типы next-intl) → сид → Message
+messages/admin/ru.json                — интерфейс админки (namespace "admin"), только русский, не в БД
+messages/content/{ru,en}.json         — демо-контент для сида (коллекция, товары, отзывы, меню, alt …)
+prisma/schema.prisma, migrations/     — модель данных (одна init-миграция + CHECK-ограничения)
+prisma/seed.ts, prisma/seed/*.ts      — сид: админ, сообщения, медиа → S3, картинки лендинга, сущности
+src/i18n/                             — локали, routing, request.ts (сообщения из БД поверх JSON), message-format.ts (ICU)
+src/proxy.ts                          — next-intl (в Next 16 middleware → proxy)
+src/app/[locale]/                     — лендинг, страница коллекции /catalog/<slug>, 404, ошибка
 src/app/admin/**                      — админка (RU), вне локалей
+src/app/media/[...key]/route.ts       — отдача картинок из S3 (immutable-кэш, ETag/304)
 src/app/api/leads/route.ts            — приём заявок
-src/app/uploads/[...path]/route.ts    — отдача загруженных файлов (fallback)
-src/app/{sitemap.ts,robots.ts,manifest.ts}
-src/lib/db.ts                         — PrismaClient singleton
-src/lib/content/                      — типизированный слой чтения контента (getLanding(locale) → LandingContent)
-src/lib/i18n-text.ts                  — LocalizedText (zod), t(text, locale) с фолбэком на ru
-src/lib/media.ts                      — загрузка/валидация/обработка изображений
-src/lib/leads.ts, src/lib/telegram.ts — заявки, отправка в Telegram (HTML-экранирование, ретраи, не теряем заявку при сбое)
-src/lib/seo/                          — metadata, hreflang, JSON-LD (Organization/ClothingStore, Product, BreadcrumbList)
-src/components/site/**                — секции лендинга
-src/components/admin/**               — UI админки
-messages/{ru,en}.json                 — только системные строки (ошибки форм и т.п.); весь видимый контент — в БД
-public/brand/**                       — логотип/вордмарк/SVG из assets/
+src/lib/content/                      — слой чтения контента: getLanding(locale), реестр текстов (registry.ts)
+src/lib/storage/                      — S3-клиент, ключи и ссылки медиа
+src/lib/media.ts                      — валидация и обработка изображений
+src/lib/admin/                        — запросы, server actions, схемы, i18n админки
+src/lib/leads.ts, src/lib/telegram.ts — заявки и уведомления в Telegram
+src/lib/seo/                          — metadata, hreflang, JSON-LD, sitemap
+src/components/site/**, admin/**      — UI сайта и админки
+public/brand/**                       — статичная бренд-графика (SVG)
+.claude/skills/site-texts/SKILL.md    — как добавлять текст (обязательно для агентов)
 ```
+
+## Тексты
+
+1. `messages/ru.json` / `en.json` — источник дефолтов и набора ключей. Ключ = путь через точку (`hero.title`, `forms.errors.required`).
+2. Сид (`npm run db:seed`) кладёт каждую строку в `Message(key, locale, value, editedAt)`: создаёт недостающие, обновляет строки с `editedAt IS NULL` новым дефолтом, правки из админки (`editedAt` задан) не трогает. `SEED_OVERWRITE=1` — сбросить всё к JSON. Ключи, удалённые из JSON, сид только показывает в отчёте.
+3. Сайт читает `getSiteMessages(locale)` (`src/i18n/site-messages.ts`, `'use cache'` + тег `content`): строки из БД поверх JSON. Нет строки — берётся дефолт; БД недоступна — сайт рендерится на JSON-дефолтах.
+4. Админка «Тексты сайта» (`/admin/content`): разделы = верхние namespace, вкладки языков, поиск, «изменено», «вернуть по умолчанию». При сохранении проверяются ICU-синтаксис, пробное форматирование и то, что `{аргументы}` и `<теги>` совпадают с дефолтом; тексты вида `template` (их подставляет клиентский код сайта) — только простые `{name}` без plural/select; обязательные тексты (заголовки, кнопки, подписи полей, aria-названия, ошибки формы) нельзя оставить пустыми по-русски. Форма отправляет только изменённые тексты вместе с исходным значением; если текст успели изменить в другой вкладке, сохранение отклоняется целиком (`src/lib/admin/site-text-save.ts`, advisory lock). После записи — `revalidateContent()`, сайт обновляется сразу.
+5. Регрессионные тесты `src/lib/content/site-copy.test.ts` и `src/lib/admin/admin-copy.test.ts` падают на кириллице в литералах и на ключах, которых нет в JSON.
+
+Порядок добавления текста — `.claude/skills/site-texts/SKILL.md`.
 
 ## Модель данных (Prisma)
-Переводимые поля — `Json` со структурой `LocalizedText = { [locale]: string }` (валидируется zod при чтении/записи). Так новый язык не требует миграций.
 
-- **ContentBlock** — `key` (PK, точечный ключ = `data-edit` / `data-edit-img` из концептов, напр. `hero.cta`, `about.title`), `section`, `kind` (TEXT | RICHTEXT | IMAGE | LINK), `value Json?` (LocalizedText), `mediaId?`, `order`, `updatedAt`. Тексты всех секций-«одиночек» (hero, about, tailoring, reviews, news, gallery, offers, partners, contacts, footer, меню, кнопки).
-- **Media** — файл: `path`, `mime`, `width`, `height`, `size`, `alt Json` (LocalizedText), `createdAt`.
-- **Collection** — `slug` (unique), `title`, `description` (LT), `coverId?`, `order`, `published`.
-- **Product** — `slug`, `collectionId`, `title`, `description`, `details` (LT), `price Int?` (₽), `images` (ProductImage: productId, mediaId, order), `order`, `published`.
-- **Review** — `author`, `role` (LT), `text` (LT), `avatarId?`, `rating?`, `order`, `published`.
-- **NewsItem** — `slug`, `title`, `excerpt`, `body` (LT), `date`, `imageId?`, `published`.
-- **GalleryItem** — `mediaId`, `caption` (LT), `order`, `published`.
-- **Offer** — `title`, `text`, `badge`, `ctaLabel` (LT), `ctaHref?`, `validUntil?`, `imageId?`, `order`, `published`.
-- **Partner** — `name`, `url?`, `logoId?`, `description` (LT), `order`, `published`.
-- **Lead** — `type` (TAILORING | PARTNERSHIP | CONTACT), `name`, `email?`, `phone?`, `message`, `locale`, `status` (NEW | IN_PROGRESS | DONE | SPAM), `telegramSent`, `telegramError?`, `ipHash?`, `meta Json?`, `createdAt`.
-- **SiteSettings** (одна строка) — `phone`, `email`, `address` (LT), `socials Json` (`{type,url}[]`), `seoTitle`, `seoDescription` (LT), `ogImageId?`.
+Переводимые поля сущностей — `Json` со структурой `LocalizedText = { [locale]: string }` (zod при чтении и записи), новый язык не требует миграций.
+
+- **Message** — `(key, locale)` PK, `value`, `editedAt?` (null = значение из сида), `updatedAt`. Все тексты UI сайта.
+- **ContentImage** — `key` (`about.image`, `tailoring.image`) → `mediaId?`. Картинки лендинга.
+- **User** — `role` (ADMIN | USER), `name`. Сейчас одна строка ADMIN из сида (вход по-прежнему по `ADMIN_PASSWORD`); USER — задел под пользователей сайта.
+- **Media** — `ownerType` (ADMIN | USER), `ownerId` → User, `uuid`, `bucket`, `key` = `<admin|user>/<ownerId>/<uuid>/image.webp` (CHECK), `url` = `/media/<key>`, `mime`, `width`, `height`, `size`, `alt` (LT), `originalName`.
+- **MenuItem** — `label` (LT), `href` (`#якорь`, `/путь`, `https://…`, `mailto:`, `tel:`), `showInHeader`, `showInFooter`, `order`, `published`.
+- **SocialLink** — `type` (TELEGRAM | VK | INSTAGRAM | WHATSAPP | YOUTUBE | TIKTOK | PINTEREST | WEBSITE | OTHER), `url`, `label` (LT, пусто = подпись из `social.<TYPE>`), `order`, `published`.
+- **Collection** — `slug`, `title`, `description` (LT), `coverId?`, `order`, `published`.
+- **Product** — `slug`, `collectionId`, `title`, `description`, `details` (LT), `price Int?` (₽), `images` (ProductImage), `order`, `published`.
+- **Review** — `author`, `role` (LT), `text` (LT), `avatarId?`, `rating?` (1..`reviewRatingMax`, CHECK 1..10), `userId?` (задел), `order`, `published`.
+- **NewsItem**, **GalleryItem**, **Offer**, **Partner** — как раньше (тексты LT, картинки → Media).
+- **Lead** — заявки (тип, контакты, статус, отправка в Telegram, ipHash для лимитов).
+- **SiteSettings** (одна строка) — `phone`, `email`, `address` (LT), `seoTitle`, `seoDescription` (LT), `ogImageId?`, `reviewRatingMax` (1..10, по умолчанию 5).
+
+## Картинки (S3 / MinIO)
+
+- Загрузка: `POST /admin/api/media` → проверка формата по сигнатуре (JPEG, PNG, WebP, AVIF, GIF; без SVG), ≤ 15 МБ → `sharp` → WebP → `PutObject` в бакет `S3_BUCKET` по ключу `admin/<ownerId>/<uuid>/image.webp` → строка `Media`. Если запись в БД не удалась, объект удаляется.
+- Отдача: `src/app/media/[...key]/route.ts` стримит объект из S3 (`Cache-Control: immutable`, ETag/304, `nosniff`, CSP `sandbox`); он же источник для `/_next/image`. Бакет приватный, MinIO наружу не открыт.
+- Удаление — только если картинка нигде не используется (проверка по всем связям).
+- Сид загружает картинки из `assets/` в тот же бакет; uuid детерминирован (повторный сид не дублирует объекты, новая версия файла → новый uuid → новый URL).
 
 ## Админка (`/admin`, по-русски)
-Дашборд (счётчики, последние заявки) · Контент секций (группы по секциям, вкладки языков RU/EN/…, выбор картинки из медиатеки, ссылка «посмотреть на сайте») · Коллекции и товары (CRUD, фото с порядком, публикация) · Отзывы · Новости · Галерея · Спецпредложения · Партнёры · Медиатека (мульти-загрузка, alt на всех языках, удаление с проверкой использования) · Заявки (фильтр по типу/статусу, смена статуса, повторная отправка в Telegram) · Настройки (контакты, соцсети, SEO по языкам, OG-картинка).
-После сохранения — `revalidateTag`/`revalidatePath`, сайт обновляется сразу.
-Доступ: сейчас открыт всем. Заложен выключатель: если задан `ADMIN_PASSWORD` — вход по паролю (подписанная httpOnly-cookie). Админка закрыта от индексации (`noindex`, robots).
+
+Дашборд · Тексты сайта · Меню · Соцсети · Коллекции и товары · Отзывы (звёзды по шкале из настроек) · Новости · Галерея · Спецпредложения · Партнёры · Медиатека · Заявки · Настройки (контакты, SEO, OG-картинка, шкала оценок).
+Каждое сохранение публичного контента вызывает `revalidateContent()`.
+Доступ: сейчас открыт (`ADMIN_ALLOW_OPEN=1` в проде). Если задан `ADMIN_PASSWORD` — вход по паролю (подписанная httpOnly-cookie). Админка закрыта от индексации.
 
 ## Заявки
-Формы «Оставить заявку» (пошив), «Оставить заявку для сотрудничества», «Связаться» → `POST /api/leads` → zod-валидация + honeypot + лимит частоты по IP-хэшу → сохранение в БД → сообщение в Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_ID` из `.env`). Сбой Telegram не теряет заявку: `telegramSent=false` + текст ошибки, повтор из админки. В тестах и dev Telegram отключён (`TELEGRAM_DRY_RUN=1`).
+
+Форма «Письмо в редакцию» → `POST /api/leads` → zod + honeypot + лимит по IP-хэшу → БД → Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_ID`). Сбой Telegram не теряет заявку: `telegramSent=false` + текст ошибки, повтор из админки. Шаблоны сообщений — `telegram.*` в messages. В dev и тестах `TELEGRAM_DRY_RUN=1`.
 
 ## SEO
-`generateMetadata` по языкам (title/description из настроек), canonical + `hreflang` (ru, en, x-default), Open Graph/Twitter, JSON-LD (ClothingStore/Organization, ItemList/Product для каталога, BreadcrumbList), `sitemap.xml` с альтернативами языков, `robots.txt`, `manifest`, favicon из логотипа, `<html lang>`, семантичные заголовки, alt на всех языках, шрифты через `next/font` (кириллица, self-hosted), Core Web Vitals (lazy-картинки, анимации только transform/opacity, reduced-motion).
+
+`generateMetadata` по языкам, canonical + `hreflang`, Open Graph/Twitter, JSON-LD (ClothingStore/Organization, ItemList/Product, BreadcrumbList), `sitemap.xml`, `robots.txt`, `manifest`, `<html lang>`, alt на всех языках, шрифты через `next/font`.
 
 ## Окружение
-`.env` (не в git): `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_ID`, `TELEGRAM_DRY_RUN`, `UPLOAD_DIR`, `SITE_URL`, `ADMIN_PASSWORD` (опц.), `IP_HASH_SALT`. `.env.example` — те же ключи без значений.
-Локально: `docker compose -f docker-compose.dev.yml up -d` (Postgres) → `npm run db:migrate` → `npm run db:seed` → `npm run dev`.
+
+`.env` (не в git), шаблон — `.env.example`: `DATABASE_URL`, `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `TELEGRAM_*`, `SITE_URL`, `IP_HASH_SALT`, `ADMIN_PASSWORD`, `ADMIN_ALLOW_OPEN`, `ADMIN_SESSION_SECRET`; в проде ещё `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `POSTGRES_*`, `APP_DB_*`, `DOMAIN`.
+Локально: `npm run db:up` (Postgres + MinIO) → `npm run db:deploy` → `npm run db:seed` → `npm run dev`.

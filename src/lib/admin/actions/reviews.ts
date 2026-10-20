@@ -1,25 +1,39 @@
-"use server";
+'use server';
 
-import { db } from "@/lib/db";
-import { revalidateContent } from "@/lib/content/cache";
-import { adminAction, findMissingMediaIds, MISSING_MEDIA_MESSAGE } from "../action-helpers";
-import { actionFail, actionOk, type ActionResult } from "../action-result";
-import { idSchema, reviewInputSchema, type ReviewInput } from "../schemas";
-import { parseInput } from "../validation";
+import { revalidateContent } from '@/lib/content/cache';
+import { db } from '@/lib/db';
 
-/** Create (id = null) or update a review. */
+import { adminAction, errorFailure, missingMediaFailure } from '../action-helpers';
+import { actionFail, actionOk, type ActionResult } from '../action-result';
+import { getAdminTranslations } from '../i18n-server';
+import { DEFAULT_REVIEW_RATING_MAX, idSchema, reviewInputSchema, type ReviewInput } from '../schemas';
+import { parseInput } from '../validation';
+
+/**
+ * Create (id = null) or update a review. The rating must fit the CURRENT star scale
+ * (SiteSettings.reviewRatingMax, read here — the form's own copy of it may be stale).
+ */
 export async function saveReview(id: string | null, input: ReviewInput): Promise<ActionResult<{ id: string }>> {
-  return adminAction("saveReview", async () => {
+  return adminAction('saveReview', async () => {
     const parsedId = id === null ? null : idSchema.safeParse(id);
-    if (parsedId && !parsedId.success) return actionFail("Некорректный идентификатор");
-    const parsed = parseInput(reviewInputSchema, input);
+    if (parsedId && !parsedId.success) return errorFailure('invalidId');
+    const parsed = await parseInput(reviewInputSchema, input);
     if (!parsed.success) return actionFail(parsed.message, parsed.fieldErrors);
     const data = parsed.data;
     const currentId = parsedId?.data ?? null;
+    const t = await getAdminTranslations('admin.reviews');
 
-    if ((await findMissingMediaIds([data.avatarId])).length > 0) {
-      return actionFail(MISSING_MEDIA_MESSAGE, { avatarId: MISSING_MEDIA_MESSAGE });
+    if (data.rating !== null) {
+      const settings = await db.siteSettings.findUnique({ where: { id: 1 }, select: { reviewRatingMax: true } });
+      const max = settings?.reviewRatingMax ?? DEFAULT_REVIEW_RATING_MAX;
+      if (data.rating > max) {
+        return actionFail(t('ratingAboveScale', { rating: data.rating }), {
+          rating: t('ratingAboveScaleField', { max }),
+        });
+      }
     }
+    const missingMedia = await missingMediaFailure([data.avatarId], ['avatarId']);
+    if (missingMedia) return missingMedia;
 
     const fields = {
       author: data.author,
@@ -40,6 +54,6 @@ export async function saveReview(id: string | null, input: ReviewInput): Promise
       ).id;
     }
     revalidateContent();
-    return actionOk({ id: savedId }, currentId ? "Отзыв сохранён" : "Отзыв добавлен");
+    return actionOk({ id: savedId }, t(currentId ? 'saved' : 'created'));
   });
 }

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   type KeyboardEvent,
@@ -9,17 +9,19 @@ import {
   useEffect,
   useRef,
   useState,
-} from "react";
-import { type ImgAttrs, lightboxImageStyle } from "../img-attrs";
-import type { GalleryLabels } from "../labels";
-import type { GalleryCell } from "../layout-rules";
-import { chapterReveal, genericReveals, litWhenCentred, panelWipes } from "../motion/effects";
-import { pad2 } from "../format";
-import { motionEnabled } from "../motion/env";
-import { gsap } from "../motion/gsap";
-import { lockScroll } from "../motion/lenis-store";
-import { useScene } from "../motion/useScene";
-import { SceneRoot, type SceneProps } from "./SceneRoot";
+} from 'react';
+
+import type { GalleryCell } from '../layout-rules';
+
+import { pad2 } from '../format';
+import { type ImgAttrs, lightboxImageStyle } from '../img-attrs';
+import { fill, type GalleryLabels } from '../labels';
+import { chapterReveal, genericReveals, litWhenCentred, panelWipes } from '../motion/effects';
+import { motionEnabled } from '../motion/env';
+import { gsap } from '../motion/gsap';
+import { lockScroll } from '../motion/lenis-store';
+import { useScene } from '../motion/useScene';
+import { SceneRoot, type SceneProps } from './SceneRoot';
 
 /** «Галерея» chapter scene: header, lead, «evidence photos» wiping in, colour on touch when centred. */
 export function GalleryScene(props: SceneProps): ReactElement {
@@ -28,7 +30,7 @@ export function GalleryScene(props: SceneProps): ReactElement {
     chapterReveal(root);
     genericReveals(root);
     panelWipes(root, ctx);
-    litWhenCentred(root, ".gal__item", "top 62%", "bottom 38%");
+    litWhenCentred(root, '.gal__item', 'top 62%', 'bottom 38%');
   });
   return <SceneRoot sceneRef={ref} {...props} />;
 }
@@ -41,12 +43,12 @@ export type GalleryPicture = {
   /** The full picture (the link works without JS). */
   href: string;
   caption: string;
-  cell: Pick<GalleryCell, "slot" | "full" | "tall" | "wipe">;
+  cell: Pick<GalleryCell, 'slot' | 'full' | 'tall' | 'wipe'>;
   thumb: ImgAttrs;
 };
 
 /** The opened picture: as wide as the viewport allows, at most 1240 px (noir.css .lb__img). */
-const LIGHTBOX_SIZES = "(max-width: 1240px) 100vw, 1240px";
+const LIGHTBOX_SIZES = '(max-width: 1240px) 100vw, 1240px';
 /**
  * next/image's srcset for LIGHTBOX_SIZES (smallest share 100vw) holds the candidates from the
  * first device size (640, next.config default deviceSizes) up; the thumbnail's holds the same
@@ -59,16 +61,18 @@ const LIGHTBOX_MIN_WIDTH = 640;
  * decoding; lazy) — derived from the thumbnail's instead of sent twice in the page payload.
  */
 function lightboxAttrs(thumb: ImgAttrs): ImgAttrs {
-  const candidates = (thumb.srcSet ?? "").split(", ").filter(Boolean);
-  const wide = candidates.filter((candidate) => Number.parseInt(candidate.slice(candidate.lastIndexOf(" ") + 1), 10) >= LIGHTBOX_MIN_WIDTH);
+  const candidates = (thumb.srcSet ?? '').split(', ').filter(Boolean);
+  const wide = candidates.filter(
+    candidate => Number.parseInt(candidate.slice(candidate.lastIndexOf(' ') + 1), 10) >= LIGHTBOX_MIN_WIDTH,
+  );
   const width = thumb.width ?? 0;
   const height = thumb.height ?? 0;
   return {
     ...thumb,
-    srcSet: wide.length > 0 ? wide.join(", ") : thumb.srcSet,
+    srcSet: wide.length > 0 ? wide.join(', ') : thumb.srcSet,
     sizes: LIGHTBOX_SIZES,
-    loading: "lazy",
-    className: "lb__img",
+    loading: 'lazy',
+    className: 'lb__img',
     style: { ...thumb.style, ...lightboxImageStyle(width, height) },
   };
 }
@@ -85,7 +89,7 @@ export function GalleryGrid({
   empty,
 }: {
   pictures: GalleryPicture[];
-  labels: Omit<GalleryLabels, "galleryPhoto">;
+  labels: GalleryLabels;
   empty: ReactNode;
 }): ReactElement {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -110,11 +114,17 @@ export function GalleryGrid({
     const dialog = dialogRef.current;
     if (!dialog?.open || !motionEnabled()) return;
     const ctx = gsap.context(() => {
-      const from = direction > 0 ? "inset(0% 0% 0% 100%)" : direction < 0 ? "inset(0% 100% 0% 0%)" : "inset(100% 0% 0% 0%)";
+      const from =
+        direction > 0 ? 'inset(0% 0% 0% 100%)' : direction < 0 ? 'inset(0% 100% 0% 0%)' : 'inset(100% 0% 0% 0%)';
       if (imageRef.current) {
-        gsap.fromTo(imageRef.current, { clipPath: from }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.7, ease: "power3.inOut", clearProps: "clipPath" });
+        gsap.fromTo(
+          imageRef.current,
+          { clipPath: from },
+          { clipPath: 'inset(0% 0% 0% 0%)', duration: 0.7, ease: 'power3.inOut', clearProps: 'clipPath' },
+        );
       }
-      if (captionRef.current) gsap.fromTo(captionRef.current, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.5, delay: 0.25 });
+      if (captionRef.current)
+        gsap.fromTo(captionRef.current, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.5, delay: 0.25 });
     });
     return () => ctx.revert();
   }, [index, direction]);
@@ -126,9 +136,9 @@ export function GalleryGrid({
       lockScroll(false);
       openerRef.current?.focus({ preventScroll: true });
     };
-    dialog.addEventListener("close", onClose);
+    dialog.addEventListener('close', onClose);
     return () => {
-      dialog.removeEventListener("close", onClose);
+      dialog.removeEventListener('close', onClose);
       if (dialog.open) lockScroll(false);
     };
   }, []);
@@ -137,7 +147,7 @@ export function GalleryGrid({
 
   const open = (event: MouseEvent<HTMLAnchorElement>, at: number): void => {
     const dialog = dialogRef.current;
-    if (!dialog || typeof dialog.showModal !== "function") return; // fall back to the link
+    if (!dialog || typeof dialog.showModal !== 'function') return; // fall back to the link
     event.preventDefault();
     openerRef.current = event.currentTarget;
     show(at, 0);
@@ -146,8 +156,8 @@ export function GalleryGrid({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDialogElement>): void => {
-    if (event.key === "ArrowRight") show(index + 1, 1);
-    if (event.key === "ArrowLeft") show(index - 1, -1);
+    if (event.key === 'ArrowRight') show(index + 1, 1);
+    if (event.key === 'ArrowLeft') show(index - 1, -1);
   };
 
   // Swipe: .lb has touch-action: pan-y pinch-zoom (noir.css), so a horizontal finger drag is
@@ -177,7 +187,8 @@ export function GalleryGrid({
       return;
     }
     const target = event.target;
-    if (target === dialogRef.current || (target instanceof HTMLElement && target.classList.contains("lb__in"))) dialogRef.current?.close();
+    if (target === dialogRef.current || (target instanceof HTMLElement && target.classList.contains('lb__in')))
+      dialogRef.current?.close();
   };
 
   return (
@@ -185,13 +196,26 @@ export function GalleryGrid({
       <ul className="gal">
         {pictures.map((picture, i) => {
           const { cell } = picture;
-          const classes = ["gal__item", `g-${cell.slot}`, "panel", "panel--media", cell.full ? "is-full" : "", cell.tall ? "is-tall" : ""]
+          const classes = [
+            'gal__item',
+            `g-${cell.slot}`,
+            'panel',
+            'panel--media',
+            cell.full ? 'is-full' : '',
+            cell.tall ? 'is-tall' : '',
+          ]
             .filter(Boolean)
-            .join(" ");
+            .join(' ');
           return (
-            <li key={picture.id} className={classes} data-wipe={cell.wipe} data-entity="GalleryItem" data-entity-id={picture.id}>
-              <a className="gal__btn media halftone" href={picture.href} onClick={(event) => open(event, i)}>
-                {/* eslint-disable-next-line @next/next/no-img-element -- next/image's attributes, computed on the server */}
+            <li
+              key={picture.id}
+              className={classes}
+              data-wipe={cell.wipe}
+              data-entity="GalleryItem"
+              data-entity-id={picture.id}
+            >
+              <a className="gal__btn media halftone" href={picture.href} onClick={event => open(event, i)}>
+                {/* oxlint-disable-next-line nextjs/no-img-element -- next/image's attributes, computed on the server */}
                 <img {...picture.thumb} alt={picture.thumb.alt} data-nimg="1" />
                 <span className="gal__no" aria-hidden="true">
                   {pad2(i + 1)}
@@ -217,7 +241,7 @@ export function GalleryGrid({
           {current ? (
             <figure className="lb__fig">
               <div ref={imageRef}>
-                {/* eslint-disable-next-line @next/next/no-img-element -- next/image's attributes, computed on the server */}
+                {/* oxlint-disable-next-line nextjs/no-img-element -- next/image's attributes, computed on the server */}
                 <img key={current.id} {...lightboxAttrs(current.thumb)} alt={current.thumb.alt} data-nimg="1" />
               </div>
               {current.caption ? (
@@ -228,15 +252,30 @@ export function GalleryGrid({
             </figure>
           ) : null}
           <p className="lb__count" aria-live="polite">
-            {pad2(index + 1)} / {pad2(count)}
+            {fill(labels.counter, { current: pad2(index + 1), total: pad2(count) })}
           </p>
-          <button className="lb__btn lb__prev" type="button" aria-label={labels.previousImage} onClick={() => show(index - 1, -1)}>
+          <button
+            className="lb__btn lb__prev"
+            type="button"
+            aria-label={labels.previousImage}
+            onClick={() => show(index - 1, -1)}
+          >
             ←
           </button>
-          <button className="lb__btn lb__next" type="button" aria-label={labels.nextImage} onClick={() => show(index + 1, 1)}>
+          <button
+            className="lb__btn lb__next"
+            type="button"
+            aria-label={labels.nextImage}
+            onClick={() => show(index + 1, 1)}
+          >
             →
           </button>
-          <button className="lb__btn lb__close" type="button" aria-label={labels.closeViewer} onClick={() => dialogRef.current?.close()}>
+          <button
+            className="lb__btn lb__close"
+            type="button"
+            aria-label={labels.closeViewer}
+            onClick={() => dialogRef.current?.close()}
+          >
             ✕
           </button>
         </div>

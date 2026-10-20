@@ -19,7 +19,7 @@
  *    full site: it is told apart by navigator.standalone / the display-mode media query.
  */
 
-export const IN_APP_CLASS = "in-app";
+export const IN_APP_CLASS = 'in-app';
 /**
  * On <html> of touch screens and in-app browsers: the cover's height is --hero-h, in px
  * (noir.css), not 100svh. A WebView's svh is the WebView's own height, and the host app resizes
@@ -33,18 +33,18 @@ export const IN_APP_CLASS = "in-app";
  * px height is the viewport's at load — what 100svh is in a browser with collapsing toolbars —
  * taken again only when the width changes (rotation) or at the top of the page.
  */
-export const HERO_PX_CLASS = "hero-px";
+export const HERO_PX_CLASS = 'hero-px';
 /** Not a touch screen (a mouse or trackpad drives it): the cover stays 100svh, a window resize resizes it. */
-export const FINE_HOVER_QUERY = "(hover: hover) and (pointer: fine)";
+export const FINE_HOVER_QUERY = '(hover: hover) and (pointer: fine)';
 /** On <html> with `motion` in an in-app browser: no scroll scenes (env.ts liteMotion()). */
-export const LITE_CLASS = "motion-lite";
+export const LITE_CLASS = 'motion-lite';
 
 /** Android WebView token and the in-app browsers' own tokens. */
 export const IN_APP_UA = /; wv\)|Telegram|Instagram|FBA[NV]\/|VKAndroidApp|VKClient|OKApp/i;
 /** An iOS WebKit that is not a browser (no "Safari/" token): a WKWebView inside an app — or the home-screen web app. */
 export const IOS_WEBVIEW_UA = /(iPhone|iPad|iPod).*AppleWebKit(?!.*Safari\/)/;
 /** The site opened from the home screen (manifest display "standalone"). */
-export const STANDALONE_QUERY = "(display-mode: standalone)";
+export const STANDALONE_QUERY = '(display-mode: standalone)';
 
 /**
  * The same test as MOTION_BOOT (boot.ts) runs before first paint. `standalone`: the page runs as

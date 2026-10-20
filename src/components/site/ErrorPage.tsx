@@ -1,5 +1,6 @@
-import type { ReactElement, ReactNode } from "react";
-import { ScrollSpine } from "./chrome/ScrollSpine";
+import type { ReactElement, ReactNode } from 'react';
+
+import { ScrollSpine } from './chrome/ScrollSpine';
 
 type ErrorPageProps = {
   kicker: string;
@@ -20,7 +21,16 @@ type ErrorPageProps = {
  * Static markup (works from both the server not-found and the client error boundary) + the scroll
  * snake, the scrollbar of every public page (noir.css hides the native one).
  */
-export function ErrorPage({ kicker, title, caption, text, mark, action, homeHref, homeLabel }: ErrorPageProps): ReactElement {
+export function ErrorPage({
+  kicker,
+  title,
+  caption,
+  text,
+  mark,
+  action,
+  homeHref,
+  homeLabel,
+}: ErrorPageProps): ReactElement {
   return (
     <>
       <ScrollSpine />

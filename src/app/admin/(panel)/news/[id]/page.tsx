@@ -1,21 +1,27 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import type { ReactElement } from "react";
-import { NewsForm } from "@/components/admin/forms/NewsForm";
-import { PageHeader } from "@/components/admin/ui/layout";
-import { getNewsForm } from "@/lib/admin/queries";
-import { toDateInputValue } from "@/lib/admin/schemas";
+import { getTranslations } from 'next-intl/server';
+import { notFound } from 'next/navigation';
 
-export const metadata: Metadata = { title: "Новость" };
+import { NewsForm } from '@/components/admin/forms/NewsForm';
+import { PageHeader } from '@/components/admin/ui/layout';
+import { adminPageMetadata } from '@/lib/admin/i18n-server';
+import { getNewsForm } from '@/lib/admin/queries';
+import { toDateInputValue } from '@/lib/admin/schemas';
 
-export default async function EditPage({ params }: PageProps<"/admin/news/[id]">): Promise<ReactElement> {
+import type { Metadata } from 'next';
+import type { ReactElement } from 'react';
+
+export function generateMetadata(): Promise<Metadata> {
+  return adminPageMetadata('news.editTitle');
+}
+
+export default async function EditPage({ params }: PageProps<'/admin/news/[id]'>): Promise<ReactElement> {
   const { id } = await params;
-  const news = await getNewsForm(id);
+  const [news, t] = await Promise.all([getNewsForm(id), getTranslations('admin.news')]);
   if (!news) notFound();
   const today = toDateInputValue(new Date());
   return (
     <>
-      <PageHeader title={news.title.ru || news.slug} backHref="/admin/news" backLabel="Все новости" />
+      <PageHeader title={news.title.ru || news.slug} backHref="/admin/news" backLabel={t('back')} />
       <NewsForm key={news.id} initial={news} today={today} />
     </>
   );

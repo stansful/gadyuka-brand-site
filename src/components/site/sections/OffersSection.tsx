@@ -1,50 +1,67 @@
-import { getTranslations } from "next-intl/server";
-import type { ReactElement } from "react";
-import type { Locale } from "@/i18n/locales";
-import type { LandingContent, OfferView } from "@/lib/content";
-import { SECTION_ANCHORS, chapterNumber } from "@/lib/content";
-import { leadSubject } from "@/lib/leads";
-import { ContentImage } from "../ContentImage";
-import { formatDate, pad2 } from "../format";
-import { aspectOf, stampSizes } from "../layout-rules";
-import { leadLinkProps, localizeSiteHref, offerCta } from "../lead-links";
-import { RichText } from "../RichText";
-import { OffersScene } from "../scenes/OffersScene";
-import { ChapterHeader, EmptyState, Folio } from "./parts";
+import type { Locale } from '@/i18n/locales';
+import type { LandingContent, OfferView } from '@/lib/content';
+import { SECTION_ANCHORS, chapterNumber } from '@/lib/content';
+import { leadSubject } from '@/lib/leads';
+
+import type { ReactElement } from 'react';
+
+import { ContentImage } from '../ContentImage';
+import { formatDate, pad2 } from '../format';
+import { aspectOf, stampSizes } from '../layout-rules';
+import { leadLinkProps, localizeSiteHref, offerCta } from '../lead-links';
+import { formatNodes, formatText } from '../message-template';
+import { RichText } from '../RichText';
+import { OffersScene } from '../scenes/OffersScene';
+import { ChapterHeader, EmptyState, Folio } from './parts';
 
 /** Copies of the wordmark on the noir red tape (CSS marquee). */
 const TAPE_WORDS = 20;
 /** Badges longer than this are set smaller, so «Подарок» still fits the coupon. */
 const SHORT_BADGE = 5;
 
-async function CouponButton({
+function CouponButton({
   offer,
-  subjectPrefix,
+  subjectTemplate,
+  newTabHint,
   locale,
 }: {
   offer: OfferView;
-  subjectPrefix: string;
+  /** offers.subject: «Купон: {offer}». */
+  subjectTemplate: string;
+  /** common.opensInNewTab (screen-reader hint of a link that opens in a new tab). */
+  newTabHint: string;
   locale: Locale;
-}): Promise<ReactElement> {
+}): ReactElement {
   const target = offerCta(offer.ctaHref);
   const label = (
     <>
-      <span data-field="ctaLabel">{offer.ctaLabel}</span> <span className="glyph" aria-hidden="true">→</span>
+      <span data-field="ctaLabel">{offer.ctaLabel}</span>{' '}
+      <span className="glyph" aria-hidden="true">
+        →
+      </span>
     </>
   );
-  if (target.kind === "form") {
+  if (target.kind === 'form') {
     return (
-      <a className="link-btn link-btn--paper" {...leadLinkProps({ type: target.type, subject: leadSubject(subjectPrefix, offer.title) }, "")}>
+      <a
+        className="link-btn link-btn--paper"
+        {...leadLinkProps(
+          {
+            type: target.type,
+            subject: leadSubject(formatText(subjectTemplate, locale, { offer: offer.title }), offer.title),
+          },
+          '',
+        )}
+      >
         {label}
       </a>
     );
   }
   if (target.external) {
-    const t = await getTranslations("common");
     return (
       <a className="link-btn link-btn--paper" href={target.href} target="_blank" rel="noopener noreferrer">
         {label}
-        <span className="sr-only"> ({t("opensInNewTab")})</span>
+        {newTabHint ? <span className="sr-only"> {newTabHint}</span> : null}
       </a>
     );
   }
@@ -63,7 +80,7 @@ async function CouponButton({
 export function OffersSection({ content }: { content: LandingContent }): ReactElement {
   const { texts, offers, locale } = content;
   return (
-    <OffersScene id={SECTION_ANCHORS.offers} className="page" labelledBy="offers-title" folio={chapterNumber("offers")}>
+    <OffersScene id={SECTION_ANCHORS.offers} className="page" labelledBy="offers-title" folio={chapterNumber('offers')}>
       <div className="tape-wrap" aria-hidden="true">
         <div className="tape">
           <div className="tape__track">
@@ -74,8 +91,15 @@ export function OffersSection({ content }: { content: LandingContent }): ReactEl
         </div>
       </div>
       <div className="wrap">
-        <ChapterHeader chapter="offers" texts={texts} titleKey="offers.title" narrationKey="offers.narration" headingId="offers-title" />
-        <RichText text={texts["offers.text"]} editKey="offers.text" className="lead lead--wide" reveal />
+        <ChapterHeader
+          chapter="offers"
+          texts={texts}
+          locale={locale}
+          titleKey="offers.title"
+          narrationKey="offers.narration"
+          headingId="offers-title"
+        />
+        <RichText text={texts['offers.text']} editKey="offers.text" className="lead lead--wide" reveal />
 
         {offers.length > 0 ? (
           <ul className="coupons">
@@ -89,11 +113,15 @@ export function OffersSection({ content }: { content: LandingContent }): ReactEl
                     <ContentImage image={offer.image} sizes={stampSizes(aspectOf(offer.image))} />
                   </span>
                 ) : null}
-                <p className="coupon__kicker">
-                  <span data-edit="offers.couponLabel">{texts["offers.couponLabel"]}</span> #{pad2(index + 1)}
+                <p className="coupon__kicker" data-edit="offers.couponNo">
+                  {formatText(texts['offers.couponNo'], locale, { number: pad2(index + 1) })}
                 </p>
                 {offer.badge ? (
-                  <p className="coupon__big" data-field="badge" data-size={offer.badge.length > SHORT_BADGE ? "long" : undefined}>
+                  <p
+                    className="coupon__big"
+                    data-field="badge"
+                    data-size={offer.badge.length > SHORT_BADGE ? 'long' : undefined}
+                  >
                     {offer.badge}
                   </p>
                 ) : null}
@@ -102,23 +130,33 @@ export function OffersSection({ content }: { content: LandingContent }): ReactEl
                 </h3>
                 <RichText text={offer.text} className="coupon__text" />
                 {offer.validUntil ? (
-                  <p className="coupon__until">
-                    <span data-edit="offers.validUntilLabel">{texts["offers.validUntilLabel"]}</span>{" "}
-                    <time dateTime={offer.validUntil} data-field="validUntil">
-                      {formatDate(offer.validUntil, locale)}
-                    </time>
+                  <p className="coupon__until" data-edit="offers.validUntil">
+                    {formatNodes(texts['offers.validUntil'], locale, {
+                      date: (
+                        <time dateTime={offer.validUntil} data-field="validUntil">
+                          {formatDate(offer.validUntil, locale)}
+                        </time>
+                      ),
+                    })}
                   </p>
                 ) : null}
-                {offer.ctaLabel ? <CouponButton offer={offer} subjectPrefix={texts["offers.subject"]} locale={locale} /> : null}
+                {offer.ctaLabel ? (
+                  <CouponButton
+                    offer={offer}
+                    subjectTemplate={texts['offers.subject']}
+                    newTabHint={texts['common.opensInNewTab']}
+                    locale={locale}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
         ) : (
-          <EmptyState text={texts["offers.empty"]} editKey="offers.empty" />
+          <EmptyState text={texts['offers.empty']} editKey="offers.empty" />
         )}
-        {texts["offers.fine"] ? (
+        {texts['offers.fine'] ? (
           <p className="fine" data-edit="offers.fine">
-            {texts["offers.fine"]}
+            {texts['offers.fine']}
           </p>
         ) : null}
       </div>

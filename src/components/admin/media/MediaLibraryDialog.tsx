@@ -1,17 +1,20 @@
-"use client";
+'use client';
 
-import { clsx } from "clsx";
-import { Check, Search } from "lucide-react";
-import Image from "next/image";
-import { useCallback, useEffect, useState, type ReactElement } from "react";
-import { formatBytes } from "@/lib/admin/labels";
-import type { AdminMedia } from "@/lib/admin/types";
-import { Button } from "../ui/Button";
-import { TextInput } from "../ui/inputs";
-import { Modal } from "../ui/Modal";
-import { fetchMediaPage, MediaApiError } from "./media-api";
-import { UploadDropzone, UploadProgressList } from "./UploadDropzone";
-import { useUploadQueue } from "./useUploadQueue";
+import { clsx } from 'clsx';
+import { Check, Search } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import Image from 'next/image';
+import { useCallback, useEffect, useState, type ReactElement } from 'react';
+
+import { fileSizeParts } from '@/lib/admin/labels';
+import type { AdminMedia } from '@/lib/admin/types';
+
+import { Button } from '../ui/Button';
+import { TextInput } from '../ui/inputs';
+import { Modal } from '../ui/Modal';
+import { fetchMediaPage, MediaApiError, mediaProblemText } from './media-api';
+import { UploadDropzone, UploadProgressList } from './UploadDropzone';
+import { useUploadQueue } from './useUploadQueue';
 
 export type MediaLibraryDialogProps = {
   open: boolean;
@@ -33,13 +36,14 @@ export function MediaLibraryDialog({
   title,
   excludeIds = [],
 }: MediaLibraryDialogProps): ReactElement {
+  const t = useTranslations('admin.media.dialog');
   return (
     <Modal
       open={open}
       onClose={onClose}
       size="xl"
-      title={title ?? (multiple ? "Выберите изображения" : "Выберите изображение")}
-      description="Из медиатеки или загрузите новые — они сразу появятся в медиатеке."
+      title={title ?? t(multiple ? 'chooseMany' : 'chooseOne')}
+      description={t('description')}
     >
       <PickerBody multiple={multiple} excludeIds={excludeIds} onSelect={onSelect} onClose={onClose} />
     </Modal>
@@ -60,8 +64,10 @@ function PickerBody({
   onSelect: (media: AdminMedia[]) => void;
   onClose: () => void;
 }): ReactElement {
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const t = useTranslations('admin.media');
+  const tErrors = useTranslations('admin.media.errors');
+  const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [uploaded, setUploaded] = useState<AdminMedia[]>([]);
   const [selected, setSelected] = useState<AdminMedia[]>([]);
@@ -76,14 +82,19 @@ function PickerBody({
     const controller = new AbortController();
     const key = debouncedQuery;
     fetchMediaPage({ query: key }, controller.signal).then(
-      (page) => setLoaded({ key, items: page.items, nextCursor: page.nextCursor, error: null }),
+      page => setLoaded({ key, items: page.items, nextCursor: page.nextCursor, error: null }),
       (error: unknown) => {
         if (controller.signal.aborted) return;
-        setLoaded({ key, items: [], nextCursor: null, error: error instanceof MediaApiError ? error.message : "Не удалось загрузить медиатеку" });
+        setLoaded({
+          key,
+          items: [],
+          nextCursor: null,
+          error: error instanceof MediaApiError ? mediaProblemText(error.problem, tErrors) : t('loadFailed'),
+        });
       },
     );
     return () => controller.abort();
-  }, [debouncedQuery]);
+  }, [debouncedQuery, t, tErrors]);
 
   const loading = loaded === null || loaded.key !== debouncedQuery;
   const excluded = new Set(excludeIds);
@@ -95,24 +106,24 @@ function PickerBody({
         onClose();
         return;
       }
-      setSelected((current) =>
-        current.some((item) => item.id === media.id) ? current.filter((item) => item.id !== media.id) : [...current, media],
+      setSelected(current =>
+        current.some(item => item.id === media.id) ? current.filter(item => item.id !== media.id) : [...current, media],
       );
     },
     [multiple, onClose, onSelect],
   );
 
-  const uploads = useUploadQueue((media) => {
-    setUploaded((current) => [media, ...current]);
-    if (multiple) setSelected((current) => [...current, media]);
+  const uploads = useUploadQueue(media => {
+    setUploaded(current => [media, ...current]);
+    if (multiple) setSelected(current => [...current, media]);
   });
 
   const loadMore = (): void => {
     if (!loaded?.nextCursor) return;
     setLoadingMore(true);
     fetchMediaPage({ cursor: loaded.nextCursor, query: loaded.key }).then(
-      (page) => {
-        setLoaded((current) =>
+      page => {
+        setLoaded(current =>
           current && current.key === loaded.key
             ? { ...current, items: [...current.items, ...page.items], nextCursor: page.nextCursor }
             : current,
@@ -123,9 +134,9 @@ function PickerBody({
     );
   };
 
-  const uploadedIds = new Set(uploaded.map((item) => item.id));
-  const items = [...uploaded, ...(loaded?.items ?? []).filter((item) => !uploadedIds.has(item.id))];
-  const selectedIds = new Set(selected.map((item) => item.id));
+  const uploadedIds = new Set(uploaded.map(item => item.id));
+  const items = [...uploaded, ...(loaded?.items ?? []).filter(item => !uploadedIds.has(item.id))];
+  const selectedIds = new Set(selected.map(item => item.id));
 
   return (
     <div className="flex flex-col gap-4">
@@ -133,17 +144,20 @@ function PickerBody({
       <UploadProgressList items={uploads.items} onClear={uploads.clearFinished} />
 
       <div className="relative">
-        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
+        <Search
+          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted"
+          aria-hidden
+        />
         <TextInput
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
+          onChange={event => setQuery(event.target.value)}
+          onKeyDown={event => {
             // Search is live (debounced); Enter must never submit anything.
-            if (event.key === "Enter") event.preventDefault();
+            if (event.key === 'Enter') event.preventDefault();
           }}
-          placeholder="Поиск по имени файла"
-          aria-label="Поиск по имени файла"
+          placeholder={t('search')}
+          aria-label={t('search')}
           className="pl-9"
         />
       </div>
@@ -162,14 +176,14 @@ function PickerBody({
         </div>
       ) : items.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted">
-          {debouncedQuery ? "Ничего не найдено." : "Медиатека пуста — загрузите первое изображение."}
+          {t(debouncedQuery ? 'dialog.noResults' : 'dialog.empty')}
         </p>
       ) : (
         <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-          {items.map((media) => {
+          {items.map(media => {
             const isExcluded = excluded.has(media.id);
             const isSelected = selectedIds.has(media.id);
-            const name = media.alt.ru || media.originalName || "Изображение";
+            const name = media.alt.ru || media.originalName || t('image');
             return (
               <li key={media.id}>
                 <button
@@ -177,11 +191,11 @@ function PickerBody({
                   disabled={isExcluded}
                   aria-pressed={multiple ? isSelected : undefined}
                   onClick={() => toggle(media)}
-                  title={`${name} · ${media.width}×${media.height} · ${formatBytes(media.size)}`}
+                  title={`${name} · ${media.width}×${media.height} · ${t('fileSize', fileSizeParts(media.size))}`}
                   className={clsx(
-                    "group relative block aspect-square w-full overflow-hidden rounded-lg border-2 bg-raised transition-colors",
-                    isSelected ? "border-beige" : "border-transparent hover:border-line-strong",
-                    isExcluded && "cursor-not-allowed opacity-40",
+                    'group relative block aspect-square w-full overflow-hidden rounded-lg border-2 bg-raised transition-colors',
+                    isSelected ? 'border-beige' : 'border-transparent hover:border-line-strong',
+                    isExcluded && 'cursor-not-allowed opacity-40',
                   )}
                 >
                   <Image src={media.url} alt="" fill sizes="(min-width: 1024px) 160px, 30vw" className="object-cover" />
@@ -192,7 +206,9 @@ function PickerBody({
                     </span>
                   ) : null}
                   {isExcluded ? (
-                    <span className="absolute inset-x-0 bottom-0 bg-ink/80 px-1 py-0.5 text-center text-[10px] text-fg">уже добавлено</span>
+                    <span className="absolute inset-x-0 bottom-0 bg-ink/80 px-1 py-0.5 text-center text-[10px] text-fg">
+                      {t('dialog.alreadyAdded')}
+                    </span>
                   ) : null}
                 </button>
               </li>
@@ -204,17 +220,17 @@ function PickerBody({
       {loaded?.nextCursor ? (
         <div className="flex justify-center">
           <Button variant="outline" size="sm" pending={loadingMore} onClick={loadMore}>
-            Показать ещё
+            {t('showMore')}
           </Button>
         </div>
       ) : null}
 
       {multiple ? (
         <div className="sticky bottom-0 -mx-5 -mb-4 flex items-center justify-between gap-3 border-t border-line bg-panel px-5 py-3">
-          <span className="text-sm text-muted">Выбрано: {selected.length}</span>
+          <span className="text-sm text-muted">{t('dialog.selected', { count: selected.length })}</span>
           <div className="flex gap-2">
             <Button variant="ghost" onClick={onClose}>
-              Отмена
+              {t('dialog.cancel')}
             </Button>
             <Button
               variant="primary"
@@ -224,7 +240,7 @@ function PickerBody({
                 onClose();
               }}
             >
-              Добавить ({selected.length})
+              {t('dialog.add', { count: selected.length })}
             </Button>
           </div>
         </div>

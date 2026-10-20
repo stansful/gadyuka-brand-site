@@ -1,14 +1,17 @@
-"use client";
+'use client';
 
-import { RefreshCw, Send } from "lucide-react";
-import { useState, type ReactElement } from "react";
-import type { LeadStatus } from "@/generated/prisma/enums";
-import { resendLead, setLeadStatus } from "@/lib/admin/actions/leads";
-import { LEAD_STATUS_LABELS, LEAD_STATUSES } from "@/lib/admin/labels";
-import { Button } from "../ui/Button";
-import { Field } from "../ui/Field";
-import { Select } from "../ui/inputs";
-import { useActionSubmit } from "../ui/useActionSubmit";
+import { RefreshCw, Send } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { useState, type ReactElement } from 'react';
+
+import type { LeadStatus } from '@/generated/prisma/enums';
+import { resendLead, setLeadStatus } from '@/lib/admin/actions/leads';
+import { LEAD_STATUSES } from '@/lib/admin/labels';
+
+import { Button } from '../ui/Button';
+import { Field } from '../ui/Field';
+import { Select } from '../ui/inputs';
+import { useActionSubmit } from '../ui/useActionSubmit';
 
 function isLeadStatus(value: string): value is LeadStatus {
   return (LEAD_STATUSES as readonly string[]).includes(value);
@@ -24,18 +27,19 @@ export function LeadActions({
   status: LeadStatus;
   telegramSent: boolean;
 }): ReactElement {
+  const t = useTranslations('admin.leads');
   const [current, setCurrent] = useState<LeadStatus>(status);
   const statusSubmit = useActionSubmit();
   const resendSubmit = useActionSubmit();
 
   return (
     <div className="flex flex-col gap-5">
-      <Field htmlFor="lead-status" label="Статус" hint="Сохраняется сразу.">
+      <Field htmlFor="lead-status" label={t('actions.status')} hint={t('actions.statusHint')}>
         <Select
           id="lead-status"
           value={current}
           disabled={statusSubmit.pending}
-          onChange={(event) => {
+          onChange={event => {
             const next = event.target.value;
             if (!isLeadStatus(next)) return;
             const previous = current;
@@ -47,25 +51,23 @@ export function LeadActions({
             });
           }}
         >
-          {LEAD_STATUSES.map((value) => (
+          {LEAD_STATUSES.map(value => (
             <option key={value} value={value}>
-              {LEAD_STATUS_LABELS[value]}
+              {t(`statuses.${value}`)}
             </option>
           ))}
         </Select>
       </Field>
       <div className="flex flex-col gap-2">
         <Button
-          variant={telegramSent ? "outline" : "secondary"}
+          variant={telegramSent ? 'outline' : 'secondary'}
           pending={resendSubmit.pending}
           icon={telegramSent ? <RefreshCw className="size-4" aria-hidden /> : <Send className="size-4" aria-hidden />}
           onClick={() => resendSubmit.run(() => resendLead(id))}
         >
-          Отправить в Telegram повторно
+          {t('actions.resend')}
         </Button>
-        <p className="text-xs text-muted">
-          {telegramSent ? "Заявка уже доставлена, но её можно отправить ещё раз." : "Заявка не дошла до Telegram — попробуйте отправить снова."}
-        </p>
+        <p className="text-xs text-muted">{t(telegramSent ? 'actions.resendHintSent' : 'actions.resendHintFailed')}</p>
       </div>
     </div>
   );

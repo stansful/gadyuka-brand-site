@@ -1,10 +1,12 @@
-import type { ReactElement } from "react";
-import type { ImageRef } from "@/lib/content";
-import { imgAttrs } from "./image-props";
+import type { ImageRef } from '@/lib/content';
+
+import type { ReactElement } from 'react';
+
+import { imgAttrs } from './image-props';
 
 type ContentImageProps = {
   image: ImageRef | null;
-  /** data-edit-img key of an IMAGE ContentBlock (omit for entity images). */
+  /** data-edit-img: the ContentImage key, e.g. "about.image" (omit for entity images). */
   editKey?: string;
   /** `sizes` attribute for responsive loading. */
   sizes: string;
@@ -25,7 +27,7 @@ export function ContentImage({
   sizes,
   className,
   priority = false,
-  fallbackAlt = "",
+  fallbackAlt = '',
 }: ContentImageProps): ReactElement {
   if (!image) {
     return <div className={className} data-edit-img={editKey} data-empty="true" aria-hidden="true" />;
@@ -39,6 +41,6 @@ export function ContentImage({
     className,
     priority,
   });
-  // eslint-disable-next-line @next/next/no-img-element -- next/image's own attributes, computed on the server
+  // oxlint-disable-next-line nextjs/no-img-element -- next/image's own attributes, computed on the server
   return <img {...attrs} alt={attrs.alt} data-nimg="1" data-edit-img={editKey} />;
 }

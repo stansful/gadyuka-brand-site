@@ -1,9 +1,11 @@
-import type { LeadStatus, LeadType } from "@/generated/prisma/enums";
-import type { ActionResult } from "./action-result";
-import type { Locale } from "@/i18n/locales";
-import type { LocalizedText } from "@/lib/i18n-text";
-import type { ContentKey, SectionId } from "@/lib/content/registry";
-import type { SocialType } from "@/lib/content/schemas";
+import type { LeadStatus, LeadType } from '@/generated/prisma/enums';
+import type { Locale } from '@/i18n/locales';
+import type { MessageKey } from '@/i18n/messages';
+import type { ImageKey, MessageKind } from '@/lib/content/registry';
+import type { SocialType } from '@/lib/content/social';
+import type { LocalizedText } from '@/lib/i18n-text';
+
+import type { ActionResult } from './action-result';
 
 /**
  * Serializable view models passed from admin Server Components to client components
@@ -14,7 +16,7 @@ import type { SocialType } from "@/lib/content/schemas";
 /** Enough of a Media row to render a thumbnail / picker preview. */
 export type AdminMediaRef = {
   id: string;
-  /** "/uploads/…" */
+  /** Public link of the file ("/media/…", Media.url) */
   url: string;
   width: number;
   height: number;
@@ -33,7 +35,7 @@ export type AdminMedia = AdminMediaRef & {
 };
 
 export type MediaUsage = {
-  /** Russian description, e.g. «Товар», «Контент: Главная» */
+  /** What references the file (admin.media.usages), e.g. «Фото товара», «Картинка лендинга». */
   kind: string;
   title: string;
   href: string;
@@ -139,28 +141,98 @@ export type SettingsFormData = {
   phone: string;
   email: string;
   address: LocalizedText;
-  socials: Array<{ type: SocialType; url: string }>;
+  /** Max stars of a review rating (1..10). */
+  reviewRatingMax: number;
   seoTitle: LocalizedText;
   seoDescription: LocalizedText;
   ogImage: AdminMediaRef | null;
 };
 
-export type ContentBlockFormData = {
-  key: ContentKey;
-  label: string;
-  kind: "TEXT" | "RICHTEXT" | "IMAGE" | "LINK";
-  value: LocalizedText;
-  media: AdminMediaRef | null;
-  /** ISO 8601, null when the block is not in the DB yet */
-  updatedAt: string | null;
+export type MenuItemFormData = {
+  id: string;
+  label: LocalizedText;
+  href: string;
+  showInHeader: boolean;
+  showInFooter: boolean;
+  published: boolean;
 };
 
-export type ContentSectionData = {
-  section: SectionId;
+/** Suggested link targets of the menu form (landing anchors, collection pages). */
+export type MenuHrefOption = { href: string; label: string };
+
+export type SocialLinkFormData = {
+  id: string;
+  type: SocialType;
+  url: string;
+  /** Own label; empty = the site's default name of the type (message `social.<TYPE>`). */
+  label: LocalizedText;
+  published: boolean;
+};
+
+// ── «Тексты сайта» (Message rows) ────────────────────────────────────────────
+
+/** One site text (a Message key) in the editor. */
+export type SiteTextEntry = {
+  key: MessageKey;
+  /** Russian admin label (admin.siteTexts.labels), the key without its namespace when there is none. */
   label: string;
-  /** In-page anchor on the site (null for header/footer). */
+  kind: MessageKind;
+  /** The Russian text must not be empty (headings, buttons, links). */
+  required: boolean;
+  /** What the site shows: the DB value, or the default when the row is missing. */
+  values: Record<Locale, string>;
+  /** messages/<locale>.json — what «Вернуть по умолчанию» restores. */
+  defaults: Record<Locale, string>;
+  /** ISO 8601 Message.editedAt of the locales edited in the admin (no entry = default text). */
+  edited: Partial<Record<Locale, string>>;
+  /** Locales without a DB row yet (the site shows the default; saving stores it). */
+  missing: Locale[];
+  /** {arguments} and <tags> of the default (the code fills them in — they must stay). */
+  placeholders: string[];
+  tags: string[];
+};
+
+/** A landing image (ContentImage row) edited next to the texts of its section. */
+export type SiteImageEntry = {
+  key: ImageKey;
+  label: string;
+  media: AdminMediaRef | null;
+};
+
+/** A group of texts in the editor: one section, or the matches of a search in one section. */
+export type SiteTextGroup = {
+  /** Section id = top-level namespace of the messages ("hero", "forms", …). */
+  section: string;
+  label: string;
+  /** In-page anchor of the section on the landing (null when not on the landing). */
   anchor: string | null;
-  blocks: ContentBlockFormData[];
+  entries: SiteTextEntry[];
+  images: SiteImageEntry[];
+};
+
+/** Tab of the «Тексты сайта» section bar. */
+export type SiteTextSectionSummary = {
+  id: string;
+  label: string;
+  /** Number of texts in the section. */
+  total: number;
+  /** Texts edited in the admin (any locale). */
+  edited: number;
+  /** Texts with an empty translation in some non-default locale (the site shows Russian there). */
+  gaps: number;
+  /** Texts with a missing DB row in some locale (seed not run yet; the default is shown). */
+  unsaved: number;
+};
+
+export type SiteTextsPageData = {
+  sections: SiteTextSectionSummary[];
+  /** "section" = one section with its images; "search" = matches of `query` across sections. */
+  mode: 'section' | 'search';
+  /** Active section in "section" mode. */
+  section: string | null;
+  /** Normalized search query in "search" mode. */
+  query: string;
+  groups: SiteTextGroup[];
 };
 
 export type LeadListItem = {

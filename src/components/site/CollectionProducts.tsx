@@ -1,13 +1,16 @@
-import { getTranslations } from "next-intl/server";
-import type { ReactElement } from "react";
-import type { Locale } from "@/i18n/locales";
-import type { CollectionView, ImageRef, LandingContent } from "@/lib/content";
-import { leadSubject } from "@/lib/leads";
-import { ContentImage } from "./ContentImage";
-import { formatPrice, pad2 } from "./format";
-import { PICTURE_SLOTS, aspectOf, coverSizes } from "./layout-rules";
-import { leadLinkProps } from "./lead-links";
-import { RichText } from "./RichText";
+import { getTranslations } from 'next-intl/server';
+
+import type { Locale } from '@/i18n/locales';
+import type { CollectionView, ImageRef, LandingContent } from '@/lib/content';
+import { leadSubject } from '@/lib/leads';
+
+import type { ReactElement } from 'react';
+
+import { ContentImage } from './ContentImage';
+import { formatPrice, pad2 } from './format';
+import { PICTURE_SLOTS, aspectOf, coverSizes } from './layout-rules';
+import { leadLinkProps } from './lead-links';
+import { RichText } from './RichText';
 
 /** Fragment id of a product card (stable link target for JSON-LD and the admin). */
 export function productAnchor(slug: string): string {
@@ -21,12 +24,12 @@ function isWide(image: ImageRef | null): boolean {
 
 type CollectionProductsProps = {
   collection: CollectionView;
-  texts: LandingContent["texts"];
+  texts: LandingContent['texts'];
   locale: Locale;
   /** "" on the landing (CTA → in-page form), the landing path ("/", "/en") elsewhere. */
   homePath: string;
   /** Heading level of product titles in the page outline. */
-  productHeading: "h2" | "h4";
+  productHeading: 'h2' | 'h4';
   /** Append the «next collection is in the works» card (after the last collection). */
   withSoon: boolean;
   /** Collection page: description, more photos and details under each cover. */
@@ -34,7 +37,7 @@ type CollectionProductsProps = {
 };
 
 /**
- * Products as comic-book covers (#01, #02 …): masthead with the wordmark, halftone noir art
+ * Products as comic-book covers (catalog.productNo: #01, #02 …): masthead with the wordmark, halftone noir art
  * that gets its colour back on hover, a price tag, title and the print line. «Заказать»
  * opens the lead form with the product as the subject. Shared by the landing catalog and the
  * collection page (src/app/[locale]/catalog/[slug]/page.tsx), which also shows the product's
@@ -49,25 +52,40 @@ export async function CollectionProducts({
   withSoon,
   detailed = false,
 }: CollectionProductsProps): Promise<ReactElement> {
-  const t = await getTranslations({ locale, namespace: "common" });
+  const [t, tCatalog] = await Promise.all([
+    getTranslations({ locale, namespace: 'common' }),
+    getTranslations({ locale, namespace: 'catalog' }),
+  ]);
   const Heading = productHeading;
   const { products } = collection;
   return (
-    <ul className={detailed ? "covers covers--page" : "covers"} data-collection={collection.slug}>
+    <ul className={detailed ? 'covers covers--page' : 'covers'} data-collection={collection.slug}>
       {products.map((product, index) => {
         const image = product.images[0] ?? null;
-        const tag = product.details[0] ?? "";
-        const order = leadLinkProps({ type: "CONTACT", subject: leadSubject(texts["catalog.orderSubject"], product.title) }, homePath);
+        const tag = product.details[0] ?? '';
+        const order = leadLinkProps(
+          {
+            type: 'CONTACT',
+            subject: leadSubject(tCatalog('orderSubject', { product: product.title }), product.title),
+          },
+          homePath,
+        );
         return (
-          <li key={product.id} id={productAnchor(product.slug)} className="cover" data-entity="Product" data-entity-id={product.id}>
+          <li
+            key={product.id}
+            id={productAnchor(product.slug)}
+            className="cover"
+            data-entity="Product"
+            data-entity-id={product.id}
+          >
             <article className="cover__card" data-tilt="">
               <div className="cover__mast">
                 <span className="cover__brand mask-img m-wordmark" aria-hidden="true" />
-                <span className="cover__issue" aria-hidden="true">
-                  #{pad2(index + 1)}
+                <span className="cover__issue" aria-hidden="true" data-edit="catalog.productNo">
+                  {tCatalog('productNo', { number: pad2(index + 1) })}
                 </span>
               </div>
-              <div className={`cover__art media halftone noir${isWide(image) ? " cover__art--wide" : ""}`}>
+              <div className={`cover__art media halftone noir${isWide(image) ? ' cover__art--wide' : ''}`}>
                 <ContentImage
                   image={image}
                   sizes={coverSizes(aspectOf(image), isWide(image) ? PICTURE_SLOTS.coverWide : PICTURE_SLOTS.cover)}
@@ -76,12 +94,12 @@ export async function CollectionProducts({
               </div>
               {product.price !== null ? (
                 <span className="cover__price">
-                  <small data-edit="catalog.priceLabel">{texts["catalog.priceLabel"]}</small>
+                  <small data-edit="catalog.priceLabel">{texts['catalog.priceLabel']}</small>
                   <b data-field="price">{formatPrice(product.price, locale)}</b>
                 </span>
               ) : (
                 <span className="cover__price cover__price--request">
-                  <b data-edit="catalog.priceOnRequest">{texts["catalog.priceOnRequest"]}</b>
+                  <b data-edit="catalog.priceOnRequest">{texts['catalog.priceOnRequest']}</b>
                 </span>
               )}
               <div className="cover__foot">
@@ -110,7 +128,7 @@ export async function CollectionProducts({
                           <ContentImage
                             image={photo}
                             sizes="80px"
-                            fallbackAlt={t("productPhoto", { product: product.title, number: photoIndex + 2 })}
+                            fallbackAlt={t('productPhoto', { product: product.title, number: photoIndex + 2 })}
                           />
                         </a>
                       </li>
@@ -120,7 +138,7 @@ export async function CollectionProducts({
                 <RichText text={product.description} className="cover__desc" />
                 {product.details.length > 0 ? (
                   <details className="cover__details">
-                    <summary data-edit="catalog.detailsLabel">{texts["catalog.detailsLabel"]}</summary>
+                    <summary data-edit="catalog.detailsLabel">{texts['catalog.detailsLabel']}</summary>
                     <ul data-field="details">
                       {product.details.map((line, lineIndex) => (
                         <li key={lineIndex}>{line}</li>
@@ -132,7 +150,10 @@ export async function CollectionProducts({
             ) : null}
 
             <a className="link-btn" {...order}>
-              <span data-edit="catalog.orderCta">{texts["catalog.orderCta"]}</span> <span className="glyph" aria-hidden="true">→</span>
+              <span data-edit="catalog.orderCta">{texts['catalog.orderCta']}</span>{' '}
+              <span className="glyph" aria-hidden="true">
+                →
+              </span>
             </a>
           </li>
         );
@@ -144,15 +165,15 @@ export async function CollectionProducts({
             {/* The next cover number continues the products; with no products there is nothing
                 to continue (a lone «#01» would read like a collection number). */}
             {products.length > 0 ? (
-              <span className="cover__soon-no" aria-hidden="true">
-                #{pad2(products.length + 1)}
+              <span className="cover__soon-no" aria-hidden="true" data-edit="catalog.productNo">
+                {tCatalog('productNo', { number: pad2(products.length + 1) })}
               </span>
             ) : null}
             <p className="cover__soon-title" data-edit="catalog.soonTitle">
-              {texts["catalog.soonTitle"]}
+              {texts['catalog.soonTitle']}
             </p>
             <p className="cover__soon-text" data-edit="catalog.soon">
-              {texts["catalog.soon"]}
+              {texts['catalog.soon']}
             </p>
           </div>
         </li>

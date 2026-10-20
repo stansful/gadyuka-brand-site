@@ -1,18 +1,20 @@
-"use server";
+'use server';
 
-import { db } from "@/lib/db";
-import { revalidateContent } from "@/lib/content/cache";
-import { adminAction, findMissingMediaIds, MISSING_MEDIA_MESSAGE } from "../action-helpers";
-import { actionFail, actionOk, type ActionResult } from "../action-result";
-import { idSchema, productInputSchema, type ProductInput } from "../schemas";
-import { parseInput } from "../validation";
+import { revalidateContent } from '@/lib/content/cache';
+import { db } from '@/lib/db';
+
+import { adminAction, errorFailure, findMissingMediaIds } from '../action-helpers';
+import { actionFail, actionOk, type ActionResult } from '../action-result';
+import { getAdminTranslations } from '../i18n-server';
+import { idSchema, productInputSchema, type ProductInput } from '../schemas';
+import { parseInput } from '../validation';
 
 /** Create (id = null) or update a product together with its ordered images. */
 export async function saveProduct(id: string | null, input: ProductInput): Promise<ActionResult<{ id: string }>> {
-  return adminAction("saveProduct", async () => {
+  return adminAction('saveProduct', async () => {
     const parsedId = id === null ? null : idSchema.safeParse(id);
-    if (parsedId && !parsedId.success) return actionFail("Некорректный идентификатор");
-    const parsed = parseInput(productInputSchema, input);
+    if (parsedId && !parsedId.success) return errorFailure('invalidId');
+    const parsed = await parseInput(productInputSchema, input);
     if (!parsed.success) return actionFail(parsed.message, parsed.fieldErrors);
     const data = parsed.data;
     const currentId = parsedId?.data ?? null;
@@ -25,9 +27,13 @@ export async function saveProduct(id: string | null, input: ProductInput): Promi
       db.collection.findUnique({ where: { id: data.collectionId }, select: { id: true } }),
       findMissingMediaIds(data.imageIds),
     ]);
-    if (slugTaken) return actionFail("Адрес уже занят", { slug: "Товар с таким адресом уже есть" });
-    if (!collection) return actionFail("Коллекция не найдена", { collectionId: "Выберите коллекцию" });
-    if (missingMedia.length > 0) return actionFail(MISSING_MEDIA_MESSAGE, { imageIds: MISSING_MEDIA_MESSAGE });
+    const [t, tErrors] = await Promise.all([
+      getAdminTranslations('admin.products'),
+      getAdminTranslations('admin.errors'),
+    ]);
+    if (slugTaken) return actionFail(tErrors('slugTaken'), { slug: t('slugTaken') });
+    if (!collection) return actionFail(t('collectionNotFound'), { collectionId: t('chooseCollection') });
+    if (missingMedia.length > 0) return actionFail(tErrors('missingMedia'), { imageIds: tErrors('missingMedia') });
 
     const fields = {
       slug: data.slug,
@@ -39,7 +45,7 @@ export async function saveProduct(id: string | null, input: ProductInput): Promi
       published: data.published,
     };
 
-    const savedId = await db.$transaction(async (tx) => {
+    const savedId = await db.$transaction(async tx => {
       const existing = currentId
         ? await tx.product.findUnique({ where: { id: currentId }, select: { collectionId: true } })
         : null;
@@ -48,7 +54,8 @@ export async function saveProduct(id: string | null, input: ProductInput): Promi
       // New product, or moved to another collection → append to the end of that collection.
       const needsOrder = !existing || existing.collectionId !== data.collectionId;
       const order = needsOrder
-        ? ((await tx.product.aggregate({ where: { collectionId: data.collectionId }, _max: { order: true } }))._max.order ?? -1) + 1
+        ? ((await tx.product.aggregate({ where: { collectionId: data.collectionId }, _max: { order: true } }))._max
+            .order ?? -1) + 1
         : undefined;
 
       const product = currentId
@@ -70,9 +77,9 @@ export async function saveProduct(id: string | null, input: ProductInput): Promi
       return product.id;
     });
 
-    if (savedId === null) return actionFail("Товар не найден — возможно, его уже удалили.");
+    if (savedId === null) return actionFail(t('notFound'));
 
     revalidateContent();
-    return actionOk({ id: savedId }, currentId ? "Товар сохранён" : "Товар создан");
+    return actionOk({ id: savedId }, t(currentId ? 'saved' : 'created'));
   });
 }

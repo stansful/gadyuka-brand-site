@@ -1,24 +1,26 @@
-"use client";
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useState, type ReactElement } from "react";
-import { errorFor } from "@/lib/admin/action-result";
-import { saveCollection } from "@/lib/admin/actions/collections";
-import { countRu } from "@/lib/admin/labels";
-import { slugify } from "@/lib/admin/slug";
-import type { AdminMediaRef, CollectionFormData } from "@/lib/admin/types";
-import type { LocalizedText } from "@/lib/i18n-text";
-import { EditLocaleProvider, localesWithErrors, translationGaps } from "../i18n/LocaleTabs";
-import { LocalizedField } from "../i18n/LocalizedField";
-import { MediaPicker } from "../media/MediaPicker";
-import { Card } from "../ui/layout";
-import { Switch } from "../ui/Switch";
-import { useActionSubmit } from "../ui/useActionSubmit";
-import { EntityFormShell } from "./EntityFormShell";
-import { collectionSiteLinks } from "./site-links";
-import { SlugField } from "./SlugField";
+import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
+import { useState, type ReactElement } from 'react';
 
-const LOCALIZED = ["title", "description"] as const;
+import { errorFor } from '@/lib/admin/action-result';
+import { saveCollection } from '@/lib/admin/actions/collections';
+import { slugify } from '@/lib/admin/slug';
+import type { AdminMediaRef, CollectionFormData } from '@/lib/admin/types';
+import type { LocalizedText } from '@/lib/i18n-text';
+
+import { EditLocaleProvider, localesWithErrors, translationGaps } from '../i18n/LocaleTabs';
+import { LocalizedField } from '../i18n/LocalizedField';
+import { MediaPicker } from '../media/MediaPicker';
+import { Card } from '../ui/layout';
+import { Switch } from '../ui/Switch';
+import { useActionSubmit } from '../ui/useActionSubmit';
+import { EntityFormShell } from './EntityFormShell';
+import { collectionSiteLinks } from './site-links';
+import { SlugField } from './SlugField';
+
+const LOCALIZED = ['title', 'description'] as const;
 
 export function CollectionForm({ initial }: { initial: CollectionFormData | null }): ReactElement {
   return (
@@ -29,9 +31,10 @@ export function CollectionForm({ initial }: { initial: CollectionFormData | null
 }
 
 function CollectionFormInner({ initial }: { initial: CollectionFormData | null }): ReactElement {
+  const t = useTranslations('admin');
   const router = useRouter();
   const [title, setTitle] = useState<LocalizedText>(initial?.title ?? {});
-  const [slug, setSlug] = useState(initial?.slug ?? "");
+  const [slug, setSlug] = useState(initial?.slug ?? '');
   const [slugTouched, setSlugTouched] = useState(initial !== null);
   const [description, setDescription] = useState<LocalizedText>(initial?.description ?? {});
   const [cover, setCover] = useState<AdminMediaRef | null>(initial?.cover ?? null);
@@ -39,11 +42,14 @@ function CollectionFormInner({ initial }: { initial: CollectionFormData | null }
   const { pending, fieldErrors, run } = useActionSubmit();
 
   const submit = (): void => {
-    run(() => saveCollection(initial?.id ?? null, { slug, title, description, coverId: cover?.id ?? null, published }), {
-      onSuccess: (data) => {
-        if (!initial) router.replace(`/admin/collections/${data.id}`);
+    run(
+      () => saveCollection(initial?.id ?? null, { slug, title, description, coverId: cover?.id ?? null, published }),
+      {
+        onSuccess: data => {
+          if (!initial) router.replace(`/admin/collections/${data.id}`);
+        },
       },
-    });
+    );
   };
 
   return (
@@ -57,69 +63,66 @@ function CollectionFormInner({ initial }: { initial: CollectionFormData | null }
       remove={
         initial
           ? {
-              entity: "collection",
+              entity: 'collection',
               id: initial.id,
-              noun: "коллекцию",
-              listHref: "/admin/collections",
+              listHref: '/admin/collections',
               warning:
-                initial.productCount > 0
-                  ? `Вместе с коллекцией будут удалены ${countRu(initial.productCount, "товар", "товара", "товаров")}.`
-                  : undefined,
+                initial.productCount > 0 ? t('collections.deleteWarning', { count: initial.productCount }) : undefined,
             }
           : undefined
       }
       aside={
         <>
-          <Card title="Публикация">
+          <Card title={t('form.publication')}>
             <Switch
               checked={published}
               onCheckedChange={setPublished}
-              label="Показывать на сайте"
-              description="Скрытая коллекция и её товары не видны посетителям."
+              label={t('form.showOnSite')}
+              description={t('collections.form.hiddenHint')}
             />
           </Card>
-          <Card title="Обложка">
+          <Card title={t('collections.form.cover')}>
             <MediaPicker
               id="collection-cover"
-              label="Изображение коллекции"
+              label={t('collections.form.coverLabel')}
               value={cover}
               onChange={setCover}
               aspect="wide"
-              error={errorFor(fieldErrors, "coverId")}
+              error={errorFor(fieldErrors, 'coverId')}
             />
           </Card>
         </>
       }
     >
-      <Card title="Основное" bodyClassName="flex flex-col gap-5">
+      <Card title={t('collections.form.main')} bodyClassName="flex flex-col gap-5">
         <LocalizedField
           name="title"
-          label="Название"
+          label={t('collections.form.name')}
           required
           value={title}
-          onChange={(next) => {
+          onChange={next => {
             setTitle(next);
-            if (!slugTouched) setSlug(slugify(next.ru ?? ""));
+            if (!slugTouched) setSlug(slugify(next.ru ?? ''));
           }}
           fieldErrors={fieldErrors}
           maxLength={200}
-          placeholder="Меня запомнят"
-          hint="Никогда не называйте коллекцию «первой» или «дебютной»."
+          placeholder={t('collections.form.namePlaceholder')}
+          hint={t('collections.form.nameHint')}
         />
         <SlugField
           id="collection-slug"
           value={slug}
-          onChange={(next) => {
+          onChange={next => {
             setSlugTouched(true);
             setSlug(next);
           }}
-          source={title.ru ?? ""}
+          source={title.ru ?? ''}
           error={fieldErrors.slug}
           prefix="/catalog/"
         />
         <LocalizedField
           name="description"
-          label="Описание"
+          label={t('collections.form.description')}
           multiline
           rows={5}
           value={description}

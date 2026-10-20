@@ -1,38 +1,34 @@
-import type { Locale } from "@/i18n/locales";
+import type { SiteMessages } from '@/i18n/messages';
 
 /**
- * Copy of the error boundary (src/app/[locale]/error.tsx) — the client-side error page cannot
- * ask the server for it and the public pages ship no message catalogue. Mirrors
- * messages/*.json (error.*, notFound.backHome, common.homeLink); error-copy.test.ts keeps the
- * two in sync.
+ * Copy of the error boundary (src/app/[locale]/error.tsx). The client-side error page can
+ * neither read the database nor ask next-intl, and bundling messages/*.json into it would ship
+ * every site message to the browser — so the server layout resolves this copy from the
+ * DB-backed messages (getSiteMessages: admin edits included) and hands it down through
+ * <ErrorCopyProvider> (./ErrorCopyProvider.tsx): a few hundred bytes per page.
+ * One source per string: error.*, common.backHome (shared with the 404 page), common.homeLink.
  */
 export type ErrorCopy = {
   kicker: string;
   title: string;
   caption: string;
   text: string;
+  /** The big outlined mark of the side panel («!?»). */
+  mark: string;
   retry: string;
   backHome: string;
   homeLink: string;
 };
 
-export const ERROR_COPY: Readonly<Record<Locale, ErrorCopy>> = {
-  ru: {
-    kicker: "Ошибка",
-    title: "Что-то пошло не так",
-    caption: "Сбой в типографии.",
-    text: "Мы уже разбираемся. Попробуйте обновить страницу.",
-    retry: "Попробовать снова",
-    backHome: "На главную",
-    homeLink: "ГАДЮКА — на главную",
-  },
-  en: {
-    kicker: "Error",
-    title: "Something went wrong",
-    caption: "Trouble at the printing press.",
-    text: "We're on it. Please try reloading the page.",
-    retry: "Try again",
-    backHome: "Back to home",
-    homeLink: "GADYUKA — home",
-  },
-};
+export function errorCopyFromMessages(messages: SiteMessages): ErrorCopy {
+  return {
+    kicker: messages.error.kicker,
+    title: messages.error.title,
+    caption: messages.error.caption,
+    text: messages.error.text,
+    mark: messages.error.mark,
+    retry: messages.error.retry,
+    backHome: messages.common.backHome,
+    homeLink: messages.common.homeLink,
+  };
+}

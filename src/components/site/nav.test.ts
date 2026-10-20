@@ -1,39 +1,56 @@
-import { describe, expect, it } from "vitest";
-import { CHAPTER_ORDER, SECTION_ANCHORS, isRequiredKey } from "@/lib/content/registry";
-import { ACTIVE_MAP, NAV } from "./nav";
+import { describe, expect, it } from 'vitest';
 
-/** Page position of an anchor: the cover first, then the chapters in CHAPTER_ORDER. */
-function pagePosition(anchor: string): number {
-  if (anchor === SECTION_ANCHORS.hero) return 0;
-  const index = CHAPTER_ORDER.findIndex((id) => SECTION_ANCHORS[id] === anchor);
-  return index < 0 ? -1 : index + 1;
-}
+import { activeMapFor, isExternalHref, menuAnchor, menuHref, menuLink } from './nav';
 
-describe("site menu", () => {
-  it("has the owner's six items: Главная, Каталог, О нас, Индивидуальный пошив, Специальное предложение, Контакты", () => {
-    expect(NAV.map((item) => item.anchor)).toEqual(["home", "catalog", "about", "tailoring", "offers", "contacts"]);
-    expect(NAV.map((item) => item.key)).toEqual([
-      "header.nav.home",
-      "header.nav.catalog",
-      "header.nav.about",
-      "header.nav.tailoring",
-      "header.nav.offers",
-      "header.nav.contacts",
-    ]);
+const item = { id: 'm1', label: 'О нас', href: '#about', showInHeader: true, showInFooter: true };
+
+describe('site menu links', () => {
+  it('keeps landing anchors on the landing and points to them from other pages', () => {
+    expect(menuAnchor('#catalog')).toBe('catalog');
+    expect(menuAnchor('/catalog/menya-zapomnyat')).toBeNull();
+    expect(menuHref({ href: '#about' }, '', 'ru')).toBe('#about');
+    expect(menuHref({ href: '#about' }, '/en', 'en')).toBe('/en#about');
   });
 
-  it("follows the order of the sections on the page", () => {
-    const positions = NAV.map((item) => pagePosition(item.anchor));
-    expect(positions.every((position) => position >= 0)).toBe(true);
-    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+  it('localizes site paths (query and hash kept, a typed language prefix replaced)', () => {
+    expect(menuHref({ href: '/catalog/menya-zapomnyat' }, '', 'en')).toBe('/en/catalog/menya-zapomnyat');
+    expect(menuHref({ href: '/catalog/menya-zapomnyat' }, '', 'ru')).toBe('/catalog/menya-zapomnyat');
+    expect(menuHref({ href: '/en/catalog/x#product-y' }, '', 'ru')).toBe('/catalog/x#product-y');
+    expect(menuHref({ href: '/#gallery' }, '', 'en')).toBe('/en#gallery');
   });
 
-  it("highlights every menu section while it is on screen (scroll-spy), nothing elsewhere", () => {
-    for (const item of NAV) expect(ACTIVE_MAP[item.anchor]).toBe(item.anchor);
-    expect(ACTIVE_MAP[SECTION_ANCHORS.reviews] ?? null).toBeNull();
+  it('leaves external links, mailto: and tel: alone', () => {
+    expect(menuHref({ href: 'https://t.me/gadyuka' }, '/en', 'en')).toBe('https://t.me/gadyuka');
+    expect(menuHref({ href: 'mailto:hello@example.com' }, '', 'ru')).toBe('mailto:hello@example.com');
+    expect(menuHref({ href: 'tel:+79000000000' }, '', 'en')).toBe('tel:+79000000000');
   });
 
-  it("never saves a menu item empty", () => {
-    expect(NAV.every((item) => isRequiredKey(item.key))).toBe(true);
+  it('opens only http(s) links to other sites in a new tab', () => {
+    expect(isExternalHref('https://t.me/gadyuka')).toBe(true);
+    expect(isExternalHref('HTTP://example.com')).toBe(true);
+    expect(isExternalHref('mailto:hello@example.com')).toBe(false);
+    expect(isExternalHref('/catalog/x')).toBe(false);
+    expect(isExternalHref('#about')).toBe(false);
+  });
+
+  it('turns a menu item into a link of the current page', () => {
+    expect(menuLink(item, '/en', 'en')).toEqual({
+      id: 'm1',
+      label: 'О нас',
+      href: '/en#about',
+      anchor: 'about',
+      external: false,
+    });
+    expect(menuLink({ ...item, href: 'https://vk.com/gadyuka' }, '', 'ru')).toMatchObject({
+      href: 'https://vk.com/gadyuka',
+      anchor: null,
+      external: true,
+    });
+  });
+
+  it('highlights every menu section while it is on screen (scroll-spy), nothing elsewhere', () => {
+    const map = activeMapFor([{ href: '#home' }, { href: '#catalog' }, { href: 'https://t.me/x' }]);
+    expect(map).toEqual({ home: 'home', catalog: 'catalog' });
+    expect(map.reviews ?? null).toBeNull();
   });
 });

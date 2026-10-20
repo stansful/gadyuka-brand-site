@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import type { ReactElement } from "react";
+import type { ReactElement } from 'react';
 
 /** Small deterministic PRNG (mulberry32): the same drip on the server and in the browser. */
 function mulberry32(seed: number): () => number {

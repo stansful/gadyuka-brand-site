@@ -1,38 +1,39 @@
-import { Plus } from "lucide-react";
-import type { Metadata } from "next";
-import Link from "next/link";
-import type { ReactElement } from "react";
-import { EntityList } from "@/components/admin/lists/EntityList";
-import { buttonClasses } from "@/components/admin/ui/Button";
-import { PageHeader } from "@/components/admin/ui/layout";
-import { listPartnersAdmin } from "@/lib/admin/queries";
+import { Plus } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
 
-export const metadata: Metadata = { title: "Партнёры" };
+import { EntityList } from '@/components/admin/lists/EntityList';
+import { buttonClasses } from '@/components/admin/ui/Button';
+import { PageHeader } from '@/components/admin/ui/layout';
+import { adminPageMetadata } from '@/lib/admin/i18n-server';
+import { listPartnersAdmin } from '@/lib/admin/queries';
+
+import type { Metadata } from 'next';
+import type { ReactElement } from 'react';
+
+export function generateMetadata(): Promise<Metadata> {
+  return adminPageMetadata('partners.title');
+}
 
 export default async function ListPage(): Promise<ReactElement> {
-  const rows = await listPartnersAdmin();
+  const [rows, t] = await Promise.all([listPartnersAdmin(), getTranslations('admin.partners')]);
   const addLink = (
-    <Link href="/admin/partners/new" className={buttonClasses("primary")}>
+    <Link href="/admin/partners/new" className={buttonClasses('primary')}>
       <Plus className="size-4" aria-hidden />
-      Новый партнёр
+      {t('add')}
     </Link>
   );
   return (
     <>
-      <PageHeader
-        title="Партнёры"
-        description="Партнёры бренда. Перетаскивайте строки, чтобы изменить порядок на сайте."
-        actions={
-          <>
-            {addLink}
-          </>
-        }
-      />
+      <PageHeader title={t('title')} description={t('description')} actions={<>{addLink}</>} />
       <EntityList
         entity="partner"
         rows={rows}
-        nounAccusative="партнёра"
-        empty={{ title: "Партнёров пока нет", description: "Бренды и организации, с которыми сотрудничает ГАДЮКА.", action: addLink }}
+        empty={{
+          title: t('empty'),
+          description: t('emptyHint'),
+          action: addLink,
+        }}
       />
     </>
   );

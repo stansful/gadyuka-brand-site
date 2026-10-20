@@ -1,6 +1,7 @@
-import "server-only";
-import { createHash, scrypt, timingSafeEqual } from "node:crypto";
-import { jwtVerify, SignJWT } from "jose";
+import 'server-only';
+import { createHash, scrypt, timingSafeEqual } from 'node:crypto';
+
+import { jwtVerify, SignJWT } from 'jose';
 
 /**
  * Admin session token: a short HS256 JWT (jose) stored in an httpOnly cookie.
@@ -19,13 +20,13 @@ import { jwtVerify, SignJWT } from "jose";
 /** 3 days. */
 export const ADMIN_SESSION_TTL_SECONDS = 3 * 24 * 60 * 60;
 
-const ISSUER = "gadyuka-admin";
-const AUDIENCE = "gadyuka-admin";
-const SUBJECT = "admin";
+const ISSUER = 'gadyuka-admin';
+const AUDIENCE = 'gadyuka-admin';
+const SUBJECT = 'admin';
 /** Anything longer is not one of our tokens — reject before parsing. */
 const MAX_TOKEN_LENGTH = 2048;
 
-const KEY_SALT_PREFIX = "gadyuka-admin-session:v2:";
+const KEY_SALT_PREFIX = 'gadyuka-admin-session:v2:';
 const SCRYPT_PARAMS = { N: 2 ** 14, r: 8, p: 1, maxmem: 64 * 1024 * 1024 } as const;
 const KEY_LENGTH = 32;
 const MAX_CACHED_KEYS = 8;
@@ -33,11 +34,11 @@ const MAX_CACHED_KEYS = 8;
 const keyCache = new Map<string, Promise<Uint8Array>>();
 
 function cacheKey(password: string, secret: string): string {
-  return createHash("sha256").update(`${secret}\u0000${password}`, "utf8").digest("hex");
+  return createHash('sha256').update(`${secret}\u0000${password}`, 'utf8').digest('hex');
 }
 
 /** 32-byte HMAC key derived from the admin password (+ optional server secret). Memoized. */
-export function deriveSessionKey(password: string, secret: string = ""): Promise<Uint8Array> {
+export function deriveSessionKey(password: string, secret: string = ''): Promise<Uint8Array> {
   const id = cacheKey(password, secret);
   const cached = keyCache.get(id);
   if (cached) return cached;
@@ -55,8 +56,8 @@ export function deriveSessionKey(password: string, secret: string = ""): Promise
 
 export async function signAdminSession(key: Uint8Array, nowMs: number = Date.now()): Promise<string> {
   const issuedAt = Math.floor(nowMs / 1000);
-  return new SignJWT({ role: "admin" })
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+  return new SignJWT({ role: 'admin' })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setSubject(SUBJECT)
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
@@ -70,13 +71,13 @@ export async function verifyAdminSession(token: string, key: Uint8Array, nowMs?:
   if (token.length === 0 || token.length > MAX_TOKEN_LENGTH) return false;
   try {
     const { payload } = await jwtVerify(token, key, {
-      algorithms: ["HS256"],
+      algorithms: ['HS256'],
       issuer: ISSUER,
       audience: AUDIENCE,
       subject: SUBJECT,
       ...(nowMs === undefined ? {} : { currentDate: new Date(nowMs) }),
     });
-    return payload.role === "admin";
+    return payload.role === 'admin';
   } catch {
     return false;
   }
@@ -87,7 +88,7 @@ export async function verifyAdminSession(token: string, key: Uint8Array, nowMs?:
  * comparison time does not depend on the length or content of either value.
  */
 export function safeEqual(a: string, b: string): boolean {
-  const left = createHash("sha256").update(a, "utf8").digest();
-  const right = createHash("sha256").update(b, "utf8").digest();
+  const left = createHash('sha256').update(a, 'utf8').digest();
+  const right = createHash('sha256').update(b, 'utf8').digest();
   return timingSafeEqual(left, right);
 }

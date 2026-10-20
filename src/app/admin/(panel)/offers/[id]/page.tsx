@@ -1,19 +1,25 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import type { ReactElement } from "react";
-import { OfferForm } from "@/components/admin/forms/OfferForm";
-import { PageHeader } from "@/components/admin/ui/layout";
-import { getOfferForm } from "@/lib/admin/queries";
+import { getTranslations } from 'next-intl/server';
+import { notFound } from 'next/navigation';
 
-export const metadata: Metadata = { title: "Спецпредложение" };
+import { OfferForm } from '@/components/admin/forms/OfferForm';
+import { PageHeader } from '@/components/admin/ui/layout';
+import { adminPageMetadata } from '@/lib/admin/i18n-server';
+import { getOfferForm } from '@/lib/admin/queries';
 
-export default async function EditPage({ params }: PageProps<"/admin/offers/[id]">): Promise<ReactElement> {
+import type { Metadata } from 'next';
+import type { ReactElement } from 'react';
+
+export function generateMetadata(): Promise<Metadata> {
+  return adminPageMetadata('offers.editTitle');
+}
+
+export default async function EditPage({ params }: PageProps<'/admin/offers/[id]'>): Promise<ReactElement> {
   const { id } = await params;
-  const offer = await getOfferForm(id);
+  const [offer, t] = await Promise.all([getOfferForm(id), getTranslations('admin.offers')]);
   if (!offer) notFound();
   return (
     <>
-      <PageHeader title={offer.title.ru || "Спецпредложение"} backHref="/admin/offers" backLabel="Все предложения" />
+      <PageHeader title={offer.title.ru || t('editTitle')} backHref="/admin/offers" backLabel={t('back')} />
       <OfferForm key={offer.id} initial={offer} />
     </>
   );

@@ -1,23 +1,33 @@
-"use client";
+'use client';
 
-import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
-import { pad2 } from "../format";
-import { motionEnabled } from "../motion/env";
-import { gsap } from "../motion/gsap";
-import { lockScroll } from "../motion/lenis-store";
-import { NAVIGATE_EVENT } from "../motion/events";
-import type { HeaderLabels, LanguageSwitcherProps } from "../labels";
-import { LanguageSwitcher } from "../LanguageSwitcher";
+import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 
+import type { HeaderLabels, LanguageSwitcherProps } from '../labels';
+
+import { pad2 } from '../format';
+import { LanguageSwitcher } from '../LanguageSwitcher';
+import { motionEnabled } from '../motion/env';
+import { NAVIGATE_EVENT } from '../motion/events';
+import { gsap } from '../motion/gsap';
+import { lockScroll } from '../motion/lenis-store';
+
+/** A menu link (MenuItem row, see ../nav.ts menuLink). */
 export type NavItem = {
-  /** Section anchor ("catalog") — also the key of the active-section highlight. */
-  anchor: string;
-  /** Full href ("#catalog" on the landing, "/#catalog" elsewhere). */
+  /** MenuItem.id (React key, data-entity-id). */
+  id: string;
+  /** Section anchor ("catalog") — the key of the active-section highlight; null for other links. */
+  anchor: string | null;
+  /** Full href ("#catalog" on the landing, "/#catalog" elsewhere, a localized path or a URL). */
   href: string;
   label: string;
-  /** ContentBlock key (data-edit). */
-  editKey: string;
+  /** External http(s) link: opens in a new tab, with the hidden labels.opensInNewTab hint. */
+  external: boolean;
 };
+
+/** target / rel of a menu link (external links open in a new tab). */
+function newTabProps(item: NavItem): { target?: '_blank'; rel?: string } {
+  return item.external ? { target: '_blank', rel: 'noopener noreferrer' } : {};
+}
 
 type HeaderClientProps = {
   nav: ReadonlyArray<NavItem>;
@@ -36,7 +46,7 @@ type HeaderClientProps = {
 const DESKTOP_MIN = 1024;
 
 /** Items of the mobile menu that rise in after the wipe. */
-const MENU_ITEMS = ".mnav__list li, .mnav__cta, .mnav__cap";
+const MENU_ITEMS = '.mnav__list li, .mnav__cta, .mnav__cap';
 
 /** Stops the menu's wipe and item tweens (a reopen during the closing wipe must win over it). */
 function stopMenuTweens(menu: HTMLElement): void {
@@ -51,7 +61,16 @@ function stopMenuTweens(menu: HTMLElement): void {
  * makes the page behind it inert, closes on Esc (focus returns to the burger), on a link and
  * when the viewport grows to desktop width.
  */
-export function HeaderClient({ nav, homeHref, formHref, menuCaption, cta, activeMap, labels, languages }: HeaderClientProps): ReactElement {
+export function HeaderClient({
+  nav,
+  homeHref,
+  formHref,
+  menuCaption,
+  cta,
+  activeMap,
+  labels,
+  languages,
+}: HeaderClientProps): ReactElement {
   const headerRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const burgerRef = useRef<HTMLButtonElement>(null);
@@ -64,35 +83,37 @@ export function HeaderClient({ nav, homeHref, formHref, menuCaption, cta, active
     const header = headerRef.current;
     if (!header) return;
     const update = (): void => {
-      header.classList.toggle("is-solid", window.scrollY > 40);
+      header.classList.toggle('is-solid', window.scrollY > 40);
     };
     update();
-    window.addEventListener("scroll", update, { passive: true });
-    return () => window.removeEventListener("scroll", update);
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
   }, []);
 
   // Active menu item: the section crossing the middle of the viewport. Blocks between sections
   // (the red band) name the section they belong to in data-nav-section.
   useEffect(() => {
-    if (!("IntersectionObserver" in window)) return;
-    const sections = Array.from(document.querySelectorAll<HTMLElement>("main > section[id], main > [data-nav-section]"));
+    if (!('IntersectionObserver' in window)) return;
+    const sections = Array.from(
+      document.querySelectorAll<HTMLElement>('main > section[id], main > [data-nav-section]'),
+    );
     if (sections.length === 0) return;
     const observer = new IntersectionObserver(
-      (entries) => {
+      entries => {
         for (const entry of entries) {
           if (!entry.isIntersecting || !(entry.target instanceof HTMLElement)) continue;
           const id = entry.target.dataset.navSection ?? entry.target.id;
           setActive(activeMap[id] ?? null);
         }
       },
-      { rootMargin: "-45% 0px -54% 0px" },
+      { rootMargin: '-45% 0px -54% 0px' },
     );
-    sections.forEach((section) => observer.observe(section));
+    sections.forEach(section => observer.observe(section));
     return () => observer.disconnect();
   }, [activeMap]);
 
   const setInert = (on: boolean): void => {
-    document.querySelectorAll<HTMLElement>("main, .ftr").forEach((el) => {
+    document.querySelectorAll<HTMLElement>('main, .ftr').forEach(el => {
       el.inert = on;
     });
   };
@@ -110,7 +131,7 @@ export function HeaderClient({ nav, homeHref, formHref, menuCaption, cta, active
     };
     stopMenuTweens(menu);
     if (motionEnabled() && !instant) {
-      gsap.to(menu, { clipPath: "circle(0% at 100% 0%)", duration: 0.5, ease: "power3.inOut", onComplete: hide });
+      gsap.to(menu, { clipPath: 'circle(0% at 100% 0%)', duration: 0.5, ease: 'power3.inOut', onComplete: hide });
     } else {
       hide();
     }
@@ -126,19 +147,23 @@ export function HeaderClient({ nav, homeHref, formHref, menuCaption, cta, active
     lockScroll(true);
     setInert(true);
     if (motionEnabled()) {
-      gsap.fromTo(menu, { clipPath: "circle(0% at 100% 0%)" }, { clipPath: "circle(150% at 100% 0%)", duration: 0.7, ease: "power3.inOut" });
+      gsap.fromTo(
+        menu,
+        { clipPath: 'circle(0% at 100% 0%)' },
+        { clipPath: 'circle(150% at 100% 0%)', duration: 0.7, ease: 'power3.inOut' },
+      );
       gsap.fromTo(
         menu.querySelectorAll(MENU_ITEMS),
         { y: 40, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, stagger: 0.06, delay: 0.2, ease: "power3.out" },
+        { y: 0, opacity: 1, duration: 0.6, stagger: 0.06, delay: 0.2, ease: 'power3.out' },
       );
     }
-    menu.querySelector<HTMLElement>("a")?.focus({ preventScroll: true });
+    menu.querySelector<HTMLElement>('a')?.focus({ preventScroll: true });
   };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape" && openRef.current) {
+      if (event.key === 'Escape' && openRef.current) {
         closeMenu(false);
         burgerRef.current?.focus();
       }
@@ -147,12 +172,12 @@ export function HeaderClient({ nav, homeHref, formHref, menuCaption, cta, active
       if (openRef.current && window.innerWidth >= DESKTOP_MIN) closeMenu(true);
     };
     const onNavigate = (): void => closeMenu(true);
-    document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", onResize);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onResize);
     window.addEventListener(NAVIGATE_EVENT, onNavigate);
     return () => {
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", onResize);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onResize);
       window.removeEventListener(NAVIGATE_EVENT, onNavigate);
       if (openRef.current) {
         lockScroll(false);
@@ -171,16 +196,19 @@ export function HeaderClient({ nav, homeHref, formHref, menuCaption, cta, active
           </a>
           <nav className="nav" aria-label={labels.mainNavigation}>
             <ul className="nav__list">
-              {nav.map((item) => (
-                <li key={item.anchor}>
+              {nav.map(item => (
+                <li key={item.id}>
                   <a
                     className="nav__link"
                     href={item.href}
-                    data-nav={item.anchor}
-                    data-edit={item.editKey}
-                    aria-current={active === item.anchor ? "true" : undefined}
+                    {...newTabProps(item)}
+                    data-nav={item.anchor ?? undefined}
+                    data-entity="MenuItem"
+                    data-entity-id={item.id}
+                    aria-current={item.anchor !== null && active === item.anchor ? 'true' : undefined}
                   >
                     {item.label}
+                    {item.external ? <span className="sr-only"> {labels.opensInNewTab}</span> : null}
                   </a>
                 </li>
               ))}
@@ -211,12 +239,15 @@ export function HeaderClient({ nav, homeHref, formHref, menuCaption, cta, active
           </p>
           <ol className="mnav__list">
             {nav.map((item, index) => (
-              <li key={item.anchor}>
-                <a href={item.href} onClick={() => closeMenu(true)}>
+              <li key={item.id}>
+                <a href={item.href} {...newTabProps(item)} onClick={() => closeMenu(true)}>
                   <span className="mnav__no" aria-hidden="true">
                     {pad2(index + 1)}
                   </span>
-                  <span data-edit={item.editKey}>{item.label}</span>
+                  <span data-entity="MenuItem" data-entity-id={item.id}>
+                    {item.label}
+                  </span>
+                  {item.external ? <span className="sr-only"> {labels.opensInNewTab}</span> : null}
                 </a>
               </li>
             ))}

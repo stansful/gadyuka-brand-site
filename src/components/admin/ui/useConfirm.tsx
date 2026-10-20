@@ -1,13 +1,17 @@
-"use client";
+'use client';
 
-import { useCallback, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { Button } from "./Button";
-import { Modal } from "./Modal";
+import { useTranslations } from 'next-intl';
+import { useCallback, useRef, useState, type ReactElement, type ReactNode } from 'react';
+
+import { Button } from './Button';
+import { Modal } from './Modal';
 
 export type ConfirmOptions = {
   title: string;
   description?: ReactNode;
+  /** Default «Удалить» (admin.ui.delete). */
   confirmLabel?: string;
+  /** Default «Отмена» (admin.ui.cancel). */
   cancelLabel?: string;
   /** Red confirm button for destructive actions (default true). */
   destructive?: boolean;
@@ -20,6 +24,7 @@ export type ConfirmOptions = {
  *   return <>{…}{confirmDialog}</>;
  */
 export function useConfirm(): [ReactElement, (options: ConfirmOptions) => Promise<boolean>] {
+  const t = useTranslations('admin.ui');
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
   const resolver = useRef<((value: boolean) => void) | null>(null);
 
@@ -32,7 +37,7 @@ export function useConfirm(): [ReactElement, (options: ConfirmOptions) => Promis
   const confirm = useCallback((next: ConfirmOptions) => {
     resolver.current?.(false);
     setOptions(next);
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>(resolve => {
       resolver.current = resolve;
     });
   }, []);
@@ -41,16 +46,20 @@ export function useConfirm(): [ReactElement, (options: ConfirmOptions) => Promis
     <Modal
       open={options !== null}
       onClose={() => settle(false)}
-      title={options?.title ?? ""}
+      title={options?.title ?? ''}
       description={options?.description}
       size="sm"
       footer={
         <>
           <Button variant="ghost" onClick={() => settle(false)}>
-            {options?.cancelLabel ?? "Отмена"}
+            {options?.cancelLabel ?? t('cancel')}
           </Button>
-          <Button variant={options?.destructive === false ? "primary" : "danger"} onClick={() => settle(true)} autoFocus>
-            {options?.confirmLabel ?? "Удалить"}
+          <Button
+            variant={options?.destructive === false ? 'primary' : 'danger'}
+            onClick={() => settle(true)}
+            autoFocus
+          >
+            {options?.confirmLabel ?? t('delete')}
           </Button>
         </>
       }

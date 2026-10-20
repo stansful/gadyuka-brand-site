@@ -1,5 +1,7 @@
-import { clsx } from "clsx";
-import type { ReactElement, ReactNode } from "react";
+import { clsx } from 'clsx';
+import { useTranslations } from 'next-intl';
+
+import type { ReactElement, ReactNode } from 'react';
 
 export type FieldProps = {
   /** id of the control inside (label htmlFor). */
@@ -17,13 +19,14 @@ export type FieldProps = {
 /** ids for aria-describedby: `${id}-hint`, `${id}-error`. */
 export function describedBy(id: string, hint: unknown, error: unknown): string | undefined {
   const ids = [hint ? `${id}-hint` : null, error ? `${id}-error` : null].filter(Boolean);
-  return ids.length > 0 ? ids.join(" ") : undefined;
+  return ids.length > 0 ? ids.join(' ') : undefined;
 }
 
-/** Label + control + hint + error, with ids matching describedBy(). */
+/** Label + control + hint + error, with ids matching describedBy(). Server and client. */
 export function Field({ htmlFor, label, hint, error, required, aside, className, children }: FieldProps): ReactElement {
+  const t = useTranslations('admin.ui');
   return (
-    <div className={clsx("flex flex-col gap-1.5", className)}>
+    <div className={clsx('flex flex-col gap-1.5', className)}>
       <div className="flex items-center justify-between gap-2">
         <label htmlFor={htmlFor} className="text-sm font-medium text-fg/90">
           {label}
@@ -32,7 +35,7 @@ export function Field({ htmlFor, label, hint, error, required, aside, className,
               *
             </span>
           ) : null}
-          {required ? <span className="sr-only"> (обязательно)</span> : null}
+          {required ? <span className="sr-only"> {t('requiredMark')}</span> : null}
         </label>
         {aside}
       </div>

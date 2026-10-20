@@ -1,17 +1,23 @@
-import type { Metadata } from "next";
-import type { ReactElement } from "react";
-import { ReviewForm } from "@/components/admin/forms/ReviewForm";
-import { PageHeader } from "@/components/admin/ui/layout";
-import { requireAdminPage } from "@/lib/admin/auth";
+import { getTranslations } from 'next-intl/server';
 
-export const metadata: Metadata = { title: "Новый отзыв" };
+import { ReviewForm } from '@/components/admin/forms/ReviewForm';
+import { PageHeader } from '@/components/admin/ui/layout';
+import { adminPageMetadata } from '@/lib/admin/i18n-server';
+import { getReviewRatingMax } from '@/lib/admin/queries';
+
+import type { Metadata } from 'next';
+import type { ReactElement } from 'react';
+
+export function generateMetadata(): Promise<Metadata> {
+  return adminPageMetadata('reviews.newTitle');
+}
 
 export default async function NewPage(): Promise<ReactElement> {
-  await requireAdminPage();
+  const [ratingMax, t] = await Promise.all([getReviewRatingMax(), getTranslations('admin.reviews')]);
   return (
     <>
-      <PageHeader title="Новый отзыв" backHref="/admin/reviews" backLabel="Все отзывы" />
-      <ReviewForm initial={null} />
+      <PageHeader title={t('newTitle')} backHref="/admin/reviews" backLabel={t('back')} />
+      <ReviewForm initial={null} ratingMax={ratingMax} />
     </>
   );
 }

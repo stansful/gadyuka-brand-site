@@ -1,8 +1,10 @@
-import "server-only";
-import { getImageProps } from "next/image";
-import type { CSSProperties } from "react";
-import { preload } from "react-dom";
-import type { ImgAttrs } from "./img-attrs";
+import 'server-only';
+import { getImageProps } from 'next/image';
+import { preload } from 'react-dom';
+
+import type { CSSProperties } from 'react';
+
+import type { ImgAttrs } from './img-attrs';
 
 type ImageInput = {
   src: string;
@@ -31,22 +33,23 @@ export function imgAttrs({ src, width, height, alt, sizes, className, style, pri
     sizes,
     className,
     style,
-    loading: priority ? "eager" : "lazy",
-    fetchPriority: priority ? "high" : undefined,
+    loading: priority ? 'eager' : 'lazy',
+    fetchPriority: priority ? 'high' : undefined,
   });
   const attrs: ImgAttrs = {
     src: props.src,
     srcSet: props.srcSet,
     sizes: props.sizes,
-    width: typeof props.width === "number" ? props.width : undefined,
-    height: typeof props.height === "number" ? props.height : undefined,
+    width: typeof props.width === 'number' ? props.width : undefined,
+    height: typeof props.height === 'number' ? props.height : undefined,
     alt,
-    loading: props.loading === "eager" ? "eager" : "lazy",
-    decoding: props.decoding === "sync" || props.decoding === "auto" ? props.decoding : "async",
-    fetchPriority: priority ? "high" : undefined,
+    loading: props.loading === 'eager' ? 'eager' : 'lazy',
+    decoding: props.decoding === 'sync' || props.decoding === 'auto' ? props.decoding : 'async',
+    fetchPriority: priority ? 'high' : undefined,
     className: props.className,
     style: props.style,
   };
-  if (priority) preload(attrs.src, { as: "image", imageSrcSet: attrs.srcSet, imageSizes: attrs.sizes, fetchPriority: "high" });
+  if (priority)
+    preload(attrs.src, { as: 'image', imageSrcSet: attrs.srcSet, imageSizes: attrs.sizes, fetchPriority: 'high' });
   return attrs;
 }

@@ -1,20 +1,30 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import type { ReactElement } from "react";
-import { ReviewForm } from "@/components/admin/forms/ReviewForm";
-import { PageHeader } from "@/components/admin/ui/layout";
-import { getReviewForm } from "@/lib/admin/queries";
+import { getTranslations } from 'next-intl/server';
+import { notFound } from 'next/navigation';
 
-export const metadata: Metadata = { title: "Отзыв" };
+import { ReviewForm } from '@/components/admin/forms/ReviewForm';
+import { PageHeader } from '@/components/admin/ui/layout';
+import { adminPageMetadata } from '@/lib/admin/i18n-server';
+import { getReviewForm, getReviewRatingMax } from '@/lib/admin/queries';
 
-export default async function EditPage({ params }: PageProps<"/admin/reviews/[id]">): Promise<ReactElement> {
+import type { Metadata } from 'next';
+import type { ReactElement } from 'react';
+
+export function generateMetadata(): Promise<Metadata> {
+  return adminPageMetadata('reviews.editTitle');
+}
+
+export default async function EditPage({ params }: PageProps<'/admin/reviews/[id]'>): Promise<ReactElement> {
   const { id } = await params;
-  const review = await getReviewForm(id);
+  const [review, ratingMax, t] = await Promise.all([
+    getReviewForm(id),
+    getReviewRatingMax(),
+    getTranslations('admin.reviews'),
+  ]);
   if (!review) notFound();
   return (
     <>
-      <PageHeader title={review.author} backHref="/admin/reviews" backLabel="Все отзывы" />
-      <ReviewForm key={review.id} initial={review} />
+      <PageHeader title={review.author} backHref="/admin/reviews" backLabel={t('back')} />
+      <ReviewForm key={review.id} initial={review} ratingMax={ratingMax} />
     </>
   );
 }

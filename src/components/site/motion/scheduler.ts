@@ -1,6 +1,6 @@
-import { fragmentId } from "../locale-switch";
-import { liteMotion, SCENE_LATE_ATTR, SCENE_PENDING_ATTR } from "./env";
-import { loadScrollTrigger } from "./gsap";
+import { fragmentId } from '../locale-switch';
+import { liteMotion, SCENE_LATE_ATTR, SCENE_PENDING_ATTR } from './env';
+import { loadScrollTrigger } from './gsap';
 
 /**
  * Lazy set-up of the scroll scenes (client only).
@@ -33,7 +33,7 @@ type Job = {
 };
 
 /** How far below the screen a scene is set up ahead of time. */
-const AHEAD = "0px 0px 150% 0px";
+const AHEAD = '0px 0px 150% 0px';
 /** The longest a scene waits for its fonts before it is set up anyway. */
 const FONTS_TIMEOUT_MS = 1800;
 /** The longest the scenes wait for the scroll plugins (a stalled request) before they are shown as server-rendered. */
@@ -51,15 +51,15 @@ let failed = false;
 
 /** Lets the browser handle input / paint between two scene setups. */
 function yieldToMain(): Promise<void> {
-  const scheduler: unknown = Reflect.get(globalThis, "scheduler");
-  if (typeof scheduler === "object" && scheduler !== null) {
-    const fn: unknown = Reflect.get(scheduler, "yield");
-    if (typeof fn === "function") {
+  const scheduler: unknown = Reflect.get(globalThis, 'scheduler');
+  if (typeof scheduler === 'object' && scheduler !== null) {
+    const fn: unknown = Reflect.get(scheduler, 'yield');
+    if (typeof fn === 'function') {
       const yielded: unknown = fn.call(scheduler);
       return Promise.resolve(yielded).then(() => undefined);
     }
   }
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const channel = new MessageChannel();
     channel.port1.onmessage = () => resolve();
     channel.port2.postMessage(null);
@@ -75,7 +75,7 @@ function appRuns(): void {
 
 /** Resolves true once the scroll plugins are registered, false if they failed or did not arrive within PLUGINS_TIMEOUT_MS. */
 function scrollPluginsReady(): Promise<boolean> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const timer = window.setTimeout(() => {
       console.error(`Scroll plugins not loaded within ${PLUGINS_TIMEOUT_MS} ms: scenes shown without animation`);
       resolve(false);
@@ -164,14 +164,19 @@ function onIntersect(entries: IntersectionObserverEntry[]): void {
 
 /** Fonts the scene's split titles are measured in (Tektur display weights), at most FONTS_TIMEOUT_MS. */
 export function titleFonts(root: ParentNode): Promise<void> {
-  if (typeof document === "undefined" || !("fonts" in document)) return Promise.resolve();
-  const titles = Array.from(root.querySelectorAll<HTMLElement>(".chapter__title, .gazette__title"));
+  if (typeof document === 'undefined' || !('fonts' in document)) return Promise.resolve();
+  const titles = Array.from(root.querySelectorAll<HTMLElement>('.chapter__title, .gazette__title'));
   if (titles.length === 0) return Promise.resolve();
-  const loads = titles.map((title) => {
+  const loads = titles.map(title => {
     const style = getComputedStyle(title);
-    return document.fonts.load(`${style.fontStyle} ${style.fontWeight} 16px ${style.fontFamily}`, title.textContent || "А").catch(() => []);
+    return document.fonts
+      .load(`${style.fontStyle} ${style.fontWeight} 16px ${style.fontFamily}`, title.textContent || 'А')
+      .catch(() => []);
   });
-  return Promise.race([Promise.all(loads).then(() => undefined), new Promise<void>((resolve) => window.setTimeout(resolve, FONTS_TIMEOUT_MS))]);
+  return Promise.race([
+    Promise.all(loads).then(() => undefined),
+    new Promise<void>(resolve => window.setTimeout(resolve, FONTS_TIMEOUT_MS)),
+  ]);
 }
 
 /**
@@ -190,8 +195,13 @@ export function scheduleScene(root: HTMLElement, run: () => void): () => void {
     loadScrollTrigger().catch(() => undefined);
   }
   // A late scene splits no title the visitor has seen: it does not hold the queue for the fonts.
-  const job: Job = { root, prepare: () => (root.hasAttribute(SCENE_LATE_ATTR) ? Promise.resolve() : titleFonts(root)), run, done: false };
-  if (typeof IntersectionObserver === "undefined") {
+  const job: Job = {
+    root,
+    prepare: () => (root.hasAttribute(SCENE_LATE_ATTR) ? Promise.resolve() : titleFonts(root)),
+    run,
+    done: false,
+  };
+  if (typeof IntersectionObserver === 'undefined') {
     enqueue(job, false);
   } else {
     observer ??= new IntersectionObserver(onIntersect, { rootMargin: AHEAD });

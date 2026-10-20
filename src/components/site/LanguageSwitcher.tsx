@@ -1,9 +1,12 @@
-"use client";
+'use client';
 
-import type { MouseEvent, ReactElement } from "react";
-import { SECTION_ANCHORS } from "@/lib/content/anchors";
-import type { LanguageSwitcherProps } from "./labels";
-import { currentSectionId, fragmentId, withSectionHash } from "./locale-switch";
+import { SECTION_ANCHORS } from '@/lib/content/anchors';
+
+import type { MouseEvent, ReactElement } from 'react';
+
+import type { LanguageSwitcherProps } from './labels';
+
+import { currentSectionId, fragmentId, withSectionHash } from './locale-switch';
 
 /** Same reading line as the menu highlight (HeaderClient: rootMargin -45 % from the top). */
 const READING_LINE = 0.45;
@@ -13,7 +16,7 @@ const READING_LINE = 0.45;
  * line (the cover → none); on other pages (no chapters) — the current #hash, if any.
  */
 function readerAnchor(): string | null {
-  const sections = Array.from(document.querySelectorAll<HTMLElement>("main > section[id]"), (el) => ({
+  const sections = Array.from(document.querySelectorAll<HTMLElement>('main > section[id]'), el => ({
     id: el.id,
     top: el.getBoundingClientRect().top,
   }));
@@ -34,8 +37,16 @@ function readerAnchor(): string | null {
  */
 export function LanguageSwitcher({ label, options, switchBefore, switchAfter }: LanguageSwitcherProps): ReactElement {
   const onSwitch = (event: MouseEvent<HTMLAnchorElement>): void => {
-    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    const href = event.currentTarget.getAttribute("href");
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    )
+      return;
+    const href = event.currentTarget.getAttribute('href');
     if (!href) return;
     const target = withSectionHash(href, readerAnchor(), SECTION_ANCHORS.hero);
     if (target === href) return;
@@ -58,7 +69,7 @@ export function LanguageSwitcher({ label, options, switchBefore, switchAfter }: 
               <a href={href} hrefLang={locale} onClick={onSwitch}>
                 {short}
                 <span className="sr-only">
-                  {" — "}
+                  {' — '}
                   {switchBefore}
                   <span lang={locale}>{native}</span>
                   {switchAfter}

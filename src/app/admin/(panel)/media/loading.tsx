@@ -1,5 +1,6 @@
-import type { ReactElement } from "react";
-import { PageSkeleton } from "@/components/admin/ui/layout";
+import { PageSkeleton } from '@/components/admin/ui/layout';
+
+import type { ReactElement } from 'react';
 
 /**
  * Section-level <Suspense> boundary. The pages here read cookies + uncached DB data, so

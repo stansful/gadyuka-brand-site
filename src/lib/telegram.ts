@@ -1,7 +1,12 @@
-import "server-only";
-import { z } from "zod";
-import type { LeadType } from "@/generated/prisma/enums";
-import { db } from "@/lib/db";
+import 'server-only';
+import { createTranslator } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
+import { z } from 'zod';
+
+import type { LeadType } from '@/generated/prisma/enums';
+import { defaultLocale, localeTags } from '@/i18n/locales';
+import { DEFAULT_MESSAGES, type MessageKey } from '@/i18n/messages';
+import { db } from '@/lib/db';
 
 /**
  * Lead notifications via the Telegram Bot API (sendMessage, parse_mode HTML).
@@ -9,14 +14,49 @@ import { db } from "@/lib/db";
  *   sendLeadToTelegram(lead)        — send + record telegramSent / telegramError on the Lead row
  *   resendLeadToTelegram(leadId)    — admin «Отправить повторно»: load the lead, then the same
  *
+ * Every word of the message and every status stored in Lead.telegramError is a site message
+ * (telegram.*, editable in the admin), always in the default locale — the owner reads Russian
+ * whatever the language of the visitor (shown as «Язык сайта»). The HTML markup and the line
+ * icons stay here; the messages are HTML-escaped like the visitor's input.
+ *
  * Env: TELEGRAM_BOT_TOKEN, TELEGRAM_OWNER_ID (chat id the bot writes to),
  *      TELEGRAM_DRY_RUN=1 → no network: a redacted preview is logged. The lead is recorded
- *      as NOT delivered (telegramSent=false + DRY_RUN_ERROR), so a forgotten dry-run flag in
- *      production shows up in the admin («не отправлено») instead of silently dropping
+ *      as NOT delivered (telegramSent=false + telegram.errors.dryRun), so a forgotten dry-run
+ *      flag in production shows up in the admin («не отправлено») instead of silently dropping
  *      notifications; in production a loud warning is logged as well.
  * Safety: the token is never logged or returned in errors; under Vitest the network is
  * never used unless a fetch implementation is injected explicitly.
  */
+
+/** A key of the telegram.* messages, without the namespace ("newLead", "errors.dryRun"). */
+export type TelegramMessageKey = MessageKey extends infer K ? (K extends `telegram.${infer R}` ? R : never) : never;
+
+/** The owner-facing copy: telegram.* in the default locale, ICU arguments filled in. */
+export type TelegramText = (key: TelegramMessageKey, values?: Readonly<Record<string, string | number>>) => string;
+
+/** The bundled defaults (messages/<default locale>.json) — when the DB-backed messages cannot be read. */
+function defaultTelegramText(): TelegramText {
+  const t = createTranslator({
+    locale: defaultLocale,
+    messages: DEFAULT_MESSAGES[defaultLocale],
+    namespace: 'telegram',
+  });
+  return (key, values) => t(key, values ? { ...values } : undefined);
+}
+
+/**
+ * The telegram.* messages (DB rows over the JSON defaults, cached with the site content). A
+ * notification must never be lost to a failing message read: the bundled defaults stand in.
+ */
+export async function loadTelegramText(): Promise<TelegramText> {
+  try {
+    const t = await getTranslations({ locale: defaultLocale, namespace: 'telegram' });
+    return (key, values) => t(key, values ? { ...values } : undefined);
+  } catch (error: unknown) {
+    console.error('[telegram] could not read the telegram.* messages, using the defaults:', error);
+    return defaultTelegramText();
+  }
+}
 
 export type TelegramResult = { ok: boolean; error?: string; dryRun?: boolean };
 
@@ -33,6 +73,8 @@ export type TelegramLead = {
 };
 
 export type TelegramSendOptions = {
+  /** The telegram.* messages (default: loadTelegramText()). */
+  t?: TelegramText;
   /** Injected fetch (tests). Default: global fetch. */
   fetch?: typeof fetch;
   /** Injected sleep for backoff (tests). */
@@ -66,12 +108,9 @@ export const TELEGRAM_DEFAULTS = {
 } as const;
 
 /** Path of the leads list in the admin (used in the message footer link). */
-export const ADMIN_LEADS_PATH = "/admin/leads";
+export const ADMIN_LEADS_PATH = '/admin/leads';
 
-const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
-
-/** Stored as Lead.telegramError when TELEGRAM_DRY_RUN=1 suppressed the message. */
-export const DRY_RUN_ERROR = "Не отправлено: включён тестовый режим TELEGRAM_DRY_RUN=1 (сообщения в Telegram не уходят)";
+const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on']);
 
 /** True when TELEGRAM_DRY_RUN is on (the admin shows a warning about it in production). */
 export function isTelegramDryRun(): boolean {
@@ -81,20 +120,20 @@ export function isTelegramDryRun(): boolean {
 let warnedAboutProductionDryRun = false;
 
 function warnIfProductionDryRun(): void {
-  if (warnedAboutProductionDryRun || process.env.NODE_ENV !== "production") return;
+  if (warnedAboutProductionDryRun || process.env.NODE_ENV !== 'production') return;
   warnedAboutProductionDryRun = true;
   console.warn(
-    "[telegram] ВНИМАНИЕ: TELEGRAM_DRY_RUN=1 в production — заявки сохраняются, но в Telegram НЕ отправляются. " +
-      "Задайте TELEGRAM_DRY_RUN=0 в .env и перезапустите приложение.",
+    '[telegram] WARNING: TELEGRAM_DRY_RUN=1 in production — leads are saved but NOT sent to Telegram. ' +
+      'Set TELEGRAM_DRY_RUN=0 in .env and restart the app.',
   );
 }
 
 export function getTelegramConfig(): TelegramConfig {
   return {
-    token: process.env.TELEGRAM_BOT_TOKEN?.trim() ?? "",
-    chatId: process.env.TELEGRAM_OWNER_ID?.trim() ?? "",
-    dryRun: TRUE_VALUES.has((process.env.TELEGRAM_DRY_RUN ?? "").trim().toLowerCase()),
-    siteUrl: (process.env.SITE_URL ?? "").trim().replace(/\/+$/, ""),
+    token: process.env.TELEGRAM_BOT_TOKEN?.trim() ?? '',
+    chatId: process.env.TELEGRAM_OWNER_ID?.trim() ?? '',
+    dryRun: TRUE_VALUES.has((process.env.TELEGRAM_DRY_RUN ?? '').trim().toLowerCase()),
+    siteUrl: (process.env.SITE_URL ?? '').trim().replace(/\/+$/, ''),
   };
 }
 
@@ -102,40 +141,42 @@ export function getTelegramConfig(): TelegramConfig {
 
 /** Escape text for Telegram parse_mode=HTML (only &, <, > need escaping; " for attributes). */
 export function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-export const LEAD_TYPE_LABELS: Readonly<Record<LeadType, { emoji: string; title: string }>> = {
-  TAILORING: { emoji: "🧵", title: "Индивидуальный пошив" },
-  PARTNERSHIP: { emoji: "🤝", title: "Сотрудничество" },
-  CONTACT: { emoji: "💬", title: "Связаться с нами" },
+/** Icon of each lead type (the title is the message telegram.leadTypes.<TYPE>). */
+export const LEAD_TYPE_EMOJI: Readonly<Record<LeadType, string>> = {
+  TAILORING: '🧵',
+  PARTNERSHIP: '🤝',
+  CONTACT: '💬',
 };
 
 function truncate(value: string, max: number): string {
   const chars = Array.from(value);
-  return chars.length <= max ? value : `${chars.slice(0, max - 1).join("")}…`;
+  return chars.length <= max ? value : `${chars.slice(0, max - 1).join('')}…`;
 }
 
 /** "+79001234567" → "+7******4567"; "ivan@mail.ru" → "i***@mail.ru" (logs only). */
 export function maskPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length <= 4) return "***";
-  return `+${digits.slice(0, 1)}${"*".repeat(Math.max(3, digits.length - 5))}${digits.slice(-4)}`;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length <= 4) return '***';
+  return `+${digits.slice(0, 1)}${'*'.repeat(Math.max(3, digits.length - 5))}${digits.slice(-4)}`;
 }
 
 export function maskEmail(email: string): string {
-  const at = email.lastIndexOf("@");
-  if (at <= 0) return "***";
+  const at = email.lastIndexOf('@');
+  if (at <= 0) return '***';
   return `${email.slice(0, 1)}***${email.slice(at)}`;
 }
 
-const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
-  timeZone: "Europe/Moscow",
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
+/** The owner's clock: Moscow time, written the default locale's way. */
+const dateFormatter = new Intl.DateTimeFormat(localeTags[defaultLocale], {
+  timeZone: 'Europe/Moscow',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
 });
 
 export type FormatLeadOptions = {
@@ -146,30 +187,33 @@ export type FormatLeadOptions = {
 };
 
 /**
- * Russian HTML message for the owner. Every user-provided value is HTML-escaped.
- * The result never exceeds Telegram's 4096-character limit.
+ * The owner's HTML message (telegram.* messages, see the module comment). Every message and
+ * every user-provided value is HTML-escaped. The result never exceeds Telegram's
+ * 4096-character limit.
  */
-export function formatLeadMessage(lead: TelegramLead, options: FormatLeadOptions = {}): string {
-  const { emoji, title } = LEAD_TYPE_LABELS[lead.type];
+export function formatLeadMessage(lead: TelegramLead, t: TelegramText, options: FormatLeadOptions = {}): string {
+  const emoji = LEAD_TYPE_EMOJI[lead.type];
+  const title = t('newLead', { type: t(`leadTypes.${lead.type}`) });
   const redact = options.redact === true;
-  const lines: string[] = [`${emoji} <b>Новая заявка: ${escapeHtml(title)}</b>`, ""];
+  const label = (key: TelegramMessageKey): string => `<b>${escapeHtml(t(key))}</b>`;
+  const lines: string[] = [`${emoji} <b>${escapeHtml(title)}</b>`, ''];
 
-  lines.push(`👤 <b>Имя:</b> ${escapeHtml(lead.name)}`);
-  if (lead.phone) lines.push(`📞 <b>Телефон:</b> ${escapeHtml(redact ? maskPhone(lead.phone) : lead.phone)}`);
-  if (lead.email) lines.push(`✉️ <b>E-mail:</b> ${escapeHtml(redact ? maskEmail(lead.email) : lead.email)}`);
-  lines.push(`🌐 <b>Язык сайта:</b> ${escapeHtml(lead.locale.toUpperCase())}`);
+  lines.push(`👤 ${label('name')} ${escapeHtml(lead.name)}`);
+  if (lead.phone) lines.push(`📞 ${label('phone')} ${escapeHtml(redact ? maskPhone(lead.phone) : lead.phone)}`);
+  if (lead.email) lines.push(`✉️ ${label('email')} ${escapeHtml(redact ? maskEmail(lead.email) : lead.email)}`);
+  lines.push(`🌐 ${label('locale')} ${escapeHtml(lead.locale.toUpperCase())}`);
 
-  const head = lines.join("\n");
+  const head = lines.join('\n');
   const footerLines = [
-    "",
-    `🕒 ${escapeHtml(dateFormatter.format(lead.createdAt))} (МСК)`,
+    '',
+    `🕒 ${escapeHtml(t('time', { time: dateFormatter.format(lead.createdAt) }))}`,
     `🆔 <code>${escapeHtml(lead.id)}</code>`,
   ];
-  const siteUrl = (options.siteUrl ?? "").replace(/\/+$/, "");
-  if (siteUrl.startsWith("https://")) {
-    footerLines.push(`<a href="${escapeHtml(`${siteUrl}${ADMIN_LEADS_PATH}`)}">Открыть заявки в админке</a>`);
+  const siteUrl = (options.siteUrl ?? '').replace(/\/+$/, '');
+  if (siteUrl.startsWith('https://')) {
+    footerLines.push(`<a href="${escapeHtml(`${siteUrl}${ADMIN_LEADS_PATH}`)}">${escapeHtml(t('openAdmin'))}</a>`);
   }
-  const footer = footerLines.join("\n");
+  const footer = footerLines.join('\n');
 
   const rawMessage = lead.message.trim();
   if (!rawMessage) return `${head}\n${footer}`;
@@ -177,7 +221,7 @@ export function formatLeadMessage(lead: TelegramLead, options: FormatLeadOptions
   // Fit the message into the Telegram limit: shrink the user text until the whole thing fits.
   let limit: number = redact ? 200 : TELEGRAM_DEFAULTS.maxUserMessageLength;
   for (;;) {
-    const body = `\n\n📝 <b>Сообщение:</b>\n<blockquote>${escapeHtml(truncate(rawMessage, limit))}</blockquote>`;
+    const body = `\n\n📝 ${label('message')}\n<blockquote>${escapeHtml(truncate(rawMessage, limit))}</blockquote>`;
     const text = `${head}${body}\n${footer}`;
     if (text.length <= TELEGRAM_DEFAULTS.maxMessageLength || limit <= 100) return text;
     limit = Math.floor(limit * 0.8);
@@ -193,24 +237,24 @@ const telegramResponseSchema = z.object({
   parameters: z.object({ retry_after: z.number().optional() }).optional(),
 });
 
-const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+const defaultSleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 /** Remove the token from any text that might end up in logs / the DB. */
 function redactToken(text: string, token: string): string {
-  return token ? text.split(token).join("***") : text;
+  return token ? text.split(token).join('***') : text;
 }
 
-function describeError(error: unknown): string {
+function describeError(error: unknown, t: TelegramText): string {
   if (error instanceof Error) {
-    if (error.name === "TimeoutError" || error.name === "AbortError") return "превышено время ожидания ответа Telegram";
-    const cause = error.cause instanceof Error ? `: ${error.cause.message}` : "";
-    return `сетевая ошибка (${error.message}${cause})`;
+    if (error.name === 'TimeoutError' || error.name === 'AbortError') return t('errors.timeout');
+    const cause = error.cause instanceof Error ? `: ${error.cause.message}` : '';
+    return t('errors.network', { details: `${error.message}${cause}` });
   }
-  return "неизвестная ошибка";
+  return t('errors.unknown');
 }
 
 function isVitest(): boolean {
-  return process.env.VITEST === "true" || process.env.VITEST === "1";
+  return process.env.VITEST === 'true' || process.env.VITEST === '1';
 }
 
 type AttemptOutcome = { ok: true } | { ok: false; error: string; retry: boolean; waitMs?: number };
@@ -220,22 +264,23 @@ async function attemptSend(
   config: TelegramConfig,
   text: string,
   timeoutMs: number,
+  t: TelegramText,
 ): Promise<AttemptOutcome> {
   let response: Response;
   try {
     response = await fetchImpl(`https://api.telegram.org/bot${config.token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: config.chatId,
         text,
-        parse_mode: "HTML",
+        parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
       }),
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error: unknown) {
-    return { ok: false, error: describeError(error), retry: true };
+    return { ok: false, error: describeError(error, t), retry: true };
   }
 
   let payload: z.infer<typeof telegramResponseSchema> | null = null;
@@ -249,8 +294,10 @@ async function attemptSend(
   if (response.ok && payload?.ok === true) return { ok: true };
 
   const status = response.status;
-  const description = payload?.description ?? response.statusText ?? "";
-  const error = `Telegram API ${status}${description ? `: ${description}` : ""}`;
+  // Telegram's own description ("Forbidden: bot was blocked by the user") is untranslatable:
+  // it is the technical detail inside the owner's message, like the cause of errors.network.
+  const details = payload?.description?.trim() || response.statusText.trim() || t('errors.unknown');
+  const error = t('errors.api', { status: String(status), details });
   if (status === 429) {
     const retryAfterMs = (payload?.parameters?.retry_after ?? 1) * 1000;
     return { ok: false, error, retry: retryAfterMs <= TELEGRAM_DEFAULTS.maxRetryAfterMs, waitMs: retryAfterMs };
@@ -269,11 +316,12 @@ export async function sendTelegramMessage(text: string, options: TelegramSendOpt
   if (config.dryRun || (isVitest() && !injectedFetch)) {
     return { ok: true, dryRun: true };
   }
+  const t = options.t ?? (await loadTelegramText());
   if (!config.token || !config.chatId) {
-    return { ok: false, error: "Telegram не настроен: задайте TELEGRAM_BOT_TOKEN и TELEGRAM_OWNER_ID в .env" };
+    return { ok: false, error: t('errors.notConfigured') };
   }
   if (!/^\d+:[A-Za-z0-9_-]{20,}$/.test(config.token)) {
-    return { ok: false, error: "Telegram не настроен: TELEGRAM_BOT_TOKEN имеет неверный формат" };
+    return { ok: false, error: t('errors.badToken') };
   }
 
   const fetchImpl = injectedFetch ?? fetch;
@@ -281,9 +329,9 @@ export async function sendTelegramMessage(text: string, options: TelegramSendOpt
   const retries = options.retries ?? TELEGRAM_DEFAULTS.retries;
   const timeoutMs = options.timeoutMs ?? TELEGRAM_DEFAULTS.timeoutMs;
 
-  let lastError = "неизвестная ошибка";
+  let lastError = t('errors.unknown');
   for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const outcome = await attemptSend(fetchImpl, config, text, timeoutMs);
+    const outcome = await attemptSend(fetchImpl, config, text, timeoutMs, t);
     if (outcome.ok) return { ok: true };
     lastError = redactToken(outcome.error, config.token);
     if (!outcome.retry || attempt === retries) break;
@@ -297,17 +345,17 @@ export async function sendTelegramMessage(text: string, options: TelegramSendOpt
 }
 
 /** Log a redacted preview of a lead message (dry-run). Never logs the token or full contacts. */
-function logDryRun(lead: TelegramLead): void {
+function logDryRun(lead: TelegramLead, t: TelegramText): void {
   warnIfProductionDryRun();
-  const preview = formatLeadMessage(lead, { redact: true });
-  console.info(`[telegram] DRY RUN (TELEGRAM_DRY_RUN=1) — сообщение не отправлено. Предпросмотр:\n${preview}`);
+  const preview = formatLeadMessage(lead, t, { redact: true });
+  console.info(`[telegram] DRY RUN (TELEGRAM_DRY_RUN=1) — message not sent. Preview:\n${preview}`);
 }
 
 /**
  * Save the delivery result on the Lead row. Errors are logged, never thrown.
  * A dry run is NOT a delivery: telegramSent stays false and the reason is stored.
  */
-async function recordResult(leadId: string, result: TelegramResult): Promise<void> {
+async function recordResult(leadId: string, result: TelegramResult, t: TelegramText): Promise<void> {
   const delivered = result.ok && result.dryRun !== true;
   try {
     await db.lead.update({
@@ -317,8 +365,8 @@ async function recordResult(leadId: string, result: TelegramResult): Promise<voi
         telegramError: delivered
           ? null
           : result.dryRun
-            ? DRY_RUN_ERROR
-            : (result.error ?? "неизвестная ошибка").slice(0, 2000),
+            ? t('errors.dryRun')
+            : (result.error ?? t('errors.unknown')).slice(0, 2000),
       },
     });
   } catch (error: unknown) {
@@ -337,31 +385,37 @@ export type SendLeadOptions = TelegramSendOptions & {
  * so it can be re-sent from the admin.
  */
 export async function sendLeadToTelegram(lead: TelegramLead, options: SendLeadOptions = {}): Promise<TelegramResult> {
+  const t = options.t ?? (await loadTelegramText());
   let result: TelegramResult;
   try {
     const config: TelegramConfig = { ...getTelegramConfig(), ...options.config };
-    const text = formatLeadMessage(lead, { siteUrl: config.siteUrl });
-    result = await sendTelegramMessage(text, { ...options, config });
-    if (result.dryRun) logDryRun(lead);
-    else if (!result.ok) console.warn(`[telegram] lead ${lead.id} was saved but not delivered: ${result.error ?? ""}`);
+    const text = formatLeadMessage(lead, t, { siteUrl: config.siteUrl });
+    result = await sendTelegramMessage(text, { ...options, config, t });
+    if (result.dryRun) logDryRun(lead, t);
+    else if (!result.ok) console.warn(`[telegram] lead ${lead.id} was saved but not delivered: ${result.error ?? ''}`);
   } catch (error: unknown) {
     result = {
       ok: false,
-      error: `внутренняя ошибка отправки: ${error instanceof Error ? error.message : String(error)}`,
+      error: t('errors.internal', { details: error instanceof Error ? error.message : String(error) }),
     };
     console.error(`[telegram] lead ${lead.id}: unexpected error`, error);
   }
-  if (options.record !== false) await recordResult(lead.id, result);
+  if (options.record !== false) await recordResult(lead.id, result, t);
   return result;
 }
 
 /**
  * Admin «Отправить повторно»: load the lead by id, send it, record the outcome.
- * Returns `{ ok: false, error }` (Russian text) when the lead does not exist or sending fails.
+ * Returns `{ ok: false, error }` (a telegram.errors.* message) when the lead does not exist or
+ * sending fails.
  */
-export async function resendLeadToTelegram(leadId: string): Promise<{ ok: boolean; error?: string }> {
-  const id = typeof leadId === "string" ? leadId.trim() : "";
-  if (!id || id.length > 64) return { ok: false, error: "Некорректный идентификатор заявки" };
+export async function resendLeadToTelegram(
+  leadId: string,
+  options: Pick<SendLeadOptions, 't'> = {},
+): Promise<{ ok: boolean; error?: string }> {
+  const t = options.t ?? (await loadTelegramText());
+  const id = typeof leadId === 'string' ? leadId.trim() : '';
+  if (!id || id.length > 64) return { ok: false, error: t('errors.invalidId') };
   let lead: TelegramLead | null;
   try {
     lead = await db.lead.findUnique({
@@ -379,10 +433,19 @@ export async function resendLeadToTelegram(leadId: string): Promise<{ ok: boolea
     });
   } catch (error: unknown) {
     console.error(`[telegram] could not load lead ${id}:`, error);
-    return { ok: false, error: "Не удалось загрузить заявку из базы данных" };
+    return { ok: false, error: t('errors.loadFailed') };
   }
-  if (!lead) return { ok: false, error: "Заявка не найдена" };
-  const result = await sendLeadToTelegram(lead);
-  if (result.dryRun) return { ok: false, error: DRY_RUN_ERROR };
-  return result.ok ? { ok: true } : { ok: false, error: result.error ?? "Не удалось отправить в Telegram" };
+  if (!lead) return { ok: false, error: t('errors.notFound') };
+  const result = await sendLeadToTelegram(lead, { t });
+  if (result.dryRun) return { ok: false, error: t('errors.dryRun') };
+  return result.ok ? { ok: true } : { ok: false, error: result.error ?? t('errors.sendFailed') };
+}
+
+/**
+ * Lead.telegramError of a lead saved while the site-wide notification ceiling was exceeded
+ * (src/app/api/leads/submit.ts): telegram.errors.notifyCeiling.
+ */
+export async function notifyCeilingError(ceiling: { max: number; windowMs: number }): Promise<string> {
+  const t = await loadTelegramText();
+  return t('errors.notifyCeiling', { max: ceiling.max, minutes: Math.round(ceiling.windowMs / 60_000) });
 }

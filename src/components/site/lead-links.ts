@@ -1,8 +1,8 @@
-import type { LeadType } from "@/generated/prisma/enums";
-import { isLocale, type Locale } from "@/i18n/locales";
-import { LEAD_FORM_ANCHOR } from "@/lib/content/anchors";
-import { type LeadIntent, leadIntentHref } from "@/lib/lead-intent";
-import { localizedPath } from "@/lib/seo/site-url";
+import type { LeadType } from '@/generated/prisma/enums';
+import { isLocale, type Locale } from '@/i18n/locales';
+import { LEAD_FORM_ANCHOR } from '@/lib/content/anchors';
+import { type LeadIntent, leadIntentHref } from '@/lib/lead-intent';
+import { localizedPath } from '@/lib/seo/site-url';
 
 /**
  * Links that open the lead form («Письмо в редакцию») with a preselected topic — isomorphic,
@@ -12,8 +12,8 @@ import { localizedPath } from "@/lib/seo/site-url";
 /** Attributes of a CTA link to the form (spread onto <a>). */
 export type LeadLinkProps = {
   href: string;
-  "data-lead-type": LeadType;
-  "data-lead-subject"?: string;
+  'data-lead-type': LeadType;
+  'data-lead-subject'?: string;
 };
 
 /**
@@ -24,19 +24,19 @@ export type LeadLinkProps = {
 export function leadLinkProps(intent: LeadIntent, homePath: string): LeadLinkProps {
   const href = homePath ? leadIntentHref(homePath, intent, LEAD_FORM_ANCHOR) : `#${LEAD_FORM_ANCHOR}`;
   return intent.subject
-    ? { href, "data-lead-type": intent.type, "data-lead-subject": intent.subject }
-    : { href, "data-lead-type": intent.type };
+    ? { href, 'data-lead-type': intent.type, 'data-lead-subject': intent.subject }
+    : { href, 'data-lead-type': intent.type };
 }
 
 /** Where an offer's button leads. */
-export type OfferCta = { kind: "form"; type: LeadType } | { kind: "link"; href: string; external: boolean };
+export type OfferCta = { kind: 'form'; type: LeadType } | { kind: 'link'; href: string; external: boolean };
 
 /** In-page sections whose CTA is the form, and the topic each one implies. */
 const FORM_TOPICS: Readonly<Record<string, LeadType>> = {
-  [LEAD_FORM_ANCHOR]: "CONTACT",
-  contacts: "CONTACT",
-  tailoring: "TAILORING",
-  partners: "PARTNERSHIP",
+  [LEAD_FORM_ANCHOR]: 'CONTACT',
+  contacts: 'CONTACT',
+  tailoring: 'TAILORING',
+  partners: 'PARTNERSHIP',
 };
 
 /** "#x", "/#x", "/en#x" — an anchor on the landing (any locale). */
@@ -49,12 +49,12 @@ const LANDING_ANCHOR = /^(?:\/(?:[a-z]{2}(?:-[a-z]{2})?)?)?#([\w-]+)$/i;
  *  - any other anchor / path / URL → a plain link (external http(s) opens in a new tab).
  */
 export function offerCta(ctaHref: string | null): OfferCta {
-  const href = (ctaHref ?? "").trim();
-  if (href === "") return { kind: "form", type: "CONTACT" };
+  const href = (ctaHref ?? '').trim();
+  if (href === '') return { kind: 'form', type: 'CONTACT' };
   const anchor = LANDING_ANCHOR.exec(href)?.[1];
   const topic = anchor ? FORM_TOPICS[anchor] : undefined;
-  if (topic) return { kind: "form", type: topic };
-  return { kind: "link", href, external: /^https?:\/\//i.test(href) };
+  if (topic) return { kind: 'form', type: topic };
+  return { kind: 'link', href, external: /^https?:\/\//i.test(href) };
 }
 
 /**
@@ -64,12 +64,11 @@ export function offerCta(ctaHref: string | null): OfferCta {
  * kept; anchors ("#x"), protocol-relative and absolute URLs are returned unchanged.
  */
 export function localizeSiteHref(href: string, locale: Locale): string {
-  if (!href.startsWith("/") || href.startsWith("//")) return href;
+  if (!href.startsWith('/') || href.startsWith('//')) return href;
   const cut = href.search(/[?#]/);
   const path = cut === -1 ? href : href.slice(0, cut);
-  const rest = cut === -1 ? "" : href.slice(cut);
-  const [, first = ""] = path.split("/");
-  const bare = isLocale(first) ? path.slice(first.length + 1) || "/" : path;
+  const rest = cut === -1 ? '' : href.slice(cut);
+  const [, first = ''] = path.split('/');
+  const bare = isLocale(first) ? path.slice(first.length + 1) || '/' : path;
   return `${localizedPath(locale, bare)}${rest}`;
 }
-

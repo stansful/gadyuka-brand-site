@@ -1,28 +1,34 @@
-import { Plus } from "lucide-react";
-import type { Metadata } from "next";
-import Link from "next/link";
-import type { ReactElement } from "react";
-import { GalleryBulkAdd } from "@/components/admin/lists/GalleryBulkAdd";
-import { EntityList } from "@/components/admin/lists/EntityList";
-import { buttonClasses } from "@/components/admin/ui/Button";
-import { PageHeader } from "@/components/admin/ui/layout";
-import { listGalleryAdmin } from "@/lib/admin/queries";
+import { Plus } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
 
-export const metadata: Metadata = { title: "Галерея" };
+import { EntityList } from '@/components/admin/lists/EntityList';
+import { GalleryBulkAdd } from '@/components/admin/lists/GalleryBulkAdd';
+import { buttonClasses } from '@/components/admin/ui/Button';
+import { PageHeader } from '@/components/admin/ui/layout';
+import { adminPageMetadata } from '@/lib/admin/i18n-server';
+import { listGalleryAdmin } from '@/lib/admin/queries';
+
+import type { Metadata } from 'next';
+import type { ReactElement } from 'react';
+
+export function generateMetadata(): Promise<Metadata> {
+  return adminPageMetadata('gallery.title');
+}
 
 export default async function ListPage(): Promise<ReactElement> {
-  const rows = await listGalleryAdmin();
+  const [rows, t] = await Promise.all([listGalleryAdmin(), getTranslations('admin.gallery')]);
   const addLink = (
-    <Link href="/admin/gallery/new" className={buttonClasses("primary")}>
+    <Link href="/admin/gallery/new" className={buttonClasses('primary')}>
       <Plus className="size-4" aria-hidden />
-      Одно фото
+      {t('addOne')}
     </Link>
   );
   return (
     <>
       <PageHeader
-        title="Галерея"
-        description="Фото раздела «Галерея». Перетаскивайте карточки, чтобы изменить порядок."
+        title={t('title')}
+        description={t('description')}
         actions={
           <>
             <GalleryBulkAdd />
@@ -34,8 +40,11 @@ export default async function ListPage(): Promise<ReactElement> {
         entity="gallery"
         rows={rows}
         layout="grid"
-        nounAccusative="фото из галереи"
-        empty={{ title: "В галерее пока нет фото", description: "Добавьте фото из медиатеки или загрузите новые.", action: addLink }}
+        empty={{
+          title: t('empty'),
+          description: t('emptyHint'),
+          action: addLink,
+        }}
       />
     </>
   );

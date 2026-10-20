@@ -1,247 +1,155 @@
-import type { SeedMediaKey } from "./media";
+import type { SocialType } from '../../src/generated/prisma/enums';
+import type { LocalizedText } from '../../src/lib/i18n-text';
+import type { SeedMediaKey } from './media';
 
-type Copy = { ru: string; en: string };
+import { SECTION_ANCHORS } from '../../src/lib/content/anchors';
+import { defaultCopy, localized, type SeedCopy } from './copy';
 
 /**
- * Seed entities. Rows without a natural unique key get deterministic ids
- * ("seed-…") so re-running the seed upserts instead of duplicating.
+ * Seed entities: the non-text data (slugs, ids, image keys, dates, ratings, links) — every text
+ * comes from messages/content/<locale>.json through ./copy. Rows without a natural unique key
+ * get deterministic ids ("seed-…") so re-running the seed upserts instead of duplicating.
  *
  * RULE: the collection «Меня запомнят» is never described as first / debut / №1.
  * Reviews, news, offers and partners are PLACEHOLDERS to be replaced in the admin.
  */
 
-export const SEED_COLLECTION = {
-  slug: "menya-zapomnyat",
-  title: { ru: "Меня запомнят", en: "They Will Remember Me" },
-  description: {
-    ru: "Худи с тату-графикой ГАДЮКИ: змея, обвивающая «Г», голова змеи анфас, чешуя и большая голова на спине. Слоган «Меня запомнят» — на каждой вещи.",
-    en: "Hoodies carrying GADYUKA's tattoo graphics: the snake coiled around the «Г», a face-on snake head, scales, and an oversized head across the back. The slogan «They Will Remember Me» is on every piece.",
-  },
-  cover: "hoodieBlackBack",
-  order: 0,
-} as const satisfies {
-  slug: string;
-  title: Copy;
-  description: Copy;
+/** Id of the ADMIN user the seed creates (owner of the seed media: S3 keys admin/seed-admin/…). */
+export const SEED_ADMIN_USER_ID = 'seed-admin';
+
+/** Fallback name of the seed ADMIN user when messages/content has none. */
+export const SEED_ADMIN_FALLBACK_NAME = 'Администратор';
+
+export function seedAdminName(): string {
+  return defaultCopy(copy => copy.adminUser.name).trim() || SEED_ADMIN_FALLBACK_NAME;
+}
+
+type CollectionSlug = keyof SeedCopy['collections'];
+
+const COLLECTION_SLUG: CollectionSlug = 'menya-zapomnyat';
+
+export const SEED_COLLECTION: {
+  slug: CollectionSlug;
+  title: LocalizedText;
+  description: LocalizedText;
   cover: SeedMediaKey;
   order: number;
+} = {
+  slug: COLLECTION_SLUG,
+  title: localized(copy => copy.collections[COLLECTION_SLUG].title),
+  description: localized(copy => copy.collections[COLLECTION_SLUG].description),
+  cover: 'hoodieBlackBack',
+  order: 0,
 };
 
 type SeedProduct = {
-  slug: string;
-  title: Copy;
-  description: Copy;
-  details: Copy;
+  slug: keyof SeedCopy['products'];
+  title: LocalizedText;
+  description: LocalizedText;
+  details: LocalizedText;
   images: readonly SeedMediaKey[];
 };
 
-export const SEED_PRODUCTS: readonly SeedProduct[] = [
-  {
-    slug: "hoodie-white-logo",
-    title: { ru: "Худи «Знак», белое", en: "Sign Hoodie — White" },
-    description: {
-      ru: "Белое худи с главным знаком бренда: гравюрная змея с раскрытой пастью обвивает букву «Г». Внизу — надпись «ГАДЮКА / Меня запомнят».",
-      en: "A white hoodie bearing the brand's signature mark: an engraved snake, jaws open, coiled around the letter «Г». Finished with «ГАДЮКА / They Will Remember Me» at the hem.",
-    },
-    details: {
-      ru: "Принт: логотип — змея и буква «Г»\nНадпись «ГАДЮКА / Меня запомнят» внизу\nФирменная бирка с красным языком\nСостав и размеры — уточняйте при заказе",
-      en: "Print: the logo — snake and letter «Г»\n«ГАДЮКА / They Will Remember Me» lettering at the hem\nSignature hang tag with the red tongue\nAsk about fabric and sizes when ordering",
-    },
-    images: ["hoodieWhiteLogo"],
-  },
-  {
-    slug: "hoodie-white-head",
-    title: { ru: "Худи «Анфас», белое", en: "Face-On Hoodie — White" },
-    description: {
-      ru: "Белое худи с головой змеи анфас: раскрытая пасть, клыки и тонкая тату-графика. Взгляд, который не забудут.",
-      en: "A white hoodie with the snake's head face-on: open jaws, fangs and fine tattoo linework. A stare no one forgets.",
-    },
-    details: {
-      ru: "Принт: голова змеи анфас\nНадпись «ГАДЮКА / Меня запомнят» внизу\nФирменная бирка с красным языком\nСостав и размеры — уточняйте при заказе",
-      en: "Print: face-on snake head\n«ГАДЮКА / They Will Remember Me» lettering at the hem\nSignature hang tag with the red tongue\nAsk about fabric and sizes when ordering",
-    },
-    images: ["hoodieWhiteHead"],
-  },
-  {
-    slug: "hoodie-white-scales",
-    title: { ru: "Худи «Чешуя», белое", en: "Scales Hoodie — White" },
-    description: {
-      ru: "Белое худи с паттерном змеиной чешуи — фирменный элемент ГАДЮКИ в графике гравюры.",
-      en: "A white hoodie with a snake-scale pattern — GADYUKA's signature element, drawn in an engraving style.",
-    },
-    details: {
-      ru: "Принт: змеиная чешуя\nНадпись «ГАДЮКА / Меня запомнят» внизу\nФирменная бирка с красным языком\nСостав и размеры — уточняйте при заказе",
-      en: "Print: snake scales\n«ГАДЮКА / They Will Remember Me» lettering at the hem\nSignature hang tag with the red tongue\nAsk about fabric and sizes when ordering",
-    },
-    images: ["hoodieWhiteScales"],
-  },
-  {
-    slug: "hoodie-black-back",
-    title: { ru: "Худи «Голова», чёрное", en: "Head Hoodie — Black" },
-    description: {
-      ru: "Чёрное худи с крупной головой змеи во всю спину. Главная вещь для тех, кого запомнят.",
-      en: "A black hoodie with an oversized snake head across the entire back. The statement piece for those who will be remembered.",
-    },
-    details: {
-      ru: "Принт: большая голова змеи на спине\nЦвет: чёрный\nФирменная бирка с красным языком\nСостав и размеры — уточняйте при заказе",
-      en: "Print: oversized snake head on the back\nColour: black\nSignature hang tag with the red tongue\nAsk about fabric and sizes when ordering",
-    },
-    images: ["hoodieBlackBack"],
-  },
+const PRODUCTS: ReadonlyArray<Pick<SeedProduct, 'slug' | 'images'>> = [
+  { slug: 'hoodie-white-logo', images: ['hoodieWhiteLogo'] },
+  { slug: 'hoodie-white-head', images: ['hoodieWhiteHead'] },
+  { slug: 'hoodie-white-scales', images: ['hoodieWhiteScales'] },
+  { slug: 'hoodie-black-back', images: ['hoodieBlackBack'] },
 ];
 
-type SeedReview = { id: string; author: string; role: Copy; text: Copy; rating: number };
+/** Products of SEED_COLLECTION, in catalog order. */
+export const SEED_PRODUCTS: readonly SeedProduct[] = PRODUCTS.map(product => ({
+  ...product,
+  title: localized(copy => copy.products[product.slug].title),
+  description: localized(copy => copy.products[product.slug].description),
+  details: localized(copy => copy.products[product.slug].details),
+}));
 
-export const SEED_REVIEWS: readonly SeedReview[] = [
-  {
-    id: "seed-review-1",
-    author: "Сергей",
-    role: { ru: "покупатель", en: "customer" },
-    text: {
-      ru: "Бренд Гадюка предлагает уникальные модели, которые идеально подходят для жизни в большом городе. Доволен своей покупкой!",
-      en: "GADYUKA offers unique designs that are perfect for big-city life. Very happy with my purchase!",
-    },
-    rating: 5,
-  },
-  {
-    id: "seed-review-2",
-    author: "Анна",
-    role: { ru: "покупательница", en: "customer" },
-    text: {
-      ru: "Худи отлично сидит, а принт со змеёй замечают везде, где бы я ни была.",
-      en: "The hoodie fits beautifully, and the snake print gets noticed wherever I go.",
-    },
-    rating: 5,
-  },
-  {
-    id: "seed-review-3",
-    author: "Дмитрий",
-    role: { ru: "индивидуальный пошив", en: "made-to-measure client" },
-    text: {
-      ru: "Заказывал худи по своим меркам — помогли с тканью и посадкой. Результат превзошёл ожидания.",
-      en: "I ordered a hoodie to my own measurements — the team helped with fabric and fit. The result exceeded my expectations.",
-    },
-    rating: 5,
-  },
+type SeedReview = {
+  id: keyof SeedCopy['reviews'];
+  /** Single-language column: the default-locale name. */
+  author: string;
+  role: LocalizedText;
+  text: LocalizedText;
+  /** 1..SEED_SETTINGS.reviewRatingMax */
+  rating: number;
+};
+
+const REVIEWS: ReadonlyArray<Pick<SeedReview, 'id' | 'rating'>> = [
+  { id: 'seed-review-1', rating: 5 },
+  { id: 'seed-review-2', rating: 5 },
+  { id: 'seed-review-3', rating: 5 },
 ];
+
+export const SEED_REVIEWS: readonly SeedReview[] = REVIEWS.map(review => ({
+  ...review,
+  author: defaultCopy(copy => copy.reviews[review.id].author),
+  role: localized(copy => copy.reviews[review.id].role),
+  text: localized(copy => copy.reviews[review.id].text),
+}));
 
 type SeedNews = {
-  slug: string;
-  title: Copy;
-  excerpt: Copy;
-  body: Copy;
+  slug: keyof SeedCopy['news'];
+  title: LocalizedText;
+  excerpt: LocalizedText;
+  body: LocalizedText;
+  /** ISO 8601 */
   date: string;
   image: SeedMediaKey;
 };
 
-export const SEED_NEWS: readonly SeedNews[] = [
-  {
-    slug: "kollekciya-menya-zapomnyat-v-kataloge",
-    title: {
-      ru: "Коллекция «Меня запомнят» — в каталоге",
-      en: "«They Will Remember Me» is now in the catalog",
-    },
-    excerpt: {
-      ru: "Четыре худи с фирменной тату-графикой: знак, голова змеи анфас, чешуя и большая голова на спине.",
-      en: "Four hoodies with signature tattoo graphics: the mark, a face-on snake head, scales and an oversized head on the back.",
-    },
-    body: {
-      ru: "Коллекция «Меня запомнят» уже в каталоге. Четыре худи с гравюрной графикой ГАДЮКИ — от главного знака до большой головы змеи во всю спину.\n\nКаждая вещь приходит в фирменной коробке с номером и биркой с красным языком.",
-      en: "«They Will Remember Me» is now in the catalog. Four hoodies with GADYUKA's engraving-style graphics — from the signature mark to an oversized snake head across the back.\n\nEvery piece arrives in a numbered signature box with the red-tongue hang tag.",
-    },
-    date: "2026-10-01T09:00:00.000Z",
-    image: "hoodieWhiteLogo",
-  },
-  {
-    slug: "pop-up-v-krasnodare",
-    title: { ru: "Поп-ап ГАДЮКИ в Краснодаре", en: "GADYUKA pop-up in Krasnodar" },
-    excerpt: {
-      ru: "Примерьте худи вживую, познакомьтесь с командой и обсудите индивидуальный пошив. Дата и место — скоро.",
-      en: "Try the hoodies on, meet the team and talk made-to-measure. Date and venue coming soon.",
-    },
-    body: {
-      ru: "Готовим поп-ап в Краснодаре: можно будет примерить модели коллекции «Меня запомнят», познакомиться с командой и обсудить индивидуальный пошив.\n\nДату и место объявим в новостях и соцсетях.",
-      en: "We're preparing a pop-up in Krasnodar: try on pieces from «They Will Remember Me», meet the team and talk through a made-to-measure order.\n\nDate and venue will be announced in our news and on social media.",
-    },
-    date: "2026-10-10T09:00:00.000Z",
-    image: "packaging",
-  },
+const NEWS: ReadonlyArray<Pick<SeedNews, 'slug' | 'date' | 'image'>> = [
+  { slug: 'kollekciya-menya-zapomnyat-v-kataloge', date: '2026-10-01T09:00:00.000Z', image: 'hoodieWhiteLogo' },
+  { slug: 'pop-up-v-krasnodare', date: '2026-10-10T09:00:00.000Z', image: 'packaging' },
 ];
 
-type SeedGalleryItem = { id: string; media: SeedMediaKey; caption: Copy };
+export const SEED_NEWS: readonly SeedNews[] = NEWS.map(item => ({
+  ...item,
+  title: localized(copy => copy.news[item.slug].title),
+  excerpt: localized(copy => copy.news[item.slug].excerpt),
+  body: localized(copy => copy.news[item.slug].body),
+}));
 
-export const SEED_GALLERY: readonly SeedGalleryItem[] = [
-  {
-    id: "seed-gallery-1",
-    media: "snakeHeadCloseup",
-    caption: { ru: "Голова гадюки — гравюрная графика бренда", en: "The viper's head — the brand's engraving-style artwork" },
-  },
-  {
-    id: "seed-gallery-2",
-    media: "labelLogo",
-    caption: { ru: "Тканевая нашивка с логотипом", en: "Woven logo label" },
-  },
-  {
-    id: "seed-gallery-3",
-    media: "hangtag",
-    caption: { ru: "Фирменная бирка с красным языком", en: "Signature hang tag with the red tongue" },
-  },
-  {
-    id: "seed-gallery-4",
-    media: "wordmarkPatternRed",
-    caption: { ru: "Вордмарк ГАДЮКА на красном", en: "GADYUKA wordmark on red" },
-  },
-  {
-    id: "seed-gallery-5",
-    media: "labelTongue",
-    caption: { ru: "Нашивка с раздвоенным языком", en: "Forked-tongue label" },
-  },
-  {
-    id: "seed-gallery-6",
-    media: "styleElements",
-    caption: { ru: "Фирменные элементы стиля", en: "Signature style elements" },
-  },
+type SeedGalleryItem = { id: keyof SeedCopy['gallery']; media: SeedMediaKey; caption: LocalizedText };
+
+const GALLERY: ReadonlyArray<Pick<SeedGalleryItem, 'id' | 'media'>> = [
+  { id: 'seed-gallery-1', media: 'snakeHeadCloseup' },
+  { id: 'seed-gallery-2', media: 'labelLogo' },
+  { id: 'seed-gallery-3', media: 'hangtag' },
+  { id: 'seed-gallery-4', media: 'wordmarkPatternRed' },
+  { id: 'seed-gallery-5', media: 'labelTongue' },
+  { id: 'seed-gallery-6', media: 'styleElements' },
 ];
+
+export const SEED_GALLERY: readonly SeedGalleryItem[] = GALLERY.map(item => ({
+  ...item,
+  caption: localized(copy => copy.gallery[item.id].caption),
+}));
 
 type SeedOffer = {
-  id: string;
-  title: Copy;
-  text: Copy;
-  badge: Copy;
-  ctaLabel: Copy;
+  id: keyof SeedCopy['offers'];
+  title: LocalizedText;
+  text: LocalizedText;
+  badge: LocalizedText;
+  ctaLabel: LocalizedText;
   ctaHref: string;
+  /** ISO 8601 or null (no end date) */
   validUntil: string | null;
   image: SeedMediaKey | null;
 };
 
-export const SEED_OFFERS: readonly SeedOffer[] = [
-  {
-    id: "seed-offer-1",
-    title: { ru: "−10% на индивидуальный пошив", en: "10% off made-to-measure" },
-    text: {
-      ru: "Оставьте заявку на индивидуальный пошив до конца года и получите скидку 10%. Условия уточняйте у менеджера.",
-      en: "Request a made-to-measure piece before the end of the year and get 10% off. Ask our team for details.",
-    },
-    badge: { ru: "−10%", en: "−10%" },
-    ctaLabel: { ru: "Оставить заявку", en: "Submit a request" },
-    ctaHref: "#tailoring",
-    validUntil: "2026-12-31T20:59:59.000Z",
-    image: "lekalaRack",
-  },
-  {
-    id: "seed-offer-2",
-    title: { ru: "Подарочная упаковка", en: "Gift packaging" },
-    text: {
-      ru: "Каждое худи — в фирменной коробке с номером. Упакуем покупку в подарок без доплаты.",
-      en: "Every hoodie comes in a numbered signature box. We'll gift-wrap your purchase at no extra cost.",
-    },
-    badge: { ru: "Подарок", en: "Gift" },
-    ctaLabel: { ru: "Связаться", en: "Get in touch" },
-    ctaHref: "#contacts",
-    validUntil: null,
-    image: "packaging",
-  },
+const OFFERS: ReadonlyArray<Pick<SeedOffer, 'id' | 'ctaHref' | 'validUntil' | 'image'>> = [
+  { id: 'seed-offer-1', ctaHref: '#tailoring', validUntil: '2026-12-31T20:59:59.000Z', image: 'lekalaRack' },
+  { id: 'seed-offer-2', ctaHref: '#contacts', validUntil: null, image: 'packaging' },
 ];
+
+export const SEED_OFFERS: readonly SeedOffer[] = OFFERS.map(offer => ({
+  ...offer,
+  title: localized(copy => copy.offers[offer.id].title),
+  text: localized(copy => copy.offers[offer.id].text),
+  badge: localized(copy => copy.offers[offer.id].badge),
+  ctaLabel: localized(copy => copy.offers[offer.id].ctaLabel),
+}));
 
 /**
  * Partner rows are DRAFTS (published: false): Partner.name is one string for every language
@@ -250,63 +158,87 @@ export const SEED_OFFERS: readonly SeedOffer[] = [
  * партнёра» / «Your brand here»); the drafts are templates in the admin — fill in the real
  * name and logo, then switch on «Показывать на сайте».
  */
-type SeedPartner = { id: string; name: string; description: Copy; published: false };
+type SeedPartner = {
+  id: keyof SeedCopy['partners'];
+  /** Single-language column: the default-locale name. */
+  name: string;
+  description: LocalizedText;
+  published: false;
+};
 
-export const SEED_PARTNERS: readonly SeedPartner[] = [
-  {
-    id: "seed-partner-1",
-    name: "Партнёр 01",
-    published: false,
-    description: {
-      ru: "Тату-студия — место для логотипа партнёра (заглушка)",
-      en: "Tattoo studio — partner logo goes here (placeholder)",
-    },
-  },
-  {
-    id: "seed-partner-2",
-    name: "Партнёр 02",
-    published: false,
-    description: {
-      ru: "Печать и вышивка — место для партнёра (заглушка)",
-      en: "Print & embroidery — partner slot (placeholder)",
-    },
-  },
-  {
-    id: "seed-partner-3",
-    name: "Партнёр 03",
-    published: false,
-    description: {
-      ru: "Концепт-стор — место для партнёра (заглушка)",
-      en: "Concept store — partner slot (placeholder)",
-    },
-  },
+const PARTNER_IDS: ReadonlyArray<SeedPartner['id']> = ['seed-partner-1', 'seed-partner-2', 'seed-partner-3'];
+
+export const SEED_PARTNERS: readonly SeedPartner[] = PARTNER_IDS.map(id => ({
+  id,
+  name: defaultCopy(copy => copy.partners[id].name),
+  description: localized(copy => copy.partners[id].description),
+  published: false,
+}));
+
+type SeedMenuItem = {
+  id: string;
+  label: LocalizedText;
+  href: string;
+  showInHeader: boolean;
+  showInFooter: boolean;
+};
+
+/**
+ * The site menu (header, mobile menu and footer list the same items) in the order of the
+ * chapters on the page: Главная, Каталог, О нас, Индивидуальный пошив, Специальное
+ * предложение, Контакты. Hrefs are landing anchors ("#home" is the cover).
+ */
+const MENU: ReadonlyArray<{ label: keyof SeedCopy['menu']; anchor: string }> = [
+  { label: 'home', anchor: SECTION_ANCHORS.hero },
+  { label: 'catalog', anchor: SECTION_ANCHORS.catalog },
+  { label: 'about', anchor: SECTION_ANCHORS.about },
+  { label: 'tailoring', anchor: SECTION_ANCHORS.tailoring },
+  { label: 'offers', anchor: SECTION_ANCHORS.offers },
+  { label: 'contacts', anchor: SECTION_ANCHORS.contacts },
 ];
 
-export const SEED_SETTINGS = {
-  /** PLACEHOLDER — replace in the admin («Настройки»). */
-  phone: "+7 (000) 000-00-00",
-  /** PLACEHOLDER — example.com is a reserved demo domain. */
-  email: "hello@example.com",
-  address: {
-    ru: "Краснодар (адрес — заглушка, укажите в админке)",
-    en: "Krasnodar, Russia (placeholder address — set it in the admin)",
-  },
-  socials: [{ type: "telegram", url: "https://t.me/" }],
-  seoTitle: {
-    ru: "ГАДЮКА — авторская уличная одежда из Краснодара",
-    en: "GADYUKA — designer streetwear from Krasnodar",
-  },
-  seoDescription: {
-    ru: "Стритвир с авторскими моделями и тату-графикой: худи коллекции «Меня запомнят» и индивидуальный пошив. Краснодар.",
-    en: "Streetwear with original designs and tattoo graphics: hoodies from the «They Will Remember Me» collection and made-to-measure tailoring. Krasnodar.",
-  },
-  ogImage: "wordmarkOnBlack",
-} as const satisfies {
+export const SEED_MENU: readonly SeedMenuItem[] = MENU.map(item => ({
+  id: `seed-menu-${item.label}`,
+  label: localized(copy => copy.menu[item.label]),
+  href: `#${item.anchor}`,
+  showInHeader: true,
+  showInFooter: true,
+}));
+
+type SeedSocialLink = {
+  id: string;
+  type: SocialType;
+  /** Empty = the site shows the default label of the type (message `social.<type>`). */
+  label: LocalizedText;
+  url: string;
+  published: boolean;
+};
+
+/**
+ * PLACEHOLDER — the bare https://t.me/ is shown in «Контакты» like the placeholder phone and
+ * e-mail (a preview of the block; JSON-LD sameAs skips URLs without a path). Put the real
+ * channel in the admin, or switch the link off there.
+ */
+export const SEED_SOCIALS: readonly SeedSocialLink[] = [
+  { id: 'seed-social-telegram', type: 'TELEGRAM', label: {}, url: 'https://t.me/', published: true },
+];
+
+export const SEED_SETTINGS: {
   phone: string;
   email: string;
-  address: Copy;
-  socials: ReadonlyArray<{ type: string; url: string }>;
-  seoTitle: Copy;
-  seoDescription: Copy;
+  address: LocalizedText;
+  reviewRatingMax: number;
+  seoTitle: LocalizedText;
+  seoDescription: LocalizedText;
   ogImage: SeedMediaKey;
+} = {
+  /** PLACEHOLDER — replace in the admin («Настройки»). */
+  phone: '+7 (000) 000-00-00',
+  /** PLACEHOLDER — example.com is a reserved demo domain. */
+  email: 'hello@example.com',
+  address: localized(copy => copy.settings.address),
+  reviewRatingMax: 5,
+  seoTitle: localized(copy => copy.settings.seoTitle),
+  seoDescription: localized(copy => copy.settings.seoDescription),
+  ogImage: 'wordmarkOnBlack',
 };

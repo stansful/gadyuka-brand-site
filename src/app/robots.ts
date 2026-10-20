@@ -1,5 +1,6 @@
-import type { MetadataRoute } from "next";
-import { getSiteUrl } from "@/lib/seo/site-url";
+import { getSiteUrl } from '@/lib/seo/site-url';
+
+import type { MetadataRoute } from 'next';
 
 /**
  * /robots.txt — the admin (/admin…) and the API (/api/…) are never crawled.
@@ -9,7 +10,7 @@ import { getSiteUrl } from "@/lib/seo/site-url";
 export default function robots(): MetadataRoute.Robots {
   const siteUrl = getSiteUrl();
   return {
-    rules: [{ userAgent: "*", allow: "/", disallow: ["/admin", "/api/"] }],
+    rules: [{ userAgent: '*', allow: '/', disallow: ['/admin', '/api/'] }],
     sitemap: `${siteUrl}/sitemap.xml`,
     host: siteUrl,
   };

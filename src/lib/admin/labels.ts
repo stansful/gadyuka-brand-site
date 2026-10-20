@@ -1,63 +1,49 @@
-import type { LeadStatus, LeadType } from "@/generated/prisma/enums";
-import type { SocialType } from "@/lib/content/schemas";
+import type { LeadStatus, LeadType } from '@/generated/prisma/enums';
+import type { SocialType } from '@/lib/content/social';
 
-/** Russian labels for enums shown in the admin (isomorphic). */
+/**
+ * Enum lists and ru-only formatters of the admin (isomorphic). The enum NAMES are admin copy:
+ * admin.leads.types / admin.leads.statuses / admin.socials.types in messages/admin/ru.json;
+ * counts with plural forms are ICU plurals there too.
+ */
 
-export const LEAD_TYPE_LABELS: Readonly<Record<LeadType, string>> = {
-  TAILORING: "Индивидуальный пошив",
-  PARTNERSHIP: "Сотрудничество",
-  CONTACT: "Связаться",
+export const LEAD_TYPES: readonly LeadType[] = ['TAILORING', 'PARTNERSHIP', 'CONTACT'];
+export const LEAD_STATUSES: readonly LeadStatus[] = ['NEW', 'IN_PROGRESS', 'DONE', 'SPAM'];
+
+/** Example link per social type (placeholder of the URL field). */
+export const SOCIAL_URL_PLACEHOLDERS: Readonly<Record<SocialType, string>> = {
+  TELEGRAM: 'https://t.me/…',
+  VK: 'https://vk.com/…',
+  INSTAGRAM: 'https://instagram.com/…',
+  WHATSAPP: 'https://wa.me/79000000000',
+  YOUTUBE: 'https://youtube.com/@…',
+  TIKTOK: 'https://tiktok.com/@…',
+  PINTEREST: 'https://pinterest.com/…',
+  WEBSITE: 'https://…',
+  OTHER: 'https://…',
 };
 
-export const LEAD_STATUS_LABELS: Readonly<Record<LeadStatus, string>> = {
-  NEW: "Новая",
-  IN_PROGRESS: "В работе",
-  DONE: "Готово",
-  SPAM: "Спам",
-};
-
-export const LEAD_TYPES: readonly LeadType[] = ["TAILORING", "PARTNERSHIP", "CONTACT"];
-export const LEAD_STATUSES: readonly LeadStatus[] = ["NEW", "IN_PROGRESS", "DONE", "SPAM"];
-
-export const SOCIAL_TYPE_LABELS: Readonly<Record<SocialType, string>> = {
-  telegram: "Telegram",
-  vk: "ВКонтакте",
-  instagram: "Instagram",
-  whatsapp: "WhatsApp",
-  youtube: "YouTube",
-  tiktok: "TikTok",
-  pinterest: "Pinterest",
-  website: "Сайт",
-  other: "Другое",
-};
-
-/** «1 товар», «2 товара», «5 товаров». */
-export function pluralRu(count: number, one: string, few: string, many: string): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
+/** "★★★★☆" — `rating` filled stars of `max` (the rating is clamped to the scale). */
+export function formatStars(rating: number, max: number): string {
+  const scale = Math.max(1, Math.round(max));
+  const filled = Math.min(scale, Math.max(0, Math.round(rating)));
+  return `${'★'.repeat(filled)}${'☆'.repeat(scale - filled)}`;
 }
 
-export function countRu(count: number, one: string, few: string, many: string): string {
-  return `${count} ${pluralRu(count, one, few, many)}`;
-}
-
-const DATE_TIME = new Intl.DateTimeFormat("ru-RU", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "Europe/Moscow",
+const DATE_TIME = new Intl.DateTimeFormat('ru-RU', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'Europe/Moscow',
 });
 
-const DATE_ONLY = new Intl.DateTimeFormat("ru-RU", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "Europe/Moscow",
+const DATE_ONLY = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'Europe/Moscow',
 });
 
 /** "16.10.2026, 23:41" (Moscow time) */
@@ -70,14 +56,17 @@ export function formatDateRu(iso: string): string {
   return DATE_ONLY.format(new Date(iso));
 }
 
-/** "1,4 МБ" / "820 КБ" */
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} Б`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
-  return `${(bytes / (1024 * 1024)).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} МБ`;
+/**
+ * A file size in the unit the admin shows it in — the ICU arguments of admin.media.fileSize
+ * («820 КБ», «1,4 МБ»): bytes below 1 KB, whole kilobytes below 1 MB, megabytes to 0.1.
+ */
+export function fileSizeParts(bytes: number): { unit: 'b' | 'kb' | 'mb'; value: number } {
+  if (bytes < 1024) return { unit: 'b', value: bytes };
+  if (bytes < 1024 * 1024) return { unit: 'kb', value: Math.round(bytes / 1024) };
+  return { unit: 'mb', value: Math.round((bytes / (1024 * 1024)) * 10) / 10 };
 }
 
 /** "12 900 ₽" */
 export function formatRubles(value: number): string {
-  return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(value);
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(value);
 }

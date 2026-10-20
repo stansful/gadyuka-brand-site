@@ -1,6 +1,7 @@
-import { gsap } from "gsap";
-import type { ScrollTrigger } from "gsap/ScrollTrigger";
-import type { SplitText } from "gsap/SplitText";
+import { gsap } from 'gsap';
+
+import type { ScrollTrigger } from 'gsap/ScrollTrigger';
+import type { SplitText } from 'gsap/SplitText';
 
 /**
  * GSAP for the public site. The core loads with the page (menu, lightbox, cover cursor); the
@@ -20,7 +21,7 @@ let loading: Promise<ScrollTriggerPlugin> | null = null;
 
 /** Imports and registers ScrollTrigger + SplitText once (a failed import can be retried). */
 export function loadScrollTrigger(): Promise<ScrollTriggerPlugin> {
-  loading ??= Promise.all([import("gsap/ScrollTrigger"), import("gsap/SplitText")]).then(
+  loading ??= Promise.all([import('gsap/ScrollTrigger'), import('gsap/SplitText')]).then(
     ([scroll, split]) => {
       gsap.registerPlugin(scroll.ScrollTrigger, split.SplitText);
       // ScrollTrigger's automatic refreshes are full ones (the window scrolled to 0 and back), and
@@ -30,8 +31,8 @@ export function loadScrollTrigger(): Promise<ScrollTriggerPlugin> {
       // and a big height change (keyboard, split screen). Mouse / trackpad keep visibilitychange
       // and resize (GSAP defers those to its scrollEnd itself). Inline matchMedia: env.ts imports
       // this module.
-      const touch = !window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-      scroll.ScrollTrigger.config({ autoRefreshEvents: touch ? "none" : "visibilitychange,resize" });
+      const touch = !window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      scroll.ScrollTrigger.config({ autoRefreshEvents: touch ? 'none' : 'visibilitychange,resize' });
       plugins = { ScrollTrigger: scroll.ScrollTrigger, SplitText: split.SplitText };
       return scroll.ScrollTrigger;
     },
@@ -49,7 +50,7 @@ export function loadedScrollTrigger(): ScrollTriggerPlugin | null {
 }
 
 function loaded(): ScrollPlugins {
-  if (!plugins) throw new Error("A scroll plugin is used before loadScrollTrigger() resolved");
+  if (!plugins) throw new Error('A scroll plugin is used before loadScrollTrigger() resolved');
   return plugins;
 }
 

@@ -27,7 +27,7 @@ export function coverSizes(imageAspect: number, slots: ReadonlyArray<CoverSlot>)
       const width = `${Math.ceil(vw * Math.max(1, aspect / slotAspect))}vw`;
       return maxWidth === undefined ? width : `(max-width: ${maxWidth}px) ${width}`;
     })
-    .join(", ");
+    .join(', ');
 }
 
 /** Width / height of a media reference (0 when unknown). */
@@ -90,8 +90,8 @@ export function stampSizes(imageAspect: number, sidePx = 92): string {
 
 // ─── Gallery ────────────────────────────────────────────────────────────────
 
-type GallerySlot = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h";
-type Wipe = "left" | "right" | "up" | "down" | "diag";
+type GallerySlot = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h';
+type Wipe = 'left' | 'right' | 'up' | 'down' | 'diag';
 
 export type GalleryCell = {
   slot: GallerySlot;
@@ -107,16 +107,16 @@ export type GalleryCell = {
 };
 
 /** The concept's 8-panel page: a b c (4 rows), d e f (3 rows), g h (3 rows). */
-const PAGE: ReadonlyArray<GallerySlot> = ["a", "b", "c", "d", "e", "f", "g", "h"];
+const PAGE: ReadonlyArray<GallerySlot> = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const WIPES: Readonly<Record<GallerySlot, Wipe>> = {
-  a: "left",
-  b: "down",
-  c: "right",
-  d: "up",
-  e: "diag",
-  f: "up",
-  g: "left",
-  h: "right",
+  a: 'left',
+  b: 'down',
+  c: 'right',
+  d: 'up',
+  e: 'diag',
+  f: 'up',
+  g: 'left',
+  h: 'right',
 };
 
 /** [mobile (2 columns, 132 px rows), tablet, desktop] width (vw) / aspect of each cell. */
@@ -162,13 +162,13 @@ function cellSlots(slot: GallerySlot, full: boolean, tall: boolean): CoverSlot[]
 
 /** Slots of an incomplete last page (n = 1…7 items) that still close every row. */
 const TAILS: Readonly<Record<number, ReadonlyArray<GallerySlot>>> = {
-  1: ["a"],
-  2: ["a", "b"],
-  3: ["a", "b", "c"],
-  4: ["a", "b", "c", "d"],
-  5: ["a", "b", "c", "g", "h"],
-  6: ["a", "b", "c", "d", "e", "f"],
-  7: ["a", "b", "c", "d", "e", "f", "g"],
+  1: ['a'],
+  2: ['a', 'b'],
+  3: ['a', 'b', 'c'],
+  4: ['a', 'b', 'c', 'd'],
+  5: ['a', 'b', 'c', 'g', 'h'],
+  6: ['a', 'b', 'c', 'd', 'e', 'f'],
+  7: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
 };
 
 export function galleryLayout(count: number): GalleryCell[] {
@@ -183,7 +183,7 @@ export function galleryLayout(count: number): GalleryCell[] {
     const last = index === tail.length - 1;
     // A lone «a», a lone «d» after a b c, a lone «g» after a…f fill the whole row.
     const full = last && (rest === 1 || rest === 4 || rest === 7);
-    const tall = rest === 2 && slot === "b";
+    const tall = rest === 2 && slot === 'b';
     cells.push(cell(slot, full, tall));
   });
   return cells;
@@ -197,21 +197,21 @@ function cell(slot: GallerySlot, full: boolean, tall: boolean): GalleryCell {
 // ─── Reviews ────────────────────────────────────────────────────────────────
 
 export type ReviewPanel = {
-  variant: "a" | "b" | "c" | "d";
+  variant: 'a' | 'b' | 'c' | 'd';
   /** Alone in its row → spans the full width. */
   wide: boolean;
   /** Background texture of the panel. */
-  texture: "dots" | "scales" | "hatch";
-  tone: "ink" | "blue";
+  texture: 'dots' | 'scales' | 'hatch';
+  tone: 'ink' | 'blue';
 };
 
-const FIRST_PANEL: Omit<ReviewPanel, "wide"> = { variant: "a", texture: "dots", tone: "ink" };
+const FIRST_PANEL: Omit<ReviewPanel, 'wide'> = { variant: 'a', texture: 'dots', tone: 'ink' };
 
-const REVIEW_CYCLE: ReadonlyArray<Omit<ReviewPanel, "wide">> = [
+const REVIEW_CYCLE: ReadonlyArray<Omit<ReviewPanel, 'wide'>> = [
   FIRST_PANEL,
-  { variant: "b", texture: "scales", tone: "blue" },
-  { variant: "c", texture: "hatch", tone: "ink" },
-  { variant: "d", texture: "dots", tone: "ink" },
+  { variant: 'b', texture: 'scales', tone: 'blue' },
+  { variant: 'c', texture: 'hatch', tone: 'ink' },
+  { variant: 'd', texture: 'dots', tone: 'ink' },
 ];
 
 /** Witness panels go in pairs (7 + 5 / 5 + 7 columns); an odd last one takes the full row. */

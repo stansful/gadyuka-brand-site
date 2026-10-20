@@ -2,7 +2,7 @@
 // Plain CSS files (e.g. src/styles/site.css) pass through untouched.
 const config = {
   plugins: {
-    "@tailwindcss/postcss": {},
+    '@tailwindcss/postcss': {},
   },
 };
 

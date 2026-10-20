@@ -26,7 +26,7 @@ export function currentSectionId(sections: ReadonlyArray<SectionPosition>, line:
 
 /** "#reviews" → "reviews"; anything that is not a plain anchor id → null. */
 export function fragmentId(hash: string): string | null {
-  let id = hash.startsWith("#") ? hash.slice(1) : hash;
+  let id = hash.startsWith('#') ? hash.slice(1) : hash;
   try {
     id = decodeURIComponent(id);
   } catch {
@@ -40,7 +40,7 @@ export function fragmentId(hash: string): string | null {
  * path — the other language then simply opens at the top.
  */
 export function withSectionHash(href: string, id: string | null, topId?: string): string {
-  const base = href.split("#")[0] ?? href;
+  const base = href.split('#')[0] ?? href;
   if (!id || id === topId || !FRAGMENT_ID.test(id)) return base;
   return `${base}#${id}`;
 }

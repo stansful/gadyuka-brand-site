@@ -1,24 +1,28 @@
-import "server-only";
-import { cacheLife, cacheTag } from "next/cache";
-import type { Locale } from "@/i18n/locales";
-import { db } from "@/lib/db";
-import { readText } from "@/lib/i18n-text";
-import { CACHE_TAGS, CONTENT_CACHE_LIFE } from "./cache";
-import { CONTENT_COPY } from "./default-copy";
-import { mediaSelect, recordFromKeys, toImageRef, toLines } from "./mappers";
-import { IMAGE_KEYS, TEXT_KEYS, type TextKey } from "./registry";
-import { parseSocialLinks } from "./schemas";
+import 'server-only';
+import { cacheLife, cacheTag } from 'next/cache';
+
+import type { Locale } from '@/i18n/locales';
+import { getSiteTexts } from '@/i18n/site-messages';
+import { db } from '@/lib/db';
+import { readOptionalText, readText } from '@/lib/i18n-text';
+
 import type {
   CollectionView,
   GalleryView,
   ImageRef,
   LandingContent,
+  MenuItemView,
   NewsView,
   OfferView,
   PartnerView,
   ReviewView,
   SettingsView,
-} from "./types";
+  SocialLinkView,
+} from './types';
+
+import { CACHE_TAGS, CONTENT_CACHE_LIFE } from './cache';
+import { mediaSelect, recordFromKeys, toImageRef, toLines } from './mappers';
+import { IMAGE_KEYS } from './registry';
 
 /** Upper bounds for public lists (the landing never renders unbounded queries). */
 const LIMITS = {
@@ -29,7 +33,12 @@ const LIMITS = {
   gallery: 60,
   offers: 12,
   partners: 40,
+  menu: 30,
+  socials: 20,
 } as const;
+
+/** Review star scale when SiteSettings has no row yet (= the column default). */
+const DEFAULT_REVIEW_RATING_MAX = 5;
 
 const collectionSelect = {
   id: true,
@@ -39,7 +48,7 @@ const collectionSelect = {
   cover: { select: mediaSelect },
   products: {
     where: { published: true },
-    orderBy: [{ order: "asc" as const }, { createdAt: "asc" as const }],
+    orderBy: [{ order: 'asc' as const }, { createdAt: 'asc' as const }],
     take: LIMITS.productsPerCollection,
     select: {
       id: true,
@@ -49,7 +58,7 @@ const collectionSelect = {
       details: true,
       price: true,
       images: {
-        orderBy: { order: "asc" as const },
+        orderBy: { order: 'asc' as const },
         select: { media: { select: mediaSelect } },
       },
     },
@@ -61,7 +70,7 @@ type CollectionRow = Awaited<ReturnType<typeof queryCollections>>[number];
 function queryCollections(where: { published: true; slug?: string }) {
   return db.collection.findMany({
     where,
-    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
     take: LIMITS.collections,
     select: collectionSelect,
   });
@@ -74,7 +83,7 @@ function toCollectionView(row: CollectionRow, locale: Locale): CollectionView {
     title: readText(row.title, locale),
     description: readText(row.description, locale),
     cover: toImageRef(row.cover, locale),
-    products: row.products.map((product) => ({
+    products: row.products.map(product => ({
       id: product.id,
       slug: product.slug,
       title: readText(product.title, locale),
@@ -82,7 +91,7 @@ function toCollectionView(row: CollectionRow, locale: Locale): CollectionView {
       details: toLines(readText(product.details, locale)),
       price: product.price,
       images: product.images
-        .map((image) => toImageRef(image.media, locale))
+        .map(image => toImageRef(image.media, locale))
         .filter((image): image is ImageRef => image !== null),
     })),
   };
@@ -94,28 +103,49 @@ async function loadSettings(locale: Locale): Promise<SettingsView> {
     include: { ogImage: { select: mediaSelect } },
   });
   if (!row) {
-    return { phone: "", email: "", address: "", socials: [], seoTitle: "", seoDescription: "", ogImage: null };
+    return {
+      phone: '',
+      email: '',
+      address: '',
+      reviewRatingMax: DEFAULT_REVIEW_RATING_MAX,
+      seoTitle: '',
+      seoDescription: '',
+      ogImage: null,
+    };
   }
   return {
     phone: row.phone,
     email: row.email,
     address: readText(row.address, locale),
-    socials: parseSocialLinks(row.socials),
+    reviewRatingMax: row.reviewRatingMax,
     seoTitle: readText(row.seoTitle, locale),
     seoDescription: readText(row.seoDescription, locale),
     ogImage: toImageRef(row.ogImage, locale),
   };
 }
 
-type BlockRow = { value: unknown };
+type MenuRow = { id: string; label: unknown; href: string; showInHeader: boolean; showInFooter: boolean };
 
-/**
- * Text of a content block. A registry key WITHOUT a DB row (added by a release, not seeded yet)
- * falls back to its default copy instead of rendering blank; a row that exists is shown as
- * stored — an admin may have emptied it on purpose (e.g. «Сноска под купонами»).
- */
-export function blockText(key: TextKey, row: BlockRow | undefined, locale: Locale): string {
-  return row ? readText(row.value, locale) : readText(CONTENT_COPY[key], locale);
+/** Published menu rows → localized items; an item without a label in any locale is skipped. */
+export function toMenuItems(rows: ReadonlyArray<MenuRow>, locale: Locale): MenuItemView[] {
+  return rows.flatMap((row): MenuItemView[] => {
+    const label = readText(row.label, locale);
+    if (!label) return [];
+    return [{ id: row.id, label, href: row.href, showInHeader: row.showInHeader, showInFooter: row.showInFooter }];
+  });
+}
+
+type SocialRow = { id: string; type: SocialLinkView['type']; label: unknown; url: string };
+
+/** Published social rows → views; an empty label is null (the site shows `social.<type>`). */
+export function toSocialLinks(rows: ReadonlyArray<SocialRow>, locale: Locale): SocialLinkView[] {
+  return rows.map(row => ({ id: row.id, type: row.type, url: row.url, label: readOptionalText(row.label, locale) }));
+}
+
+/** A stored rating on the current scale: clamped to 1..max (the scale may have been lowered). */
+export function ratingOnScale(rating: number | null, max: number): number | null {
+  if (rating === null) return null;
+  return Math.min(Math.max(1, rating), max);
 }
 
 /** Values of the "hours" profile (CONTENT_CACHE_LIFE), for the shortened inline variant. */
@@ -144,7 +174,9 @@ export function offerExpiryCacheLife(
 }
 
 /**
- * Everything the landing page needs, localized for `locale`.
+ * Everything the landing page needs, localized for `locale`: the site messages (`texts`,
+ * DB-backed — getSiteTexts), the ContentImage images, the menu, the social links, the
+ * published entities and the settings.
  *
  * Cached with the Next 16 Cache Components API: `"use cache"` + cacheTag("content")
  * + cacheLife("hours", shortened before the earliest offer expiry — offerExpiryCacheLife).
@@ -152,65 +184,80 @@ export function offerExpiryCacheLife(
  * with revalidateContent() (Server Actions) / revalidateContentFromRoute() (Route Handlers).
  */
 export async function getLanding(locale: Locale): Promise<LandingContent> {
-  "use cache";
+  'use cache';
   cacheTag(CACHE_TAGS.content);
 
   const now = new Date();
 
-  const [blocks, collections, reviews, news, gallery, offers, partners, settings] = await Promise.all([
-    db.contentBlock.findMany({
-      select: { key: true, value: true, media: { select: mediaSelect } },
-    }),
-    queryCollections({ published: true }),
-    db.review.findMany({
-      where: { published: true },
-      orderBy: [{ order: "asc" }, { createdAt: "desc" }],
-      take: LIMITS.reviews,
-      select: { id: true, author: true, role: true, text: true, rating: true, avatar: { select: mediaSelect } },
-    }),
-    db.newsItem.findMany({
-      where: { published: true },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: LIMITS.news,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        excerpt: true,
-        body: true,
-        date: true,
-        image: { select: mediaSelect },
-      },
-    }),
-    db.galleryItem.findMany({
-      where: { published: true },
-      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-      take: LIMITS.gallery,
-      select: { id: true, caption: true, media: { select: mediaSelect } },
-    }),
-    db.offer.findMany({
-      where: { published: true, OR: [{ validUntil: null }, { validUntil: { gte: now } }] },
-      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-      take: LIMITS.offers,
-      select: {
-        id: true,
-        title: true,
-        text: true,
-        badge: true,
-        ctaLabel: true,
-        ctaHref: true,
-        validUntil: true,
-        image: { select: mediaSelect },
-      },
-    }),
-    db.partner.findMany({
-      where: { published: true },
-      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-      take: LIMITS.partners,
-      select: { id: true, name: true, url: true, description: true, logo: { select: mediaSelect } },
-    }),
-    loadSettings(locale),
-  ]);
+  const [texts, images, menu, socials, collections, reviews, news, gallery, offers, partners, settings] =
+    await Promise.all([
+      getSiteTexts(locale),
+      db.contentImage.findMany({
+        where: { key: { in: [...IMAGE_KEYS] } },
+        select: { key: true, media: { select: mediaSelect } },
+      }),
+      db.menuItem.findMany({
+        where: { published: true },
+        orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        take: LIMITS.menu,
+        select: { id: true, label: true, href: true, showInHeader: true, showInFooter: true },
+      }),
+      db.socialLink.findMany({
+        where: { published: true },
+        orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        take: LIMITS.socials,
+        select: { id: true, type: true, label: true, url: true },
+      }),
+      queryCollections({ published: true }),
+      db.review.findMany({
+        where: { published: true },
+        orderBy: [{ order: 'asc' }, { createdAt: 'desc' }],
+        take: LIMITS.reviews,
+        select: { id: true, author: true, role: true, text: true, rating: true, avatar: { select: mediaSelect } },
+      }),
+      db.newsItem.findMany({
+        where: { published: true },
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        take: LIMITS.news,
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          excerpt: true,
+          body: true,
+          date: true,
+          image: { select: mediaSelect },
+        },
+      }),
+      db.galleryItem.findMany({
+        where: { published: true },
+        orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        take: LIMITS.gallery,
+        select: { id: true, caption: true, media: { select: mediaSelect } },
+      }),
+      db.offer.findMany({
+        where: { published: true, OR: [{ validUntil: null }, { validUntil: { gte: now } }] },
+        orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        take: LIMITS.offers,
+        select: {
+          id: true,
+          title: true,
+          text: true,
+          badge: true,
+          ctaLabel: true,
+          ctaHref: true,
+          validUntil: true,
+          image: { select: mediaSelect },
+        },
+      }),
+      db.partner.findMany({
+        where: { published: true },
+        orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        take: LIMITS.partners,
+        select: { id: true, name: true, url: true, description: true, logo: { select: mediaSelect } },
+      }),
+      loadSettings(locale),
+    ]);
 
   // Nothing invalidates the cache when an offer's validUntil passes, so the entry must not
   // outlive the earliest expiry (otherwise an expired offer stays up to an hour).
@@ -219,71 +266,61 @@ export async function getLanding(locale: Locale): Promise<LandingContent> {
   if (offerLife) cacheLife(offerLife);
   else cacheLife(CONTENT_CACHE_LIFE);
 
-  const blockByKey = new Map(blocks.map((block) => [block.key, block]));
-  if (process.env.NODE_ENV !== "production") {
-    const missing = TEXT_KEYS.filter((key) => !blockByKey.has(key));
-    if (missing.length > 0) console.warn(`[content] no DB rows for ${missing.join(", ")} — default copy shown; run npm run db:seed`);
-  }
+  const imageByKey = new Map(images.map(row => [row.key, row.media]));
 
   return {
     locale,
-    texts: recordFromKeys(TEXT_KEYS, (key) => blockText(key, blockByKey.get(key), locale)),
-    images: recordFromKeys(IMAGE_KEYS, (key) => toImageRef(blockByKey.get(key)?.media, locale)),
-    collections: collections.map((row) => toCollectionView(row, locale)),
-    reviews: reviews.map(
-      (row): ReviewView => ({
-        id: row.id,
-        author: row.author,
-        role: readText(row.role, locale),
-        text: readText(row.text, locale),
-        avatar: toImageRef(row.avatar, locale),
-        rating: row.rating,
-      }),
-    ),
-    news: news.map(
-      (row): NewsView => ({
-        id: row.id,
-        slug: row.slug,
-        title: readText(row.title, locale),
-        excerpt: readText(row.excerpt, locale),
-        body: readText(row.body, locale),
-        date: row.date.toISOString(),
-        image: toImageRef(row.image, locale),
-      }),
-    ),
+    texts,
+    images: recordFromKeys(IMAGE_KEYS, key => toImageRef(imageByKey.get(key), locale)),
+    menu: toMenuItems(menu, locale),
+    socials: toSocialLinks(socials, locale),
+    collections: collections.map(row => toCollectionView(row, locale)),
+    reviews: reviews.map((row): ReviewView => ({
+      id: row.id,
+      author: row.author,
+      role: readText(row.role, locale),
+      text: readText(row.text, locale),
+      avatar: toImageRef(row.avatar, locale),
+      rating: ratingOnScale(row.rating, settings.reviewRatingMax),
+    })),
+    news: news.map((row): NewsView => ({
+      id: row.id,
+      slug: row.slug,
+      title: readText(row.title, locale),
+      excerpt: readText(row.excerpt, locale),
+      body: readText(row.body, locale),
+      date: row.date.toISOString(),
+      image: toImageRef(row.image, locale),
+    })),
     gallery: gallery.flatMap((row): GalleryView[] => {
       const image = toImageRef(row.media, locale);
       return image ? [{ id: row.id, caption: readText(row.caption, locale), image }] : [];
     }),
-    offers: offers.map(
-      (row): OfferView => ({
-        id: row.id,
-        title: readText(row.title, locale),
-        text: readText(row.text, locale),
-        badge: readText(row.badge, locale),
-        ctaLabel: readText(row.ctaLabel, locale),
-        ctaHref: row.ctaHref,
-        validUntil: row.validUntil ? row.validUntil.toISOString() : null,
-        image: toImageRef(row.image, locale),
-      }),
-    ),
-    partners: partners.map(
-      (row): PartnerView => ({
-        id: row.id,
-        name: row.name,
-        url: row.url,
-        description: readText(row.description, locale),
-        logo: toImageRef(row.logo, locale),
-      }),
-    ),
+    offers: offers.map((row): OfferView => ({
+      id: row.id,
+      title: readText(row.title, locale),
+      text: readText(row.text, locale),
+      badge: readText(row.badge, locale),
+      ctaLabel: readText(row.ctaLabel, locale),
+      ctaHref: row.ctaHref,
+      validUntil: row.validUntil ? row.validUntil.toISOString() : null,
+      image: toImageRef(row.image, locale),
+    })),
+    partners: partners.map((row): PartnerView => ({
+      id: row.id,
+      name: row.name,
+      url: row.url,
+      description: readText(row.description, locale),
+      logo: toImageRef(row.logo, locale),
+    })),
     settings,
     year: now.getFullYear(),
   };
 }
 
-/** Site settings only (contacts, socials, SEO defaults) — for generateMetadata, JSON-LD, footer. */
+/** Site settings only (contacts, review scale, SEO defaults) — for generateMetadata and JSON-LD. */
 export async function getSiteSettings(locale: Locale): Promise<SettingsView> {
-  "use cache";
+  'use cache';
   cacheTag(CACHE_TAGS.content);
   cacheLife(CONTENT_CACHE_LIFE);
   return loadSettings(locale);
@@ -291,7 +328,7 @@ export async function getSiteSettings(locale: Locale): Promise<SettingsView> {
 
 /** One published collection with its published products, or null (→ notFound()). */
 export async function getCollectionBySlug(locale: Locale, slug: string): Promise<CollectionView | null> {
-  "use cache";
+  'use cache';
   cacheTag(CACHE_TAGS.content);
   cacheLife(CONTENT_CACHE_LIFE);
   const [row] = await queryCollections({ published: true, slug });
@@ -300,13 +337,13 @@ export async function getCollectionBySlug(locale: Locale, slug: string): Promise
 
 /** Slugs of published collections — for generateStaticParams and sitemap.xml. */
 export async function getPublishedCollectionSlugs(): Promise<string[]> {
-  "use cache";
+  'use cache';
   cacheTag(CACHE_TAGS.content);
   cacheLife(CONTENT_CACHE_LIFE);
   const rows = await db.collection.findMany({
     where: { published: true },
-    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
     select: { slug: true },
   });
-  return rows.map((row) => row.slug);
+  return rows.map(row => row.slug);
 }

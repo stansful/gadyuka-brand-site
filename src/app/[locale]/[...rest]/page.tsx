@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { toLocale } from "@/i18n/locales";
-import { notFoundMetadata } from "@/lib/seo/metadata";
+import { notFound } from 'next/navigation';
+
+import { toLocale } from '@/i18n/locales';
+import { notFoundMetadata } from '@/lib/seo/metadata';
+
+import type { Metadata } from 'next';
 
 /** Unknown paths inside a locale render the localized [locale]/not-found.tsx. */
 
@@ -9,7 +11,7 @@ import { notFoundMetadata } from "@/lib/seo/metadata";
 export const instant = false;
 
 /** «Страница не найдена — ГАДЮКА» / «Page not found — GADYUKA» instead of the site title. */
-export async function generateMetadata({ params }: PageProps<"/[locale]/[...rest]">): Promise<Metadata> {
+export async function generateMetadata({ params }: PageProps<'/[locale]/[...rest]'>): Promise<Metadata> {
   return notFoundMetadata(toLocale((await params).locale));
 }
 

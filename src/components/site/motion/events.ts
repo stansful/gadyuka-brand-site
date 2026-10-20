@@ -4,4 +4,4 @@
  */
 
 /** Dispatched on window right before an in-page anchor scroll (the mobile menu closes on it). */
-export const NAVIGATE_EVENT = "gadyuka:navigate";
+export const NAVIGATE_EVENT = 'gadyuka:navigate';

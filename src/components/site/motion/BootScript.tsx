@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { type ReactElement, useSyncExternalStore } from "react";
+import { type ReactElement, useSyncExternalStore } from 'react';
 
 const noopSubscribe = (): (() => void) => () => {};
 

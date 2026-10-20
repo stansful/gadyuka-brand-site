@@ -15,12 +15,12 @@
 export const ADMIN_PASSWORD_MIN_LENGTH = 16;
 export const ADMIN_SESSION_SECRET_MIN_LENGTH = 32;
 
-export type AdminLockReason = "missing-password" | "weak-password" | "weak-session-secret";
+export type AdminLockReason = 'missing-password' | 'weak-password' | 'weak-session-secret';
 
 export type AdminGate =
-  | { kind: "open" }
-  | { kind: "password"; password: string; sessionSecret: string }
-  | { kind: "locked"; reason: AdminLockReason };
+  | { kind: 'open' }
+  | { kind: 'password'; password: string; sessionSecret: string }
+  | { kind: 'locked'; reason: AdminLockReason };
 
 export type AdminGateEnv = {
   NODE_ENV?: string;
@@ -29,7 +29,7 @@ export type AdminGateEnv = {
   ADMIN_SESSION_SECRET?: string;
 };
 
-const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
+const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on']);
 
 function currentEnv(): AdminGateEnv {
   return {
@@ -41,27 +41,29 @@ function currentEnv(): AdminGateEnv {
 }
 
 export function resolveAdminGate(env: AdminGateEnv = currentEnv()): AdminGate {
-  const production = env.NODE_ENV === "production";
-  const password = env.ADMIN_PASSWORD ?? "";
-  const sessionSecret = (env.ADMIN_SESSION_SECRET ?? "").trim();
+  const production = env.NODE_ENV === 'production';
+  const password = env.ADMIN_PASSWORD ?? '';
+  const sessionSecret = (env.ADMIN_SESSION_SECRET ?? '').trim();
 
   if (password.length > 0) {
-    if (production && password.length < ADMIN_PASSWORD_MIN_LENGTH) return { kind: "locked", reason: "weak-password" };
+    if (production && password.length < ADMIN_PASSWORD_MIN_LENGTH) return { kind: 'locked', reason: 'weak-password' };
     if (production && sessionSecret.length > 0 && sessionSecret.length < ADMIN_SESSION_SECRET_MIN_LENGTH) {
-      return { kind: "locked", reason: "weak-session-secret" };
+      return { kind: 'locked', reason: 'weak-session-secret' };
     }
-    return { kind: "password", password, sessionSecret };
+    return { kind: 'password', password, sessionSecret };
   }
 
-  const allowOpen = TRUE_VALUES.has((env.ADMIN_ALLOW_OPEN ?? "").trim().toLowerCase());
-  if (!production || allowOpen) return { kind: "open" };
-  return { kind: "locked", reason: "missing-password" };
+  const allowOpen = TRUE_VALUES.has((env.ADMIN_ALLOW_OPEN ?? '').trim().toLowerCase());
+  if (!production || allowOpen) return { kind: 'open' };
+  return { kind: 'locked', reason: 'missing-password' };
 }
 
-/** Russian explanation for the login page / login form. */
-export const ADMIN_LOCK_MESSAGES: Readonly<Record<AdminLockReason, string>> = {
-  "missing-password":
-    "Админка закрыта: на сервере не задан ADMIN_PASSWORD. Впишите пароль в .env и перезапустите приложение (DEPLOY.md, раздел 7).",
-  "weak-password": `Админка закрыта: ADMIN_PASSWORD слишком короткий — нужно не меньше ${ADMIN_PASSWORD_MIN_LENGTH} символов. Задайте новый пароль в .env и перезапустите приложение.`,
-  "weak-session-secret": `Админка закрыта: ADMIN_SESSION_SECRET короче ${ADMIN_SESSION_SECRET_MIN_LENGTH} символов. Сгенерируйте новый (openssl rand -hex 32) и перезапустите приложение.`,
-};
+/**
+ * ICU arguments of the «admin is locked» explanation of `reason` — the text itself is
+ * admin.auth.locked.<reason> (messages/admin/ru.json), shown by the login page and form.
+ */
+export function adminLockValues(reason: AdminLockReason): { min: number } {
+  return {
+    min: reason === 'weak-session-secret' ? ADMIN_SESSION_SECRET_MIN_LENGTH : ADMIN_PASSWORD_MIN_LENGTH,
+  };
+}

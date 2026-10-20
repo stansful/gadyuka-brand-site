@@ -1,7 +1,9 @@
-import type { NextRequest, NextResponse } from "next/server";
-import createMiddleware from "next-intl/middleware";
-import { routing } from "./i18n/routing";
-import { adminProxyGate } from "./lib/admin/proxy-gate";
+import createMiddleware from 'next-intl/middleware';
+
+import type { NextRequest, NextResponse } from 'next/server';
+
+import { routing } from './i18n/routing';
+import { adminProxyGate } from './lib/admin/proxy-gate';
 
 /**
  * Next 16 proxy (formerly middleware):
@@ -14,16 +16,18 @@ const intlProxy = createMiddleware(routing);
 
 export default async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
-  if (pathname === "/admin" || pathname.startsWith("/admin/")) return adminProxyGate(request);
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) return adminProxyGate(request);
   return intlProxy(request);
 }
 
 export const config = {
   // Run on everything EXCEPT:
   //  - /api…, /admin/api… (route handlers: POST /api/leads, the admin media API — they check access themselves)
-  //  - /uploads… (user/seed media, served by Caddy or src/app/uploads route)
+  //  - /media…   (uploads + seed media from S3, src/app/media/[...key] route handler)
   //  - /brand…   (static brand assets in public/brand)
   //  - /_next…, /_vercel…
   //  - any path containing a dot (files: favicon.ico, robots.txt, sitemap.xml, *.svg …)
-  matcher: ["/((?!api|admin/api|uploads|brand|_next|_vercel|.*\\..*).*)"],
+  // Such a path that is no file or route (/index.html, /brandbook) gets the localized 404 through
+  // next.config's afterFiles rewrite (src/i18n/locale-fallback.ts), not through next-intl.
+  matcher: ['/((?!api|admin/api|media/|brand|_next|_vercel|.*\\..*).*)'],
 };

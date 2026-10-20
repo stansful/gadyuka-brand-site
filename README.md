@@ -1,50 +1,64 @@
 # ГАДЮКА — сайт и админка
 
-Next.js 16 (App Router, Cache Components) · Prisma 7 + PostgreSQL 17 · next-intl 4 (ru/en) · TypeScript strict.
-Спецификация: `docs/ARCHITECTURE.md`, бриф и тексты: `BRIEF.md`.
+Лендинг бренда уличной одежды ГАДЮКА (Краснодар) со встроенной админкой.
+Next.js 16 · PostgreSQL 17 + Prisma 7 · MinIO (S3) для картинок · next-intl (ru/en) · TypeScript strict · oxlint + oxfmt.
+
+![Главная](docs/screenshots/site-home.png)
 
 ## Запуск локально
 
 ```bash
-cp .env.example .env          # затем заполнить TELEGRAM_* и IP_HASH_SALT
-npm install                   # postinstall → prisma generate
-npm run db:up                 # Postgres 17 в docker (контейнер gadyuka-db, порт 5432)
-npm run db:migrate            # применить миграции
-npm run db:seed               # контент из BRIEF.md (ru+en), медиа → uploads/seed/
-npm run dev                   # http://localhost:3000 (ru), /en
+cp .env.example .env    # dev-значения уже подходят; TELEGRAM_* — по желанию
+npm install             # postinstall → prisma generate
+npm run db:up           # Postgres + MinIO в docker (бакет gadyuka-media создаётся сам)
+npm run db:deploy       # применить миграции
+npm run db:seed         # тексты из messages/*.json, картинки → MinIO, демо-контент
+npm run dev             # http://localhost:3000
 ```
 
-Проверки: `npm run typecheck` (next typegen + tsc), `npm run lint`, `npm test`, `npm run build`.
-`next build` пререндерит `/` и `/en` — нужна доступная БД (DATABASE_URL) с применёнными миграциями.
+Проверки: `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test`, `npm run build` (сборке нужна БД).
 
-Повторный `npm run db:seed` на засеянной базе только добавляет недостающие блоки контента (значения уже существующих блоков, в т. ч. картинки вроде `about.image`, остаются как в БД — меняются в админке); коллекции, товары, отзывы и т. д. не трогает (удалённое в админке не возвращается). `SEED_OVERWRITE=1 npm run db:seed` — сбросить засеянные строки к тексту сида. Картинки сида — `uploads/seed/<имя>-<хэш>.webp` (новый файл → новый URL).
-Сид пишет в БД мимо приложения: уже запущенный сервер может показывать старый контент (кэш `"use cache"`) до перезапуска или до ближайшего сохранения в админке.
+## Куда идти
 
-## Соглашения
+| Что                                    | Адрес                                                                  |
+| -------------------------------------- | ---------------------------------------------------------------------- |
+| Сайт (русский)                         | http://localhost:3000                                                  |
+| Сайт (английский)                      | http://localhost:3000/en                                               |
+| Страница коллекции                     | http://localhost:3000/catalog/menya-zapomnyat                          |
+| Админка                                | http://localhost:3000/admin                                            |
+| Тексты сайта                           | http://localhost:3000/admin/content                                    |
+| Меню / соцсети                         | http://localhost:3000/admin/menu · http://localhost:3000/admin/socials |
+| Настройки (контакты, SEO, шкала звёзд) | http://localhost:3000/admin/settings                                   |
+| Медиатека                              | http://localhost:3000/admin/media                                      |
+| Консоль MinIO                          | http://127.0.0.1:9001 (логин и пароль — `docker-compose.dev.yml`)      |
+| База данных (Prisma Studio)            | `npm run db:studio`                                                    |
 
-| Что | Где / как |
-|---|---|
-| Prisma Client | `import { db } from "@/lib/db"` (server-only). Типы/enum: `@/generated/prisma/client`, в клиентских компонентах — `@/generated/prisma/enums` |
-| Переводимые поля | `Json` = `LocalizedText` (`{ ru, en }`), `src/lib/i18n-text.ts`: `readText(value, locale)` (фолбэк на ru), `localizedTextSchema` / `requiredLocalizedTextSchema` (zod, запись) |
-| Локали | `src/i18n/locales.ts` — единственный список. ru без префикса, en — `/en` |
-| Контент секций | `ContentBlock.key` = `section.key` (`hero.issue`, `tailoring.steps.0.title`) — реестр `src/lib/content/registry.ts` (`required` — заголовки, меню, кнопки: не сохраняются пустыми по-русски), текст по умолчанию `src/lib/content/default-copy.ts` (его пишет сид; ключ без строки в БД сайт показывает с этим текстом). Ключи, убранные из реестра, остаются в БД, но не показываются в админке |
-| Дизайн (публичная часть) | «Нуар-комикс» (`concepts/01-noir-comic`) + красная лента «ГАДЮКА» из `concepts/03-editorial-ink`: стили `src/styles/noir.css`, шрифты Tektur / Montserrat / Shantell Sans через `next/font` (Tektur и Montserrat — preload; Shantell — один статичный вес 700, без preload: рукописного текста на первом экране нет). Запасной шрифт Tektur до его загрузки — `Tektur Caps Fallback` в `noir.css` (Arial, подогнанный под заглавные: почти весь Tektur — капсом), а ширины в Tektur заданы в `em`, не в `ch` (`ch` считается по запасному шрифту) — заголовки не переносятся иначе и страница не прыгает, когда шрифт приходит. CSS отдаётся отдельным кэшируемым файлом (`<link>`); `experimental.inlineCss` выключен намеренно: он дублирует стили в RSC-payload и удваивает HTML, замеры — в комментарии в `next.config.ts` |
-| Порядок глав | `CHAPTER_ORDER` в `src/lib/content/registry.ts` (Каталог → О нас → [лента] → Пошив → Спецпредложения → Новости → Галерея → Отзывы → Партнёры → Контакты): номера «Глава NN» и колонтитулы «— NN —» выводятся из него. Меню (шапка, мобильное меню, подвал: Главная, Каталог, О нас, Индивидуальный пошив, Специальное предложение, Контакты) — `src/components/site/nav.ts`, тест держит его в порядке глав; к «Партнёрам» ведёт кнопка в «О нас» |
-| Анимации | GSAP 3.15 (ScrollTrigger, SplitText) + Lenis 1.3: провайдер `src/components/site/motion/SmoothScroll.tsx`, сцены секций `src/components/site/scenes/*` (`useScene` = `gsap.context` + revert). Скрытие-до-анимации — только под `html.motion` (inline-скрипт). Интро обложки — CSS с первого кадра (`html.is-intro`, `noir.css` «COVER INTRO», кривые GSAP как `linear()` из `scripts/css-eases.mjs`); `HeroScene` добавляет только то, что после интро. Сцены настраиваются лениво (`motion/scheduler.ts`: видимые сразу, остальные за 1,5 экрана до появления, по одной на задачу; ScrollTrigger, SplitText и Lenis грузятся после монтирования), до настройки стартовые состояния рисует CSS под `html.motion-pending` + `[data-scene-pending]` на корне сцены (страховка — 4 с после `load`, если бандл или ScrollTrigger не пришли; ScrollTrigger запрашивается при гидратации, не пришёл за 6 с — сцены показываются без анимации). Главы лендинга — `content-visibility: auto` (только где есть scroll anchoring, `@supports (overflow-anchor: auto)`; Safari раскладывает главы обычным образом; оценки высот в `noir.css`; заранее главы не раскладываются — переход по якорю догоняет цель кадр за кадром, `tweenScroll` из `motion/scroll-tween.ts`). `ScrollTrigger.refresh` — только через `scheduleRefresh` (`motion/env.ts` + `motion/refresh-gate.ts`): мышь/трекпад — «безопасный» `refresh(true)`; тач-экран — только когда страница стоит (ни пальца, ни прокрутки, включая инерцию) не меньше 1 с, и не полный `refresh()`, а каждый триггер по отдельности (`env.ts refreshEach`): полный пересчёт прокручивает окно в 0 и обратно, и встроенный браузер Telegram (WebView с user agent обычного Chrome) после этого швырял следующий свайп на тысячи пикселей; закреплений (pin) у триггеров нет — иначе нужен полный пересчёт, а изменения высоты меньше 96 px пересчёт не вызывают вовсе (полный пересчёт прокручивает окно в 0 и обратно и на телефоне откатывал свайп — прыжки до 543 px в Chrome на Android); свой автоматический на `load` выключен, изменение одной лишь высоты окна на тач-экране его не вызывает. Поздние главы (холодный визит по медленной сети): если посетитель листает, пока JS ещё не загрузился, глава, подошедшая к экрану в стартовом состоянии, получает `data-scene-late` (встроенный «поздний затвор» в `motion/boot.ts`, только после прокрутки самим посетителем и только до первой настройки сцен) — CSS не рисует её стартовые состояния, а при настройке уже виденные элементы остаются как есть (`effects.ts unseen()`), ниже экрана — анимируются как обычно; без этого главы были пустыми блоками и «выезжали» под пальцем. Защита от ложных тапов (`TAP_GUARD` в `motion/boot.ts`, пороги в `motion/tap-guard.ts`, первым делом на каждой странице, с анимациями и без): клик и его совместимый `mousedown` от касания, которое застало страницу в движении (инерция, видимая часть плавной прокрутки к якорю; при занятом главном потоке окно шире), сдвинуло её или вложенную прокрутку (меню, ряд обложек) или проехало пальцем больше 24 px, отменяются до всех обработчиков — Android WebView (Telegram, Instagram, VK, WhatsApp), в отличие от Chrome, превращал часть быстрых свайпов в клики: ссылка под пальцем уводила страницу к своей главе («перескакивает при быстрой прокрутке»), открывала лайтбокс галереи или страницу коллекции, поле формы получало фокус с клавиатурой; клавиатура (`detail 0`), мышь и перо не трогаются. Оттуда же `window.__gadyukaScrollAt` (змейка не отдаёт голову пальцу, под которым страница всё ещё едет) и `window.__gadyukaInput` (первое действие посетителя ещё до гидрации — выравнивание по `#якорю` из адреса в `SmoothScroll` после него не срабатывает). Диагностика на устройстве: `?diag=1` (плашка `public/diag/scroll-diag.js`, в том числе счётчик заблокированных тапов), переключатели `?lite=0|1`, `?snake=0` (`motion/boot.ts`). Встроенные браузеры приложений (Telegram, Instagram, VK… — WebView, `motion/in-app.ts`, по user agent; сайт, добавленный на экран «Домой» iOS, к ним не относится — `navigator.standalone` / `display-mode: standalone`): `html.motion-lite` вместо сцен — страница сразу в финальном виде, ScrollTrigger и Lenis не грузятся; остаются интро обложки, CSS-петли (дождь, бегущие строки, красная лента, язык змеи), а уход обложки, дрейф SFX и ленты — CSS scroll-driven анимации, цвет фото по центру — `motion/lite.ts`. Высота обложки в px (`--hero-h`, `html.hero-px`), а не `100svh`, — во встроенных браузерах и на всех сенсорных экранах (Telegram притворяется Chrome и по user agent не распознаётся): приложение меняет высоту WebView посреди прокрутки (сворачивающееся нижнее меню, шторка, клавиатура), `100svh` шла за ней, и всё ниже обложки прыгало на экране — scroll anchoring изменение окна не компенсирует (замерено в WebView эмулятора: прыжок на высоту меню при каждом её переключении; с px — ни одного); px берётся заново только при смене ширины или наверху страницы. Язык змеи (обложка и крупный план в «О нас») — CSS-анимация `tongue-flick` своего слоя (компоситор), а не GSAP. `prefers-reduced-motion` — без Lenis и анимаций, всё видно сразу |
-| Полоса прокрутки | На публичных страницах вместо системной — змея у правого края (`src/components/site/chrome/ScrollSpine.tsx`, на всех ширинах; прогресс рисует CSS — scroll-driven анимации в `noir.css`, с первого кадра и без скрипта при прокрутке; где их нет — rAF в компоненте). Голову можно тянуть (мышь, перо; палец — только после удержания головы ~0,3 с, `TOUCH_HOLD_MS`: свайп, начатый на голове, и любое касание дорожки у края на тач-экране — обычная прокрутка страницы, иначе большой палец у правого края перебрасывал страницу на экраны вперёд — так было во встроенном браузере Telegram), нажатие мышью на дорожку плавно ведёт страницу туда. На тач-экране зоны захвата — только в боковом поле (`--side`), дорожка ловит лишь тап (он ведёт страницу туда), свайп по ней листает страницу как обычно; захват отпускается и при потере фокуса окна, контекстном меню, движении без нажатой кнопки, отмене касания. Системный скроллбар скрыт в `noir.css` под `html.snake-bar` (ставит `MOTION_BOOT`, а страницам, которые рисует клиент — 404, — сама змея); без JS остаётся системный, змеи нет, а если бандл не пришёл — страховка `MOTION_BOOT` возвращает системный через 4 с после `load` (без `html.snake-ready`). В режиме принудительных цветов (высокий контраст Windows) змея рисуется системными цветами. Внутренние прокрутки (мобильное меню, лента обложек) и админка (свой корневой layout) — со своими скроллбарами |
-| Чтение контента | `getLanding(locale)` из `@/lib/content` (`"use cache"` + `cacheTag("content")` + `cacheLife("hours")`) |
-| Клиентский бандл | клиентские компоненты не импортируют zod и реестр с подписями админки: якоря — `@/lib/content/anchors`, намерения заявки — `@/lib/lead-intent`, конфигурация формы — `@/lib/lead-form-config` (валидатор `@/lib/leads` форма подгружает сама, когда до неё доходят), типы соцсетей — `@/lib/content/social` (`leads.ts`, `registry.ts`, `schemas.ts` их реэкспортируют). На публичных страницах нет клиентского next-intl и `next/image`: системные строки сервер передаёт пропсами (`src/components/site/labels.ts`), картинки — `<img>` с атрибутами `getImageProps` (`image-props.ts`) |
-| Сброс кэша после записи | Server Action: `revalidateContent()`; Route Handler: `revalidateContentFromRoute()` |
-| Медиа | файлы в `UPLOAD_DIR` (`./uploads`), `Media.path` относительный (`seed/x.webp`), URL `/uploads/<path>` (`mediaPublicUrl`) |
-| Бренд-ассеты | `public/brand/*` (SVG с `currentColor`, PNG-вырезки в `public/brand/cutout/`); публичные страницы запрашивают их по URL с хешем содержимого (`?v=…`: `next.config.ts` считает хеши `public/brand/*.svg` при сборке → `brandAssetUrl`; в CSS — свойства `--brand-…` на `<html>`, `brand/brand-assets.ts`), такие ответы кэшируются навсегда (`immutable`), без `?v` — `max-age=0, must-revalidate`; правка файла дойдёт до всех со следующей сборкой. Змея на обложке — `<use href="/brand/logo-red-tongue-ink.svg?v=…#ink">` (у `<g>` логотипа `id="ink"` — не удалять); сплошной красный язык под её контуром — `logo-red-tongue-fill.svg#fill` (силуэт языка из альфа-канала `assets/cutout/logo-red-tongue.png`, `node scripts/trace-tongue-fill.mjs`, нужен potrace). Потрейс-векторы сайта (`logo-red-tongue-ink`, `head-closeup-*`, `head-front-ink`, `tongue-red`, `wordmark-ink`) и буквы вордмарка `src/components/site/brand/wordmark-paths.ts` — сгенерированы `node scripts/optimize-brand-svg.mjs` из исходников `assets/vector/` (координаты на более грубой сетке K, компактная запись; руками не править — менять таблицу K в скрипте и сверять рендер старого и нового). Арт глав ниже первого экрана (маски, фигура в отзывах) и шрифт Shantell запрашиваются, только когда глава ближе 1,5 экрана к видимой области (подвал — ближе половины экрана): `html.near-gate` + `[data-near]` (`motion/boot.ts`, только production и только с JS; публичные страницы ссылаются друг на друга обычными `<a>` — при переходе через `next/link` шлюз надо снимать) |
-| Разметка для редактирования | `data-edit="<key>"`, `data-edit-img="<key>"`; поля сущностей — `data-entity="Product" data-entity-id="…"` + `data-field="title"` |
-| Форма заявок | одна форма «Письмо в редакцию» в контактах (`src/components/site/LeadForm.tsx`, якорь `#lead-form`); поле «Тема» = тип заявки (пошив → TAILORING, сотрудничество → PARTNERSHIP, вопрос/другое → CONTACT). Кнопки на сайте выбирают тему: ссылки с `data-lead-type` / `data-lead-subject` (на лендинге) или `/?topic=…&subject=…#lead-form` (с других страниц) — `src/components/site/lead-links.ts`. Без JS (или до гидратации) форма — обычный POST на `/api/leads` (urlencoded), ответ 303 → `/#lead-sent` / `#lead-invalid` / `#lead-failed`, сообщение показывает CSS `:target` |
-| Telegram | в dev/тестах только `TELEGRAM_DRY_RUN=1`, реальные сообщения не отправляются; такие заявки помечаются «не отправлено» (`telegramSent=false`), в production — жёлтый баннер в админке |
-| Заявки: лимиты | `src/lib/rate-limit.ts`: 5 заявок / 10 мин на IP (IPv6 — на /64), проверка и вставка в одной транзакции под `pg_advisory_xact_lock` (`src/app/api/leads/store.ts`); больше 60 заявок / 10 мин на весь сайт — сохраняются без уведомления в Telegram. `Lead.ipHash` = HMAC-SHA256(`IP_HASH_SALT`, сеть), соль обязательна в production |
-| Смена языка | `LanguageSwitcher` ведёт на ту же главу в другом языке (`/#reviews` → `/en#reviews`, `src/components/site/locale-switch.ts`); без JS — на начало страницы. Глубокие ссылки (`#product-…`, `#lead-form`) после загрузки выравниваются под шапку без учёта анимационных сдвигов (`SmoothScroll`) |
-| Партнёры в сиде | заглушки «Партнёр 01…03» создаются скрытыми (`published: false`): `Partner.name` один на все языки, поэтому до появления настоящих партнёров сайт показывает свои переведённые ячейки «Место для партнёра» / «Your brand here» |
-| Каталог | лендинг + страница коллекции `/catalog/<slug>` (`src/app/[locale]/catalog/[slug]/page.tsx`, в sitemap, BreadcrumbList + ItemList JSON-LD; Product в JSON-LD только у товаров с ценой) |
-| Заголовки безопасности | `next.config.ts` → `headers()` и `Caddyfile` (одинаковые; базовый CSP без script-src) |
-| Доступ к админке | `resolveAdminGate()` (`src/lib/admin/admin-gate.ts`), читается на каждый запрос: `ADMIN_PASSWORD` задан — вход по паролю (сессия = JWT, ключ scrypt(пароль, `ADMIN_SESSION_SECRET`)); пуст в dev — админка открыта (жёлтый баннер); пуст в production — админка **закрыта** (fail closed), открыть без пароля можно только явным `ADMIN_ALLOW_OPEN=1`; в production пароль ≥ 16 символов. `src/proxy.ts` → `adminProxyGate` отвечает 307 на `/admin/login?next=…` ещё до рендера (оптимистично); граница безопасности — `requireAdminPage` / `requireAdminAction` / `requireAdminRoute` (`src/lib/admin/auth.ts`) в каждом запросе, экшене и route handler |
-| Загрузка в админке | у каждого раздела и страницы с данными свой `loading.tsx` (скелетон) — иначе навигация блокируется (проверка instant navigation в dev) |
-| OG-картинка по умолчанию | `public/opengraph-image.png` (`/opengraph-image.png`), используется, если в «Настройках» не выбрана своя; фавикон — `src/app/favicon.ico` (из `icon.png`) |
+Админка в dev открыта без пароля (жёлтый баннер). Пароль включается переменной `ADMIN_PASSWORD`.
+
+## Что где менять
+
+- **Любой текст сайта** — админка «Тексты сайта». Значения по умолчанию лежат в `messages/ru.json` и `messages/en.json`, сид кладёт их в таблицу `Message`. Правки из админки сид не перезаписывает.
+- **Телефон, e-mail, адрес, SEO, шкала звёзд отзывов** — «Настройки».
+- **Пункты меню** (шапка и подвал) — «Меню». **Ссылки на соцсети и мессенджеры** — «Соцсети».
+- **Коллекции, товары, отзывы, новости, галерея, спецпредложения, партнёры** — одноимённые разделы. Новая коллекция появляется на сайте сразу после публикации.
+- **Картинки** — «Медиатека». Файлы хранятся в MinIO по ключу `admin/<id>/<uuid>/image.webp`, ссылка `/media/…` — в таблице `Media`.
+- **Интерфейс админки** — `messages/admin/ru.json`. **Демо-контент сида** — `messages/content/*.json`.
+
+Как добавлять новый текст в код — `.claude/skills/site-texts/SKILL.md`. Правила для агентов — `AGENTS.md`.
+
+## Скриншоты
+
+|                                                          |                                                          |
+| -------------------------------------------------------- | -------------------------------------------------------- |
+| ![Отзывы со звёздами](docs/screenshots/site-reviews.png) | ![Контакты и форма](docs/screenshots/site-contacts.png)  |
+| ![Страница коллекции](docs/screenshots/site-catalog.png) | ![Дашборд](docs/screenshots/admin-dashboard.png)         |
+| ![Тексты сайта](docs/screenshots/admin-texts.png)        | ![Меню](docs/screenshots/admin-menu.png)                 |
+| ![Соцсети](docs/screenshots/admin-socials.png)           | ![Отзыв: выбор звёзд](docs/screenshots/admin-review.png) |
+| ![Настройки](docs/screenshots/admin-settings.png)        | ![Медиатека](docs/screenshots/admin-media.png)           |
+
+## Документация
+
+- `docs/ARCHITECTURE.md` — стек, модель данных, тексты, картинки, админка.
+- `docs/CONVENTIONS.md` — соглашения по коду (дизайн, анимации, кэш, заявки, доступ к админке …).
+- `DEPLOY.md` — деплой на VPS (Docker Compose: app, Postgres, MinIO, Caddy), бэкапы.
+- `BRIEF.md` — бриф и исходные тексты.

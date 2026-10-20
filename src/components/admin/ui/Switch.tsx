@@ -1,7 +1,8 @@
-"use client";
+'use client';
 
-import { clsx } from "clsx";
-import type { ReactElement, ReactNode } from "react";
+import { clsx } from 'clsx';
+
+import type { ReactElement, ReactNode } from 'react';
 
 export type SwitchProps = {
   checked: boolean;
@@ -13,7 +14,7 @@ export type SwitchProps = {
   description?: ReactNode;
   disabled?: boolean;
   id?: string;
-  size?: "sm" | "md";
+  size?: 'sm' | 'md';
 };
 
 export function Switch({
@@ -24,11 +25,11 @@ export function Switch({
   description,
   disabled,
   id,
-  size = "md",
+  size = 'md',
 }: SwitchProps): ReactElement {
-  const track = size === "sm" ? "h-5 w-9" : "h-6 w-11";
-  const thumb = size === "sm" ? "size-4" : "size-5";
-  const shift = size === "sm" ? "translate-x-4" : "translate-x-5";
+  const track = size === 'sm' ? 'h-5 w-9' : 'h-6 w-11';
+  const thumb = size === 'sm' ? 'size-4' : 'size-5';
+  const shift = size === 'sm' ? 'translate-x-4' : 'translate-x-5';
 
   const control = (
     <button
@@ -40,18 +41,18 @@ export function Switch({
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={clsx(
-        "relative inline-flex shrink-0 items-center rounded-full border transition-colors",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-beige disabled:cursor-not-allowed disabled:opacity-50",
+        'relative inline-flex shrink-0 items-center rounded-full border transition-colors',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-beige disabled:cursor-not-allowed disabled:opacity-50',
         track,
-        checked ? "border-beige bg-beige" : "border-line-strong bg-raised-hi",
+        checked ? 'border-beige bg-beige' : 'border-line-strong bg-raised-hi',
       )}
     >
       <span
         aria-hidden
         className={clsx(
-          "inline-block rounded-full shadow transition-transform",
+          'inline-block rounded-full shadow transition-transform',
           thumb,
-          checked ? clsx(shift, "bg-ink") : "translate-x-0.5 bg-muted",
+          checked ? clsx(shift, 'bg-ink') : 'translate-x-0.5 bg-muted',
         )}
       />
     </button>
@@ -59,7 +60,7 @@ export function Switch({
 
   if (!label) return control;
   return (
-    <label className={clsx("flex items-start gap-3", disabled ? "cursor-not-allowed" : "cursor-pointer")}>
+    <label className={clsx('flex items-start gap-3', disabled ? 'cursor-not-allowed' : 'cursor-pointer')}>
       {control}
       <span className="flex flex-col gap-0.5">
         <span className="text-sm font-medium text-fg">{label}</span>

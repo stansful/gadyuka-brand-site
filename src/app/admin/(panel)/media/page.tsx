@@ -1,19 +1,23 @@
-import type { Metadata } from "next";
-import type { ReactElement } from "react";
-import { MediaLibrary } from "@/components/admin/media/MediaLibrary";
-import { PageHeader } from "@/components/admin/ui/layout";
-import { getMediaLibrary } from "@/lib/admin/queries";
+import { getTranslations } from 'next-intl/server';
 
-export const metadata: Metadata = { title: "Медиатека" };
+import { MediaLibrary } from '@/components/admin/media/MediaLibrary';
+import { PageHeader } from '@/components/admin/ui/layout';
+import { adminPageMetadata } from '@/lib/admin/i18n-server';
+import { MAX_IMAGE_DIMENSION } from '@/lib/admin/media-constants';
+import { getMediaLibrary } from '@/lib/admin/queries';
+
+import type { Metadata } from 'next';
+import type { ReactElement } from 'react';
+
+export function generateMetadata(): Promise<Metadata> {
+  return adminPageMetadata('media.title');
+}
 
 export default async function MediaPage(): Promise<ReactElement> {
-  const library = await getMediaLibrary();
+  const [library, t] = await Promise.all([getMediaLibrary(), getTranslations('admin.media')]);
   return (
     <>
-      <PageHeader
-        title="Медиатека"
-        description="Все изображения сайта. Загруженные файлы автоматически уменьшаются до 2400 px и сохраняются в WebP. Описание (alt) задаётся на каждом языке. Файл, который где-то используется, удалить нельзя."
-      />
+      <PageHeader title={t('title')} description={t('description', { max: MAX_IMAGE_DIMENSION })} />
       <MediaLibrary initial={{ items: library.items, nextCursor: library.nextCursor }} total={library.total} />
     </>
   );

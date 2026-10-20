@@ -1,5 +1,6 @@
-import type { CSSProperties, ReactElement } from "react";
-import { WORDMARK_LETTERS, WORDMARK_TRANSFORM, WORDMARK_VIEWBOX } from "./wordmark-paths";
+import type { CSSProperties, ReactElement } from 'react';
+
+import { WORDMARK_LETTERS, WORDMARK_TRANSFORM, WORDMARK_VIEWBOX } from './wordmark-paths';
 
 /**
  * Shared SVG defs, rendered once per page (in the [locale] layout):
@@ -50,9 +51,9 @@ function FallbackGlyphs(): ReactElement {
 }
 
 /** Stagger index of a letter for the cover intro's CSS (noir.css: `.wm-l` delay uses --i). */
-type LetterStyle = CSSProperties & Record<"--i", number>;
+type LetterStyle = CSSProperties & Record<'--i', number>;
 
-const letterStyle = (index: number): LetterStyle => ({ "--i": index });
+const letterStyle = (index: number): LetterStyle => ({ '--i': index });
 
 /** The wordmark as an inline SVG with one <g class="wm-l"> per letter (stamped in one by one). */
 export function WordmarkLetters(): ReactElement {

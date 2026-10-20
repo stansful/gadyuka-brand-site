@@ -1,5 +1,7 @@
-import type { Locale } from "@/i18n/locales";
-import type { ImageKey, TextKey } from "./registry";
+import type { Locale } from '@/i18n/locales';
+
+import type { ImageKey, TextKey } from './registry';
+import type { SocialType } from './social';
 
 /**
  * View models returned by the content read layer. Everything is already localized
@@ -10,7 +12,7 @@ import type { ImageKey, TextKey } from "./registry";
 export type ImageRef = {
   /** Media.id */
   id: string;
-  /** Public URL, e.g. "/uploads/seed/hoodie-white-logo.webp" */
+  /** Public URL (Media.url), e.g. "/media/admin/<ownerId>/<uuid>/image.webp" */
   src: string;
   width: number;
   height: number;
@@ -48,6 +50,7 @@ export type ReviewView = {
   role: string;
   text: string;
   avatar: ImageRef | null;
+  /** 1..settings.reviewRatingMax (clamped when the scale was lowered later); null = no rating. */
   rating: number | null;
 };
 
@@ -90,13 +93,32 @@ export type PartnerView = {
   logo: ImageRef | null;
 };
 
-export type SocialLink = { type: string; url: string };
+/** A published MenuItem; the header and the footer each list the items flagged for them. */
+export type MenuItemView = {
+  id: string;
+  /** Localized label (falls back to ru; items without any label are not returned). */
+  label: string;
+  /** As stored: "#catalog" (landing anchor), "/catalog/<slug>" (site path), "https://…", "mailto:", "tel:" */
+  href: string;
+  showInHeader: boolean;
+  showInFooter: boolean;
+};
+
+/** A published SocialLink (contacts section, JSON-LD sameAs). */
+export type SocialLinkView = {
+  id: string;
+  type: SocialType;
+  url: string;
+  /** Own localized label (falls back to ru); null = use the default label, message `social.<type>`. */
+  label: string | null;
+};
 
 export type SettingsView = {
   phone: string;
   email: string;
   address: string;
-  socials: SocialLink[];
+  /** Number of stars of the review rating scale (Review.rating is 1..reviewRatingMax). */
+  reviewRatingMax: number;
   seoTitle: string;
   seoDescription: string;
   ogImage: ImageRef | null;
@@ -105,10 +127,17 @@ export type SettingsView = {
 /** Everything the landing page renders, for one locale. */
 export type LandingContent = {
   locale: Locale;
-  /** Localized ContentBlock texts; "" when a block is missing or empty in every locale. */
+  /**
+   * Every site message for this locale (DB rows over the messages/<locale>.json defaults, see
+   * resolveMessageValues in src/i18n/messages.ts); "" only when emptied on purpose.
+   */
   texts: Record<TextKey, string>;
-  /** ContentBlock images; null when no media is assigned. */
+  /** ContentImage images; null when no media is assigned. */
   images: Record<ImageKey, ImageRef | null>;
+  /** Published menu items, ordered (MenuItem.order). */
+  menu: MenuItemView[];
+  /** Published social links, ordered (SocialLink.order). */
+  socials: SocialLinkView[];
   /** Published collections (ordered) with their published products (ordered). */
   collections: CollectionView[];
   reviews: ReviewView[];

@@ -1,12 +1,14 @@
-import { localeTags, type Locale } from "@/i18n/locales";
-import type { CollectionView, LandingContent, SettingsView } from "@/lib/content/types";
-import { BRAND, BRAND_LOGO, brandName, isPlaceholderValue } from "./brand";
-import { shareImage } from "./compose";
-import { absoluteUrl, collectionPath, getSiteUrl, localizedUrl } from "./site-url";
+import { localeTags, type Locale } from '@/i18n/locales';
+import type { CollectionView, LandingContent, SettingsView, SocialLinkView } from '@/lib/content/types';
+
+import { alternateBrandNames, BRAND, BRAND_LOGO, type BrandCopy, isPlaceholderValue, organizationName } from './brand';
+import { shareImage } from './compose';
+import { absoluteUrl, collectionPath, getSiteUrl, localizedUrl } from './site-url';
 
 /**
  * schema.org JSON-LD builders (pure, isomorphic). Render with <JsonLd data={…} />
- * (src/lib/seo/JsonLd.tsx), which escapes the payload for a <script> tag.
+ * (src/lib/seo/JsonLd.tsx), which escapes the payload for a <script> tag. Every name, slogan
+ * and city comes from the site messages (BrandCopy — brand.*, hero.slogan; getBrandCopy).
  */
 
 export type JsonLdValue = string | number | boolean | null | JsonLdObject | ReadonlyArray<JsonLdValue>;
@@ -18,13 +20,13 @@ const PARAGRAPH_SEPARATOR = String.fromCharCode(0x2029);
 /** JSON for <script type="application/ld+json">: `<`, `>`, `&`, U+2028/2029 are escaped. */
 export function serializeJsonLd(data: JsonLdObject): string {
   return JSON.stringify(data)
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e")
-    .replace(/&/g, "\\u0026")
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
     .split(LINE_SEPARATOR)
-    .join("\\u2028")
+    .join('\\u2028')
     .split(PARAGRAPH_SEPARATOR)
-    .join("\\u2029");
+    .join('\\u2029');
 }
 
 export function organizationId(siteUrl: string): string {
@@ -36,12 +38,12 @@ export function websiteId(siteUrl: string): string {
 }
 
 /** Social profile URLs with a real path (bare "https://t.me/" placeholders are skipped). */
-function sameAsUrls(settings: SettingsView): string[] {
+function sameAsUrls(socials: ReadonlyArray<Pick<SocialLinkView, 'url'>>): string[] {
   const out: string[] = [];
-  for (const social of settings.socials) {
+  for (const social of socials) {
     try {
       const url = new URL(social.url);
-      if (url.pathname.replace(/\/+$/, "").length > 0 && !out.includes(url.href)) out.push(url.href);
+      if (url.pathname.replace(/\/+$/, '').length > 0 && !out.includes(url.href)) out.push(url.href);
     } catch {
       // ignore malformed URLs
     }
@@ -49,42 +51,57 @@ function sameAsUrls(settings: SettingsView): string[] {
   return out;
 }
 
+/** The brand messages structured data needs. */
+export type JsonLdBrand = Pick<BrandCopy, 'name' | 'names' | 'city'>;
+
 export type OrganizationInput = {
   locale: Locale;
   settings: SettingsView;
+  /** Published social links (LandingContent.socials) → sameAs. */
+  socials: ReadonlyArray<Pick<SocialLinkView, 'url'>>;
+  brand: JsonLdBrand;
   siteUrl?: string;
+  /** The cover's slogan (hero.slogan); "" = left out. */
   slogan?: string;
 };
 
-/** ClothingStore (a schema.org Organization / LocalBusiness) for the brand. */
+/**
+ * ClothingStore (a schema.org Organization / LocalBusiness) for the brand. Its name is the
+ * same on every page — the default locale's spelling («ГАДЮКА») — with the other spellings
+ * («GADYUKA») as alternate names.
+ */
 export function organizationJsonLd({
   locale,
   settings,
+  socials,
+  brand,
   siteUrl = getSiteUrl(),
   slogan,
 }: OrganizationInput): JsonLdObject {
   const address = settings.address && !isPlaceholderValue(settings.address) ? settings.address : undefined;
-  const sameAs = sameAsUrls(settings);
+  const sameAs = sameAsUrls(socials);
+  const name = organizationName(brand);
+  const alternateName = alternateBrandNames(brand, name);
   return {
-    "@type": "ClothingStore",
-    "@id": organizationId(siteUrl),
-    name: BRAND.name,
-    alternateName: BRAND.alternateName,
-    url: localizedUrl(locale, "/", siteUrl),
+    '@type': 'ClothingStore',
+    '@id': organizationId(siteUrl),
+    name,
+    alternateName: alternateName.length > 0 ? alternateName : undefined,
+    url: localizedUrl(locale, '/', siteUrl),
     logo: {
-      "@type": "ImageObject",
+      '@type': 'ImageObject',
       url: absoluteUrl(BRAND_LOGO.path, siteUrl),
       width: BRAND_LOGO.width,
       height: BRAND_LOGO.height,
     },
-    image: shareImage(settings.ogImage, BRAND.name, siteUrl).url,
+    image: shareImage(settings.ogImage, name, siteUrl).url,
     description: settings.seoDescription || undefined,
-    slogan: slogan || BRAND.slogan[locale],
+    slogan: slogan || undefined,
     telephone: settings.phone && !isPlaceholderValue(settings.phone) ? settings.phone : undefined,
     email: settings.email && !isPlaceholderValue(settings.email) ? settings.email : undefined,
     address: {
-      "@type": "PostalAddress",
-      addressLocality: BRAND.city[locale],
+      '@type': 'PostalAddress',
+      addressLocality: brand.city || undefined,
       addressCountry: BRAND.countryCode,
       streetAddress: address,
     },
@@ -100,24 +117,26 @@ export function organizationJsonLd({
  */
 export function websiteJsonLd({
   locale,
+  brand,
   description,
   siteUrl = getSiteUrl(),
 }: {
   locale: Locale;
+  brand: JsonLdBrand;
   description?: string;
   siteUrl?: string;
 }): JsonLdObject {
-  const name = brandName(locale);
-  const alternates = [BRAND.name, BRAND.alternateName].filter((other) => other !== name);
+  const name = brand.name;
+  const alternates = alternateBrandNames(brand, name);
   return {
-    "@type": "WebSite",
-    "@id": websiteId(siteUrl),
-    url: localizedUrl(locale, "/", siteUrl),
+    '@type': 'WebSite',
+    '@id': websiteId(siteUrl),
+    url: localizedUrl(locale, '/', siteUrl),
     name,
     alternateName: alternates.length > 0 ? alternates : undefined,
     description: description || undefined,
     inLanguage: localeTags[locale],
-    publisher: { "@id": organizationId(siteUrl) },
+    publisher: { '@id': organizationId(siteUrl) },
   };
 }
 
@@ -138,17 +157,19 @@ export function productUrl(collectionUrl: string, productSlug: string): string {
 export function collectionItemListJsonLd({
   collection,
   collectionUrl,
+  brand,
   siteUrl = getSiteUrl(),
 }: {
   collection: CollectionView;
   /** Absolute URL of the collection page in the current locale. */
   collectionUrl: string;
+  brand: Pick<BrandCopy, 'names'>;
   siteUrl?: string;
 }): JsonLdObject | null {
   if (collection.products.length === 0) return null;
   return {
-    "@type": "ItemList",
-    "@id": `${collectionUrl}#items`,
+    '@type': 'ItemList',
+    '@id': `${collectionUrl}#items`,
     url: collectionUrl,
     name: collection.title,
     description: collection.description || undefined,
@@ -156,29 +177,29 @@ export function collectionItemListJsonLd({
     itemListElement: collection.products.map((product, index): JsonLdObject => {
       const url = productUrl(collectionUrl, product.slug);
       if (product.price === null) {
-        return { "@type": "ListItem", position: index + 1, name: product.title, url };
+        return { '@type': 'ListItem', position: index + 1, name: product.title, url };
       }
       return {
-        "@type": "ListItem",
+        '@type': 'ListItem',
         position: index + 1,
         item: {
-          "@type": "Product",
-          "@id": url,
+          '@type': 'Product',
+          '@id': url,
           name: product.title,
           description: product.description || collection.description || undefined,
           sku: product.slug,
-          image: product.images.length > 0 ? product.images.map((image) => absoluteUrl(image.src, siteUrl)) : undefined,
-          brand: { "@type": "Brand", name: BRAND.name },
+          image: product.images.length > 0 ? product.images.map(image => absoluteUrl(image.src, siteUrl)) : undefined,
+          brand: { '@type': 'Brand', name: organizationName(brand) },
           category: collection.title,
           url,
           offers: {
-            "@type": "Offer",
+            '@type': 'Offer',
             price: product.price,
             priceCurrency: BRAND.currency,
-            availability: "https://schema.org/InStock",
-            itemCondition: "https://schema.org/NewCondition",
+            availability: 'https://schema.org/InStock',
+            itemCondition: 'https://schema.org/NewCondition',
             url,
-            seller: { "@id": organizationId(siteUrl) },
+            seller: { '@id': organizationId(siteUrl) },
           },
         },
       };
@@ -191,9 +212,9 @@ export type BreadcrumbItem = { name: string; url: string };
 /** BreadcrumbList, e.g. [Главная → Каталог → «Меня запомнят»] on a collection page. */
 export function breadcrumbJsonLd(items: ReadonlyArray<BreadcrumbItem>): JsonLdObject {
   return {
-    "@type": "BreadcrumbList",
+    '@type': 'BreadcrumbList',
     itemListElement: items.map((item, index) => ({
-      "@type": "ListItem",
+      '@type': 'ListItem',
       position: index + 1,
       name: item.name,
       item: item.url,
@@ -204,21 +225,26 @@ export function breadcrumbJsonLd(items: ReadonlyArray<BreadcrumbItem>): JsonLdOb
 /** Wrap entities into one document: { "@context", "@graph": [...] }. */
 export function jsonLdGraph(entities: ReadonlyArray<JsonLdObject | null>): JsonLdObject {
   return {
-    "@context": "https://schema.org",
-    "@graph": entities.filter((entity): entity is JsonLdObject => entity !== null),
+    '@context': 'https://schema.org',
+    '@graph': entities.filter((entity): entity is JsonLdObject => entity !== null),
   };
 }
 
 /** Landing page graph: ClothingStore + WebSite + an ItemList per collection (→ collection pages). */
-export function landingJsonLd(content: LandingContent, siteUrl: string = getSiteUrl()): JsonLdObject {
-  const { locale, settings } = content;
+export function landingJsonLd(
+  content: LandingContent,
+  brand: JsonLdBrand,
+  siteUrl: string = getSiteUrl(),
+): JsonLdObject {
+  const { locale, settings, socials } = content;
   return jsonLdGraph([
-    organizationJsonLd({ locale, settings, siteUrl, slogan: content.texts["hero.slogan"] }),
-    websiteJsonLd({ locale, description: settings.seoDescription, siteUrl }),
-    ...content.collections.map((collection) =>
+    organizationJsonLd({ locale, settings, socials, brand, siteUrl, slogan: content.texts['hero.slogan'] }),
+    websiteJsonLd({ locale, brand, description: settings.seoDescription, siteUrl }),
+    ...content.collections.map(collection =>
       collectionItemListJsonLd({
         collection,
         collectionUrl: localizedUrl(locale, collectionPath(collection.slug), siteUrl),
+        brand,
         siteUrl,
       }),
     ),
@@ -233,17 +259,18 @@ export function landingJsonLd(content: LandingContent, siteUrl: string = getSite
 export function collectionPageJsonLd(
   content: LandingContent,
   collection: CollectionView,
+  brand: JsonLdBrand,
   siteUrl: string = getSiteUrl(),
 ): JsonLdObject {
-  const { locale, settings, texts } = content;
-  const homeUrl = localizedUrl(locale, "/", siteUrl);
+  const { locale, settings, socials, texts } = content;
+  const homeUrl = localizedUrl(locale, '/', siteUrl);
   const collectionUrl = localizedUrl(locale, collectionPath(collection.slug), siteUrl);
   return jsonLdGraph([
-    organizationJsonLd({ locale, settings, siteUrl, slogan: texts["hero.slogan"] }),
+    organizationJsonLd({ locale, settings, socials, brand, siteUrl, slogan: texts['hero.slogan'] }),
     breadcrumbJsonLd([
-      { name: texts["header.nav.home"] || brandName(locale), url: homeUrl },
+      { name: texts['catalog.breadcrumbHome'] || brand.name, url: homeUrl },
       { name: collection.title, url: collectionUrl },
     ]),
-    collectionItemListJsonLd({ collection, collectionUrl, siteUrl }),
+    collectionItemListJsonLd({ collection, collectionUrl, brand, siteUrl }),
   ]);
 }

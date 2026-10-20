@@ -1,4 +1,4 @@
-import { getLenis } from "./lenis-store";
+import { getLenis } from './lenis-store';
 
 /**
  * The page's scroll position and the smooth scroll of the public pages: in-page anchors
@@ -7,7 +7,7 @@ import { getLenis } from "./lenis-store";
  */
 
 /** Things the visitor does that end a tween and SmoothScroll's deep-link alignment (they are scrolling on their own). */
-export const USER_SCROLL_EVENTS = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+export const USER_SCROLL_EVENTS = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
 
 /** Duration of an anchor scroll (s), with Lenis and without. */
 const ANCHOR_DURATION = 1.5;
@@ -32,10 +32,10 @@ export type ScrollPort = { read: () => number; write: (top: number) => void };
  */
 export const pageScroll: ScrollPort = {
   read: () => getLenis()?.scroll ?? window.scrollY,
-  write: (top) => {
+  write: top => {
     const lenis = getLenis();
     if (lenis) lenis.scrollTo(top, { immediate: true, force: true });
-    else window.scrollTo({ top, behavior: "instant" });
+    else window.scrollTo({ top, behavior: 'instant' });
   },
 };
 
@@ -60,7 +60,12 @@ export type TweenOptions = {
  * ratio), so a moved target (or a scroll-anchoring adjustment) is absorbed smoothly by the rest of
  * the tween, and the last frame lands on it exactly.
  */
-export function tweenScroll(port: ScrollPort, target: () => number, onDone: () => void, options: TweenOptions = {}): () => void {
+export function tweenScroll(
+  port: ScrollPort,
+  target: () => number,
+  onDone: () => void,
+  options: TweenOptions = {},
+): () => void {
   const { duration = ANCHOR_DURATION, ignore, onInterrupt } = options;
   let frame = 0;
   const stop = (): void => {

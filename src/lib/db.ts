@@ -1,6 +1,7 @@
-import "server-only";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@/generated/prisma/client";
+import 'server-only';
+import { PrismaPg } from '@prisma/adapter-pg';
+
+import { PrismaClient } from '@/generated/prisma/client';
 
 /**
  * PrismaClient singleton (Prisma 7 + @prisma/adapter-pg driver adapter).
@@ -13,12 +14,12 @@ import { PrismaClient } from "@/generated/prisma/client";
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
-    throw new Error("DATABASE_URL is not set. Copy .env.example to .env and start the database (npm run db:up).");
+    throw new Error('DATABASE_URL is not set. Copy .env.example to .env and start the database (npm run db:up).');
   }
   const adapter = new PrismaPg({ connectionString });
   return new PrismaClient({
     adapter,
-    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
 }
 
@@ -26,7 +27,7 @@ const globalForPrisma = globalThis as typeof globalThis & { __gadyukaPrisma?: Pr
 
 export const db: PrismaClient = globalForPrisma.__gadyukaPrisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== "production") {
+if (process.env.NODE_ENV !== 'production') {
   // Survive HMR in dev without opening a new pool on every reload.
   globalForPrisma.__gadyukaPrisma = db;
 }

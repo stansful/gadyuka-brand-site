@@ -1,5 +1,11 @@
-# Local development database for the ГАДЮКА site.
+# Local development services for the ГАДЮКА site: PostgreSQL + MinIO (S3 for media).
 # Start: npm run db:up   (docker compose -f docker-compose.dev.yml up -d)
+#
+# Ports are published on loopback only: Docker publishes ports past the host firewall, so
+# 0.0.0.0 would expose these trivially-passworded dev services to the whole LAN / Wi-Fi.
+#
+# MinIO: the official minio/minio image is no longer published, so the community-maintained
+# fork pgsty/minio is used (same binary, pinned release). Console: http://127.0.0.1:9001
 services:
   db:
     image: postgres:17-alpine
@@ -10,16 +16,46 @@ services:
       POSTGRES_PASSWORD: gadyuka
       POSTGRES_DB: gadyuka
     ports:
-      # Loopback only: Docker publishes ports past the host firewall, so 0.0.0.0 would
-      # expose this trivially-passworded dev database to the whole LAN / Wi-Fi.
-      - "127.0.0.1:5432:5432"
+      - '127.0.0.1:5432:5432'
     volumes:
       - gadyuka-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gadyuka -d gadyuka"]
+      test: ['CMD-SHELL', 'pg_isready -U gadyuka -d gadyuka']
       interval: 5s
       timeout: 5s
       retries: 10
 
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    container_name: gadyuka-minio
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: gadyuka
+      MINIO_ROOT_PASSWORD: gadyuka-minio
+    ports:
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
+    volumes:
+      - gadyuka-minio-data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # One-off: creates the media bucket (private — the app serves files under /media/*).
+  minio-init:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    container_name: gadyuka-minio-init
+    restart: 'no'
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - mc alias set local http://minio:9000 gadyuka gadyuka-minio && mc mb --ignore-existing local/gadyuka-media
+
 volumes:
   gadyuka-db-data:
+  gadyuka-minio-data:

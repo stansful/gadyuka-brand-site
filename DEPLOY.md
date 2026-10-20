@@ -5,19 +5,23 @@
 ## Как это устроено
 
 ```
-Интернет ──► caddy :80/:443 ──► /uploads/*  → файлы из тома uploads (напрямую, без Node.js)
-             (HTTPS, Let's       └► всё остальное → app:3000 (Next.js, сайт + /admin + /api/leads)
-              Encrypt)                                 │
-                                                       ▼
-                                                 db (PostgreSQL 17, только внутри сервера)
+Интернет ──► caddy :80/:443 ──► app:3000 (Next.js: сайт + /admin + /api/leads + /media/*)
+             (HTTPS, Let's            │                          │
+              Encrypt)                ▼                          ▼
+                       db (PostgreSQL 17)        minio (S3-хранилище картинок, бакет S3_BUCKET)
+                       — только внутри сервера   — только внутри сервера, наружу не открыт
 ```
 
-| Сервис | Что делает | Данные (тома Docker) |
-|---|---|---|
-| `caddy` | HTTPS-сертификат для `DOMAIN`, раздача `/uploads/*`, прокси на приложение | `gadyuka_caddy_data` (сертификаты) |
-| `app` | сайт Next.js; подключается к БД ролью `APP_DB_USER` — только чтение/запись строк, без права менять схему | `gadyuka_uploads` (картинки) |
-| `db` | PostgreSQL 17; порт открыт **только** на `127.0.0.1`; при первом запуске создаёт роль `APP_DB_USER` (`deploy/postgres/initdb/`) | `gadyuka_pgdata` (база) |
-| `tools` | разовые задачи: миграции, наполнение базы (сид) — от суперпользователя `POSTGRES_USER`. Не запускается сам | — |
+| Сервис       | Что делает                                                                                                                                                         | Данные (тома Docker)               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| `caddy`      | HTTPS-сертификат для `DOMAIN`, прокси на приложение                                                                                                                | `gadyuka_caddy_data` (сертификаты) |
+| `app`        | сайт Next.js; подключается к БД ролью `APP_DB_USER` — только чтение/запись строк, без права менять схему; отдаёт картинки по адресам `/media/…`, читая их из MinIO | —                                  |
+| `db`         | PostgreSQL 17; порт открыт **только** на `127.0.0.1`; при первом запуске создаёт роль `APP_DB_USER` (`deploy/postgres/initdb/`)                                    | `gadyuka_pgdata` (база)            |
+| `minio`      | S3-хранилище картинок (загрузки из админки и стартовые картинки сида); порт не опубликован, веб-консоль выключена                                                  | `gadyuka_minio_data` (картинки)    |
+| `minio-init` | при каждом `docker compose up` создаёт бакет и отдельного пользователя MinIO для приложения (права только на этот бакет) и завершается                             | —                                  |
+| `tools`      | разовые задачи: миграции, наполнение базы (сид, вместе с загрузкой стартовых картинок в MinIO) — от суперпользователя `POSTGRES_USER`. Не запускается сам          | —                                  |
+
+Картинки хранятся в бакете MinIO закрыто: браузер получает их только через приложение по адресу `/media/<admin|user>/<id владельца>/<uuid>/image.webp` (кэш на год — файл по одному адресу никогда не меняется). Образ MinIO — `pgsty/minio` (поддерживаемая сообществом сборка того же сервера: официальный образ `minio/minio` больше не публикуется); версия закреплена в `docker-compose.yml`.
 
 Важная особенность: при сборке образа (`docker compose build app`) Next.js заранее рендерит страницы `/` и `/en` **из базы данных**. Поэтому база должна быть запущена и с применёнными миграциями **до** сборки приложения — порядок команд ниже это учитывает.
 
@@ -116,11 +120,11 @@ sudo ufw status verbose
 
 У регистратора домена создайте записи (TTL 300–3600):
 
-| Тип | Имя | Значение |
-|---|---|---|
-| `A` | `@` | IPv4 сервера |
-| `AAAA` | `@` | IPv6 сервера (если есть) |
-| `A` | `www` | IPv4 сервера (необязательно, см. ниже) |
+| Тип    | Имя   | Значение                               |
+| ------ | ----- | -------------------------------------- |
+| `A`    | `@`   | IPv4 сервера                           |
+| `AAAA` | `@`   | IPv6 сервера (если есть)               |
+| `A`    | `www` | IPv4 сервера (необязательно, см. ниже) |
 
 Проверка (должен вернуться IP сервера):
 
@@ -142,10 +146,10 @@ cd /opt/gadyuka
 git clone <URL-репозитория> .
 ```
 
-Если репозитория нет — скопируйте проект со своего компьютера (без `node_modules`, `.next`, `uploads`, `.env`):
+Если репозитория нет — скопируйте проект со своего компьютера (без `node_modules`, `.next`, `.env`):
 
 ```bash
-rsync -av --exclude node_modules --exclude .next --exclude uploads --exclude .env --exclude src/generated \
+rsync -av --exclude node_modules --exclude .next --exclude .env --exclude src/generated \
   ./ deploy@<IP-сервера>:/opt/gadyuka/
 ```
 
@@ -160,6 +164,8 @@ openssl rand -hex 24      # → APP_DB_PASSWORD (роль приложения)
 openssl rand -hex 32      # → IP_HASH_SALT
 openssl rand -base64 24   # → ADMIN_PASSWORD (пароль админки)
 openssl rand -hex 32      # → ADMIN_SESSION_SECRET
+openssl rand -hex 24      # → MINIO_ROOT_PASSWORD (администратор MinIO)
+openssl rand -hex 24      # → S3_SECRET_ACCESS_KEY (пользователь MinIO для приложения)
 nano .env
 ```
 
@@ -183,7 +189,18 @@ TELEGRAM_BOT_TOKEN=<токен от @BotFather, раздел 10>
 TELEGRAM_OWNER_ID=<ваш chat id, раздел 10>
 TELEGRAM_DRY_RUN=0
 
-UPLOAD_DIR=/app/uploads
+# Хранилище картинок (MinIO). Администратор MinIO — только для контейнеров minio и minio-init (и бэкапов)
+MINIO_ROOT_USER=gadyuka-root
+MINIO_ROOT_PASSWORD=<результат openssl rand -hex 24>
+# Пользователь MinIO, которым работает сайт: minio-init создаёт его с правами только на бакет S3_BUCKET
+S3_BUCKET=gadyuka-media
+S3_ACCESS_KEY_ID=gadyuka-app
+S3_SECRET_ACCESS_KEY=<ещё один результат openssl rand -hex 24>
+S3_REGION=us-east-1
+# Адрес хранилища задаёт docker-compose.yml (http://minio:9000); строка ниже — только для порядка
+S3_ENDPOINT=http://minio:9000
+S3_FORCE_PATH_STYLE=1
+
 # Обязательно (не короче 16 символов): без него форма заявок не работает
 IP_HASH_SALT=<результат openssl rand -hex 32>
 
@@ -200,7 +217,9 @@ GOOGLE_SITE_VERIFICATION=
 ```
 
 Правила:
-- пароли БД — только из `openssl rand -hex …` (без спецсимволов, чтобы не ломать `DATABASE_URL`);
+
+- пароли БД и MinIO — только из `openssl rand -hex …` (без спецсимволов, чтобы не ломать `DATABASE_URL` и команды `mc`);
+- `S3_ACCESS_KEY_ID` не должен совпадать с `MINIO_ROOT_USER`: сайт работает отдельным пользователем MinIO без прав администратора. Пароль этого пользователя можно сменить в `.env` в любой момент — `minio-init` применит его при следующем `docker compose up -d`;
 - `ADMIN_PASSWORD` задаётся **до** первого запуска: админка доступна из интернета сразу после `docker compose up`. Без пароля (или с паролем короче 16 символов) production-админка не открывается никому, а на `/admin/login` объяснено, что настроить. Сохраните пароль в менеджере паролей;
 - `SITE_URL` — ровно `https://<DOMAIN>`, без слеша в конце: из него строятся canonical, hreflang, sitemap и Open Graph (значение «запекается» при сборке — после изменения пересоберите `app`);
 - `.env` никогда не попадает в образ: при сборке он передаётся как секрет BuildKit только на время `next build`.
@@ -214,11 +233,15 @@ GOOGLE_SITE_VERIFICATION=
 docker compose up -d db
 docker compose logs db | grep app-role     # → [app-role] role "gadyuka_app" is ready
 
+# 1а) хранилище картинок: бакет и пользователь MinIO для сайта
+docker compose up -d minio minio-init
+docker compose logs minio-init             # → Bucket created … / Added user `gadyuka-app` … / Attached Policies: [app-media]
+
 # 2) образ для служебных задач и миграции (от суперпользователя POSTGRES_USER)
 docker compose --profile tools build tools
 docker compose --profile tools run --rm tools npx prisma migrate deploy
 
-# 3) наполнение базы стартовым контентом (тексты ru/en, коллекция «Меня запомнят», картинки)
+# 3) наполнение базы стартовым контентом (тексты ru/en, коллекция «Меня запомнят»; картинки — в MinIO)
 docker compose --profile tools run --rm tools npm run db:seed
 
 # 4) сборка приложения (нужна запущенная и мигрированная БД, ~3–6 минут)
@@ -231,8 +254,10 @@ docker compose logs -f app caddy        # Ctrl+C — выйти из логов
 ```
 
 Проверьте:
+
 - `https://<домен>/` и `https://<домен>/en` — сайт на русском и английском;
 - `https://<домен>/robots.txt`, `https://<домен>/sitemap.xml`, `https://<домен>/manifest.webmanifest`;
+- картинки на главной загружаются; любая из них открывается по адресу вида `https://<домен>/media/admin/…/image.webp` (адрес — в админке → «Медиатека» → картинка → «Открыть файл»);
 - `https://<домен>/admin` — открывается страница входа; войдите паролем `ADMIN_PASSWORD`;
 - заявка из формы «Связаться» приходит в Telegram и видна в админке → «Заявки».
 
@@ -260,7 +285,7 @@ git pull                                                     # или rsync но
 
 docker compose --profile tools build tools                   # новый код + миграции
 docker compose --profile tools run --rm tools npx prisma migrate deploy
-docker compose --profile tools run --rm tools npm run db:seed   # только добавляет новые блоки контента
+docker compose --profile tools run --rm tools npm run db:seed   # новые тексты из messages/*.json, правки админки не трогает
 docker compose build app                                     # сборка из актуальной БД
 docker compose up -d                                         # пересоздаёт изменившиеся контейнеры
 docker image prune -f                                        # удалить старые образы
@@ -268,7 +293,11 @@ docker image prune -f                                        # удалить с
 
 Миграции и сид выполняются **до** сборки, потому что сборка читает базу. Делает это только `tools` (суперпользователь): контейнер `app` работает ролью без права менять схему, поэтому сам миграции не запускает (`SKIP_MIGRATIONS=1` в `docker-compose.yml`). Новые таблицы из миграций автоматически получают права для роли приложения. Простой при обновлении — несколько секунд на пересоздание контейнера.
 
-Повторный сид на рабочей базе безопасен: он только создаёт блоки контента, которых ещё нет (подписи и кнопки, добавленные новой версией сайта, — с текстом по умолчанию на всех языках), а тексты, картинки и записи, заполненные в админке, не меняет. Если шаг пропустить, сайт и админка всё равно покажут для новых блоков текст по умолчанию (в базу он попадёт при первом сохранении раздела в админке).
+Повторный сид на рабочей базе безопасен: он создаёт тексты (`Message`), которых ещё нет, обновляет тексты, которые никто не правил в админке, до нового значения из `messages/*.json`, а тексты, картинки и записи, изменённые в админке, не трогает. Если шаг пропустить, сайт всё равно покажет новые тексты — из JSON по умолчанию.
+
+> **20.10.2026 миграции пересобраны в одну init-миграцию** (тексты в БД, медиа в MinIO). Сервер, развёрнутый раньше, не обновляется через `migrate deploy`: реальных данных там не было, поэтому разверните его заново — `docker compose down -v` (удалит базу и старый том `uploads`), затем раздел 8 целиком.
+
+Не задавайте `HOSTNAME=127.0.0.1` для контейнера `app`: при таком адресе Next.js считает запросы «локальными» и прокси языков уходит в цикл редиректов. В `docker-compose.yml` стоит `0.0.0.0` — так и оставьте.
 
 Правки контента в админке появляются на сайте сразу, пересборка для них не нужна.
 
@@ -336,7 +365,7 @@ docker compose up -d --force-recreate app
 
 Открыть админку без пароля можно только явно: `ADMIN_PASSWORD=` пусто и `ADMIN_ALLOW_OPEN=1`, затем пересоздать контейнер. Так делать не рекомендуется: любой посетитель увидит заявки с телефонами и почтой.
 
-## 13. Бэкапы (PostgreSQL + картинки)
+## 13. Бэкапы (PostgreSQL + картинки из MinIO)
 
 ### 13.1. Скрипт
 
@@ -350,23 +379,32 @@ nano /opt/gadyuka/backup.sh
 
 ```sh
 #!/bin/sh
-# Ежедневный бэкап ГАДЮКИ: дамп PostgreSQL + архив тома uploads. Хранит 14 дней.
+# Ежедневный бэкап ГАДЮКИ: дамп PostgreSQL (хранит 14 дней) + копия бакета картинок MinIO.
 set -eu
 # Дампы содержат все заявки (имена, телефоны, e-mail) — файлы доступны только владельцу.
 umask 077
 cd /opt/gadyuka
 STAMP=$(date +%Y-%m-%d_%H%M)
 DIR=/opt/gadyuka/backups
-mkdir -p "$DIR"
+mkdir -p "$DIR/media"
 chmod 700 "$DIR"
 
 docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$DIR/db_$STAMP.dump"
-docker run --rm -v gadyuka_uploads:/data:ro -v "$DIR":/backup alpine:3.22 \
-  tar czf "/backup/uploads_$STAMP.tar.gz" -C /data .
 
-find "$DIR" -type f \( -name 'db_*.dump' -o -name 'uploads_*.tar.gz' \) -mtime +14 -delete
+# Картинки: зеркало бакета обычными файлами (backups/media/<ключ>). Только докачивает новое и
+# ничего не удаляет: файл по одному адресу никогда не меняется, поэтому в зеркале есть картинки
+# для любого из хранимых дампов, даже удалённые потом в админке.
+BUCKET=$(sed -n 's/^S3_BUCKET=//p' .env | tail -n 1)
+docker compose run --rm --no-deps -T -u "$(id -u):$(id -g)" -e BUCKET="${BUCKET:-gadyuka-media}" \
+  -v "$DIR/media":/backup/media --entrypoint /bin/sh minio -c \
+  'mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null &&
+   mc mirror --quiet --overwrite "local/$BUCKET" /backup/media >/dev/null'
+
+find "$DIR" -maxdepth 1 -type f -name 'db_*.dump' -mtime +14 -delete
 echo "backup ok: $STAMP"
 ```
+
+Зеркало `backups/media/` растёт вместе с медиатекой (каждая загрузка — один WebP до 2400 px, обычно 100–600 КБ). Если нужно освободить место, удалите его целиком — следующий запуск скачает текущее содержимое бакета заново.
 
 ```bash
 chmod +x /opt/gadyuka/backup.sh
@@ -389,7 +427,7 @@ crontab -e
 rsync -av deploy@<IP-сервера>:/opt/gadyuka/backups/ ~/gadyuka-backups/
 ```
 
-(или настройте `rclone` в S3-совместимое хранилище и добавьте его вызов в конец `backup.sh`).
+(или настройте `rclone` в S3-совместимое хранилище и добавьте его вызов в конец `backup.sh`). Каталог `backups/media/` создаётся контейнером от имени пользователя `deploy`, поэтому `rsync` забирает его вместе с дампами.
 
 ### 13.3. Восстановление
 
@@ -400,11 +438,17 @@ docker compose stop app
 docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c --if-exists' < backups/db_2026-10-16_0330.dump
 # права роли приложения на восстановленные таблицы
 docker compose exec db sh /docker-entrypoint-initdb.d/10-app-role.sh
-# картинки
-docker run --rm -v gadyuka_uploads:/data -v /opt/gadyuka/backups:/backup alpine:3.22 \
-  sh -c 'tar xzf /backup/uploads_2026-10-16_0330.tar.gz -C /data'
+# картинки: бакет и пользователь приложения (на новом сервере), затем файлы из зеркала
+docker compose up -d minio minio-init
+BUCKET=$(sed -n 's/^S3_BUCKET=//p' .env | tail -n 1)
+docker compose run --rm --no-deps -T -e BUCKET="${BUCKET:-gadyuka-media}" \
+  -v /opt/gadyuka/backups/media:/backup/media:ro --entrypoint /bin/sh minio -c \
+  'mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null &&
+   mc mirror --overwrite /backup/media "local/$BUCKET"'
 docker compose up -d app
 ```
+
+Восстанавливать картинки можно и поверх работающего хранилища: `mc mirror` только добавляет недостающие файлы. Тип файла (`image/webp`) MinIO определяет по расширению.
 
 После восстановления сохраните любую запись в админке — это обновит кэш сайта.
 
@@ -416,23 +460,27 @@ docker compose logs -f --tail=200 app     # логи приложения (за�
 docker compose logs -f caddy              # HTTPS / сертификаты
 docker compose restart app                # перезапуск приложения
 docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'   # консоль БД
+docker compose logs minio minio-init      # хранилище картинок
 docker system df                          # место, занятое Docker
 df -h                                     # место на диске
 ```
 
 Частые проблемы:
 
-| Симптом | Что проверить |
-|---|---|
-| `docker compose build app` падает с ошибкой подключения к БД | запущена ли `db` (`docker compose up -d db`), совпадает ли пароль в `DATABASE_URL` и `APP_DB_PASSWORD`, создана ли роль (раздел 8.1), хост в `DATABASE_URL` — `127.0.0.1` |
-| `permission denied for table …` в логах `app` | роль приложения без прав — выполните `docker compose exec db sh /docker-entrypoint-initdb.d/10-app-role.sh` |
-| `/admin` пишет «Админка закрыта» | не задан `ADMIN_PASSWORD` или он короче 16 символов (раздел 12) |
-| форма заявок отвечает ошибкой 500, в логах `IP_HASH_SALT` | задайте `IP_HASH_SALT` (раздел 7) и пересоздайте `app` |
-| сборка падает на «relation … does not exist» | не применены миграции — выполните шаг 2 из раздела 8 |
-| сертификат не выпускается | DNS указывает на сервер? открыты 80 и 443? `docker compose logs caddy` |
-| заявки не приходят в Telegram | `TELEGRAM_DRY_RUN=0`? бот запущен вами (/start)? верен `TELEGRAM_OWNER_ID`? в админке у заявки видна ошибка |
-| в ссылках / sitemap неверный домен | `SITE_URL` в `.env` → пересоберите `app` (раздел 9) |
-| сборка падает из-за нехватки памяти | добавьте swap (раздел 2.3) |
+| Симптом                                                      | Что проверить                                                                                                                                                                   |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker compose build app` падает с ошибкой подключения к БД | запущена ли `db` (`docker compose up -d db`), совпадает ли пароль в `DATABASE_URL` и `APP_DB_PASSWORD`, создана ли роль (раздел 8.1), хост в `DATABASE_URL` — `127.0.0.1`       |
+| `permission denied for table …` в логах `app`                | роль приложения без прав — выполните `docker compose exec db sh /docker-entrypoint-initdb.d/10-app-role.sh`                                                                     |
+| `/admin` пишет «Админка закрыта»                             | не задан `ADMIN_PASSWORD` или он короче 16 символов (раздел 12)                                                                                                                 |
+| картинки не показываются, `/media/…` отвечает 502            | `docker compose ps minio` (healthy?), `docker compose logs minio-init` (завершился с кодом 0?), `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` в `.env`; в логах `app` — `[media]` |
+| `/media/…` отвечает 404 для картинки из админки              | файла нет в бакете (например, бакет восстановлен не полностью) — восстановите картинки из `backups/media` (раздел 13.3)                                                         |
+| загрузка в админке: «Не удалось сохранить файл»              | MinIO недоступен или у пользователя приложения нет прав — `docker compose up -d minio-init`, логи `app` (`[admin] media upload failed`)                                         |
+| форма заявок отвечает ошибкой 500, в логах `IP_HASH_SALT`    | задайте `IP_HASH_SALT` (раздел 7) и пересоздайте `app`                                                                                                                          |
+| сборка падает на «relation … does not exist»                 | не применены миграции — выполните шаг 2 из раздела 8                                                                                                                            |
+| сертификат не выпускается                                    | DNS указывает на сервер? открыты 80 и 443? `docker compose logs caddy`                                                                                                          |
+| заявки не приходят в Telegram                                | `TELEGRAM_DRY_RUN=0`? бот запущен вами (/start)? верен `TELEGRAM_OWNER_ID`? в админке у заявки видна ошибка                                                                     |
+| в ссылках / sitemap неверный домен                           | `SITE_URL` в `.env` → пересоберите `app` (раздел 9)                                                                                                                             |
+| сборка падает из-за нехватки памяти                          | добавьте swap (раздел 2.3)                                                                                                                                                      |
 
 ## 15. SEO после запуска
 

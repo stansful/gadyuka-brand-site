@@ -1,21 +1,24 @@
-import type { ReactElement } from "react";
-import type { LandingContent } from "@/lib/content";
-import { SECTION_ANCHORS } from "@/lib/content";
-import { brandAssetUrl } from "@/lib/media-url";
-import { collectionPath, localizedPath } from "@/lib/seo/site-url";
-import { WordmarkLetters } from "../brand/BrandDefs";
-import { DripPath } from "../scenes/DripPath";
-import { HeroScene } from "../scenes/HeroScene";
-import { introChars, type IntroVars } from "./intro-text";
-import { WithGlyphs } from "./parts";
+import type { LandingContent } from '@/lib/content';
+import { SECTION_ANCHORS } from '@/lib/content';
+import { brandAssetUrl } from '@/lib/media-url';
+import { collectionPath, localizedPath } from '@/lib/seo/site-url';
+
+import type { ReactElement } from 'react';
+
+import { WordmarkLetters } from '../brand/BrandDefs';
+import { formatNodes } from '../message-template';
+import { DripPath } from '../scenes/DripPath';
+import { HeroScene } from '../scenes/HeroScene';
+import { introChars, type IntroVars } from './intro-text';
+import { WithGlyphs } from './parts';
 
 /** The logo's potrace group (fill="currentColor"), referenced from the static file. */
-const LOGO_INK = `${brandAssetUrl("logo-red-tongue-ink.svg")}#ink`;
+const LOGO_INK = `${brandAssetUrl('logo-red-tongue-ink.svg')}#ink`;
 /**
  * The tongue's whole silhouette (its ink is only the outline), in the same user space, painted
  * in the colour of the <use> (scripts/trace-tongue-fill.mjs).
  */
-const TONGUE_FILL = `${brandAssetUrl("logo-red-tongue-fill.svg")}#fill`;
+const TONGUE_FILL = `${brandAssetUrl('logo-red-tongue-fill.svg')}#fill`;
 
 /** Intro clock (s): the first narration caption is typed from here, the next 0.5 s later. */
 const CAPTION_AT = 1.7;
@@ -23,7 +26,7 @@ const CAPTION_STEP = 0.5;
 
 /** Tongue region of the logo (SVG user space of logo-red-tongue-ink.svg, viewBox 0 0 1360 2440; scripts/trace-tongue-fill.mjs keeps a copy). */
 const TONGUE_POLYGON =
-  "586,288 586,339 545,345 476,351 420,358 388,372 366,392 350,418 332,448 300,482 258,503 210,512 186,505 186,398 230,397 270,391 300,377 325,357 345,340 372,326 400,318 444,313 500,311 548,304";
+  '586,288 586,339 545,345 476,351 420,358 388,372 366,392 350,418 332,448 300,482 258,503 210,512 186,505 186,398 230,397 270,391 300,377 325,357 345,340 372,326 400,318 444,313 500,311 548,304';
 /** The tongue's root in the mouth (static) is drawn from here to the right: 3 units under the polygon's edge (x 586). */
 const TONGUE_ROOT_X = 583;
 /**
@@ -31,7 +34,7 @@ const TONGUE_ROOT_X = 583;
  * ±5° about 586 314), in the same user space as the logo. Its CSS box (noir.css .snake-tongue)
  * is this rectangle as a share of the logo's viewBox (90 40 1230 2370).
  */
-const TONGUE_BOX = "130 250 470 310";
+const TONGUE_BOX = '130 250 470 310';
 
 /**
  * Главная — the comic cover. Brandbook image №1 (the wordmark on black, with the snake coiled
@@ -48,29 +51,37 @@ const TONGUE_BOX = "130 250 470 310";
  */
 export function HeroSection({ content }: { content: LandingContent }): ReactElement {
   const { texts, collections, locale } = content;
-  const slogan = introChars(texts["hero.slogan"]);
+  const slogan = introChars(texts['hero.slogan']);
   const collection = collections[0];
   const collectionHref = collection ? localizedPath(locale, collectionPath(collection.slug)) : null;
   // The narration captions are typed one after another (intro clock: --at), char by char; the
   // plate that is a link ends with an arrow, typed in as its last char.
-  const captions = (["hero.captionTop", "hero.captionBottom"] as const)
-    .filter((key) => texts[key])
+  const captions = (['hero.captionTop', 'hero.captionBottom'] as const)
+    .filter(key => texts[key])
     .map((key, index) => {
       const { chars, count } = introChars(texts[key]);
-      const arrow = key === "hero.captionBottom" && collectionHref !== null;
-      const style: IntroVars = { "--at": `${CAPTION_AT + index * CAPTION_STEP}s`, "--n": arrow ? count + 1 : count };
-      const arrowStyle: IntroVars = { "--i": count };
+      const arrow = key === 'hero.captionBottom' && collectionHref !== null;
+      const style: IntroVars = { '--at': `${CAPTION_AT + index * CAPTION_STEP}s`, '--n': arrow ? count + 1 : count };
+      const arrowStyle: IntroVars = { '--i': count };
       return { key, chars, style, arrowStyle };
     });
-  const caption = (key: (typeof captions)[number]["key"], modifier: string): ReactElement | null => {
-    const found = captions.find((item) => item.key === key);
+  const caption = (key: (typeof captions)[number]['key'], modifier: string): ReactElement | null => {
+    const found = captions.find(item => item.key === key);
     return found ? (
       <span className={`caption caption--paper splash__cap ${modifier}`} data-edit={key} style={found.style}>
         {found.chars}
       </span>
     ) : null;
   };
-  const collectionPlate = captions.find((item) => item.key === "hero.captionBottom");
+  const collectionPlate = captions.find(item => item.key === 'hero.captionBottom');
+  // The (screen-reader) H1: hero.heading «{title} — {subtitle}», or the title alone without a subtitle.
+  const title = <span data-edit="hero.title">{texts['hero.title']}</span>;
+  const heading = texts['hero.subtitle']
+    ? formatNodes(texts['hero.heading'], locale, {
+        title,
+        subtitle: <span data-edit="hero.subtitle">{texts['hero.subtitle']}</span>,
+      })
+    : title;
   return (
     <HeroScene className="hero" id={SECTION_ANCHORS.hero} labelledBy="hero-title">
       <div className="splash-wrap">
@@ -133,14 +144,8 @@ export function HeroSection({ content }: { content: LandingContent }): ReactElem
           <span className="splash__band">
             <span className="splash__band-line" aria-hidden="true" />
             <h1 className="splash__title" id="hero-title">
-              <span className="sr-only">
-                <span data-edit="hero.title">{texts["hero.title"]}</span>
-                {texts["hero.subtitle"] ? (
-                  <>
-                    {" — "}
-                    <span data-edit="hero.subtitle">{texts["hero.subtitle"]}</span>
-                  </>
-                ) : null}
+              <span className="sr-only" data-edit={texts['hero.subtitle'] ? 'hero.heading' : undefined}>
+                {heading}
               </span>
               <span className="wordmark" aria-hidden="true">
                 <WordmarkLetters />
@@ -152,17 +157,17 @@ export function HeroSection({ content }: { content: LandingContent }): ReactElem
             <span className="splash__band-line splash__band-line--b" aria-hidden="true" />
           </span>
 
-          {caption("hero.captionTop", "splash__cap--tl")}
-          {collectionHref ? null : caption("hero.captionBottom", "splash__cap--br")}
+          {caption('hero.captionTop', 'splash__cap--tl')}
+          {collectionHref ? null : caption('hero.captionBottom', 'splash__cap--br')}
 
           <span className="splash__corner" aria-hidden="true">
-            <b data-edit="hero.issue">{texts["hero.issue"]}</b>
-            <span data-edit="hero.issueMeta">{texts["hero.issueMeta"]}</span>
+            <b data-edit="hero.issue">{texts['hero.issue']}</b>
+            <span data-edit="hero.issueMeta">{texts['hero.issueMeta']}</span>
           </span>
 
-          {texts["hero.sfx"] ? (
+          {texts['hero.sfx'] ? (
             <span className="sfx sfx--hiss" aria-hidden="true" data-edit="hero.sfx">
-              {texts["hero.sfx"]}
+              {texts['hero.sfx']}
             </span>
           ) : null}
 
@@ -170,10 +175,10 @@ export function HeroSection({ content }: { content: LandingContent }): ReactElem
             <span className="splash__hint-arrow" aria-hidden="true">
               ↓
             </span>
-            <span data-edit="hero.hint">{texts["hero.hint"]}</span>
+            <span data-edit="hero.hint">{texts['hero.hint']}</span>
           </span>
           <span className="splash__cursor" aria-hidden="true" data-edit="hero.cursor">
-            <WithGlyphs text={texts["hero.cursor"]} />
+            <WithGlyphs text={texts['hero.cursor']} />
           </span>
         </a>
         {collectionHref && collectionPlate ? (

@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode } from 'react';
 
 /**
  * Server-side helper of the cover intro, which runs in CSS from the first paint (noir.css,
@@ -6,9 +6,9 @@ import type { CSSProperties, ReactNode } from "react";
  */
 
 /** Custom properties the intro keyframes read (--i: stagger index, --n: char count, --at: start). */
-export type IntroVars = CSSProperties & Partial<Record<"--i" | "--n" | "--at", string | number>>;
+export type IntroVars = CSSProperties & Partial<Record<'--i' | '--n' | '--at', string | number>>;
 
-const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 const WHITESPACE = /^\s+$/;
 
 /**
@@ -20,7 +20,7 @@ const WHITESPACE = /^\s+$/;
 export function introChars(text: string): { chars: ReactNode[]; count: number } {
   const chars: ReactNode[] = [];
   let count = 0;
-  let space = "";
+  let space = '';
   for (const { segment } of graphemes.segment(text)) {
     if (WHITESPACE.test(segment)) {
       space += segment;
@@ -28,9 +28,9 @@ export function introChars(text: string): { chars: ReactNode[]; count: number } 
     }
     if (space) {
       chars.push(space);
-      space = "";
+      space = '';
     }
-    const style: IntroVars = { "--i": count };
+    const style: IntroVars = { '--i': count };
     chars.push(
       <span key={count} style={style}>
         {segment}

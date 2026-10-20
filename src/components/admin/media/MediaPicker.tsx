@@ -1,12 +1,15 @@
-"use client";
+'use client';
 
-import { clsx } from "clsx";
-import { ImagePlus, X } from "lucide-react";
-import { useState, type ReactElement, type ReactNode } from "react";
-import type { AdminMediaRef } from "@/lib/admin/types";
-import { Button } from "../ui/Button";
-import { MediaLibraryDialog } from "./MediaLibraryDialog";
-import { MediaThumb } from "./MediaThumb";
+import { clsx } from 'clsx';
+import { ImagePlus, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { useState, type ReactElement, type ReactNode } from 'react';
+
+import type { AdminMediaRef } from '@/lib/admin/types';
+
+import { Button } from '../ui/Button';
+import { MediaLibraryDialog } from './MediaLibraryDialog';
+import { MediaThumb } from './MediaThumb';
 
 export type MediaPickerProps = {
   id: string;
@@ -18,13 +21,13 @@ export type MediaPickerProps = {
   /** Required pickers have no «Убрать» button. */
   required?: boolean;
   /** Preview shape. */
-  aspect?: "square" | "wide" | "portrait";
+  aspect?: 'square' | 'wide' | 'portrait';
 };
 
 const aspects = {
-  square: "aspect-square w-32",
-  wide: "aspect-video w-48",
-  portrait: "aspect-[3/4] w-28",
+  square: 'aspect-square w-32',
+  wide: 'aspect-video w-48',
+  portrait: 'aspect-[3/4] w-28',
 } as const;
 
 /**
@@ -32,7 +35,17 @@ const aspects = {
  * The error (and hint) is tied to both picker buttons via aria-describedby (aria-invalid is
  * not allowed on buttons), so it is read whenever the control gets focus, not only once.
  */
-export function MediaPicker({ id, label, value, onChange, hint, error, required = false, aspect = "square" }: MediaPickerProps): ReactElement {
+export function MediaPicker({
+  id,
+  label,
+  value,
+  onChange,
+  hint,
+  error,
+  required = false,
+  aspect = 'square',
+}: MediaPickerProps): ReactElement {
+  const t = useTranslations('admin.media.picker');
   const [open, setOpen] = useState(false);
 
   return (
@@ -50,10 +63,10 @@ export function MediaPicker({ id, label, value, onChange, hint, error, required 
           type="button"
           onClick={() => setOpen(true)}
           className={clsx(
-            "relative shrink-0 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-beige",
-            error && "ring-2 ring-red-fg/70",
+            'relative shrink-0 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-beige',
+            error && 'ring-2 ring-red-fg/70',
           )}
-          aria-label={value ? "Заменить изображение" : "Выбрать изображение"}
+          aria-label={t(value ? 'replaceImage' : 'chooseImage')}
           aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
         >
           <MediaThumb media={value} className={aspects[aspect]} sizes="200px" />
@@ -66,11 +79,16 @@ export function MediaPicker({ id, label, value, onChange, hint, error, required 
             onClick={() => setOpen(true)}
             aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
           >
-            {value ? "Заменить" : "Выбрать"}
+            {t(value ? 'replace' : 'choose')}
           </Button>
           {value && !required ? (
-            <Button size="sm" variant="ghost" icon={<X className="size-4" aria-hidden />} onClick={() => onChange(null)}>
-              Убрать
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<X className="size-4" aria-hidden />}
+              onClick={() => onChange(null)}
+            >
+              {t('remove')}
             </Button>
           ) : null}
         </div>
@@ -88,9 +106,10 @@ export function MediaPicker({ id, label, value, onChange, hint, error, required 
       <MediaLibraryDialog
         open={open}
         onClose={() => setOpen(false)}
-        onSelect={(selected) => {
+        onSelect={selected => {
           const first = selected[0];
-          if (first) onChange({ id: first.id, url: first.url, width: first.width, height: first.height, alt: first.alt });
+          if (first)
+            onChange({ id: first.id, url: first.url, width: first.width, height: first.height, alt: first.alt });
         }}
       />
     </div>

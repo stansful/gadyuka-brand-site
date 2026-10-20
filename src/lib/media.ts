@@ -1,27 +1,29 @@
-import "server-only";
-import { randomBytes } from "node:crypto";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { fileTypeFromBuffer } from "file-type";
-import sharp from "sharp";
+import 'server-only';
+import { randomUUID } from 'node:crypto';
+
+import { fileTypeFromBuffer } from 'file-type';
+import sharp from 'sharp';
+
+import type { UserRole } from '@/generated/prisma/enums';
 import {
-  ACCEPTED_FORMATS_LABEL,
   isAcceptedImageMime,
   MAX_IMAGE_DIMENSION,
   MAX_UPLOAD_BYTES,
   type AcceptedImageMime,
-} from "@/lib/admin/media-constants";
-import { resolveUploadPath } from "@/lib/uploads";
+} from '@/lib/admin/media-constants';
+import { deleteObject, getMediaBucket, putObject } from '@/lib/storage';
+import { MEDIA_CACHE_CONTROL, MEDIA_MIME, mediaObjectKey, mediaPublicUrl } from '@/lib/storage/keys';
 
 /**
  * Image upload pipeline (server-only, no DB access — see src/lib/admin/media-service.ts):
  *
  *   validate size → detect type by magic bytes (file-type) → sharp: auto-orient,
  *   fit inside 2400×2400 (no upscaling), strip metadata (EXIF/GPS), encode WebP →
- *   store as UPLOAD_DIR/<yyyy>/<mm>/<random>.webp
+ *   PutObject to S3 as <admin|user>/<ownerId>/<uuid>/image.webp (src/lib/storage)
  *
- * The stored name is random (never derived from user input), so path traversal and
- * overwrites are impossible; resolveUploadPath() re-checks the final path anyway.
+ * The key is built from the owner and a fresh random uuid (never from user input), so every
+ * upload gets its own folder and an object is never overwritten; the /media/<key> URL is
+ * cached immutably.
  */
 
 export {
@@ -30,7 +32,7 @@ export {
   MAX_IMAGE_DIMENSION,
   MAX_UPLOAD_BYTES,
   type AcceptedImageMime,
-} from "@/lib/admin/media-constants";
+} from '@/lib/admin/media-constants';
 
 /**
  * Decompression-bomb guard: refuse inputs above 40 megapixels (≈160 MB of decoded RGBA —
@@ -56,7 +58,7 @@ export async function withImageJobSlot<T>(job: () => Promise<T>): Promise<T> {
     activeImageJobs += 1;
   } else {
     // The releasing job hands its slot over directly (activeImageJobs stays the same).
-    await new Promise<void>((resolve) => waitingImageJobs.push(resolve));
+    await new Promise<void>(resolve => waitingImageJobs.push(resolve));
   }
   try {
     return await job();
@@ -67,11 +69,27 @@ export async function withImageJobSlot<T>(job: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Validation / processing failure with a Russian, user-facing message. */
+/** Why an upload was refused — the admin shows admin.media.errors.<code> (messages/admin/ru.json). */
+export type MediaValidationCode = 'empty' | 'tooLarge' | 'unsupported' | 'processingFailed';
+
+const VALIDATION_LOG_MESSAGES: Readonly<Record<MediaValidationCode, string>> = {
+  empty: 'empty file',
+  tooLarge: `file larger than ${MAX_UPLOAD_BYTES} bytes`,
+  unsupported: 'unsupported image format',
+  processingFailed: 'image could not be processed (corrupt or too large)',
+};
+
+/**
+ * Validation / processing failure of an upload. `code` is what the user is told (translated
+ * by the caller); the English message is for logs and the seed.
+ */
 export class MediaValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "MediaValidationError";
+  readonly code: MediaValidationCode;
+
+  constructor(code: MediaValidationCode) {
+    super(VALIDATION_LOG_MESSAGES[code]);
+    this.name = 'MediaValidationError';
+    this.code = code;
   }
 }
 
@@ -79,7 +97,7 @@ export type ProcessedImage = {
   data: Buffer;
   width: number;
   height: number;
-  mime: "image/webp";
+  mime: typeof MEDIA_MIME;
   size: number;
   sourceMime: AcceptedImageMime;
 };
@@ -93,20 +111,16 @@ export async function detectImageMime(data: Uint8Array): Promise<AcceptedImageMi
 
 /** Validates and converts an uploaded image to WebP. Throws MediaValidationError. */
 export async function processImage(data: Uint8Array): Promise<ProcessedImage> {
-  if (data.byteLength === 0) throw new MediaValidationError("Файл пустой");
-  if (data.byteLength > MAX_UPLOAD_BYTES) {
-    throw new MediaValidationError(`Файл больше ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} МБ`);
-  }
+  if (data.byteLength === 0) throw new MediaValidationError('empty');
+  if (data.byteLength > MAX_UPLOAD_BYTES) throw new MediaValidationError('tooLarge');
   const sourceMime = await detectImageMime(data);
-  if (!sourceMime) {
-    throw new MediaValidationError(`Неподдерживаемый формат. Можно загружать: ${ACCEPTED_FORMATS_LABEL}`);
-  }
+  if (!sourceMime) throw new MediaValidationError('unsupported');
 
   try {
     const { data: output, info } = await withImageJobSlot(() =>
       sharp(data, {
         limitInputPixels: MAX_INPUT_PIXELS,
-        failOn: "error",
+        failOn: 'error',
         // Animated GIF/WebP: only the first frame is kept (the site shows still images).
         animated: false,
       })
@@ -114,62 +128,64 @@ export async function processImage(data: Uint8Array): Promise<ProcessedImage> {
         .resize({
           width: MAX_IMAGE_DIMENSION,
           height: MAX_IMAGE_DIMENSION,
-          fit: "inside",
+          fit: 'inside',
           withoutEnlargement: true,
         })
         .webp({ quality: WEBP_QUALITY, effort: 4 })
         .toBuffer({ resolveWithObject: true }),
     );
 
-    return { data: output, width: info.width, height: info.height, mime: "image/webp", size: output.byteLength, sourceMime };
+    return {
+      data: output,
+      width: info.width,
+      height: info.height,
+      mime: MEDIA_MIME,
+      size: output.byteLength,
+      sourceMime,
+    };
   } catch (error: unknown) {
-    console.warn("[media] sharp failed to process an upload:", error instanceof Error ? error.message : error);
-    throw new MediaValidationError("Не удалось обработать изображение: файл повреждён или слишком большой");
+    console.warn('[media] sharp failed to process an upload:', error instanceof Error ? error.message : error);
+    throw new MediaValidationError('processingFailed');
   }
 }
 
 /**
- * Original file name for display only (never used on disk): no directories,
+ * Original file name for display only (never part of a storage key): no directories,
  * no control characters, NFC, at most 200 characters.
  */
 export function sanitizeOriginalName(name: string): string {
-  const base = name.split(/[\\/]/).pop() ?? "";
+  const base = name.split(/[\\/]/).pop() ?? '';
   const cleaned = base
-    .normalize("NFC")
-    .replace(/[\u0000-\u001f\u007f<>:"|?*]/g, "")
-    .replace(/\s+/g, " ")
+    .normalize('NFC')
+    // oxlint-disable-next-line eslint/no-control-regex -- stripping control characters is the point
+    .replace(/[\u0000-\u001f\u007f<>:"|?*]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
   const limited = cleaned.length > 200 ? cleaned.slice(cleaned.length - 200) : cleaned;
-  return limited.length > 0 ? limited : "image";
+  return limited.length > 0 ? limited : 'image';
 }
 
-/** "2026/10/3f9c…e1.webp" — random 24-hex-char name under a year/month folder. */
-export function buildStoragePath(now: Date, random: string = randomBytes(12).toString("hex")): string {
-  if (!/^[a-f0-9]{8,64}$/.test(random)) throw new Error("Invalid random file id");
-  const year = String(now.getUTCFullYear());
-  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-  return `${year}/${month}/${random}.webp`;
+/** Who owns an upload (the first two segments of its S3 key). */
+export type MediaOwner = { ownerType: UserRole; ownerId: string };
+
+/** Where a stored image lives — the Media row fields besides the image metadata. */
+export type StoredImage = { uuid: string; bucket: string; key: string; url: string };
+
+/**
+ * Uploads a processed image into a new per-upload folder,
+ * "<admin|user>/<ownerId>/<uuid>/image.webp" (immutable: the uuid is never reused).
+ */
+export async function storeProcessedImage(
+  image: ProcessedImage,
+  owner: MediaOwner,
+  uuid: string = randomUUID(),
+): Promise<StoredImage> {
+  const key = mediaObjectKey({ ownerType: owner.ownerType, ownerId: owner.ownerId, uuid });
+  await putObject({ key, body: image.data, contentType: image.mime, cacheControl: MEDIA_CACHE_CONTROL });
+  return { uuid, bucket: getMediaBucket(), key, url: mediaPublicUrl(key) };
 }
 
-/** Writes the processed image into UPLOAD_DIR; returns its relative path (Media.path). */
-export async function storeProcessedImage(image: ProcessedImage, now: Date = new Date()): Promise<string> {
-  const relativePath = buildStoragePath(now);
-  const absolutePath = resolveUploadPath(relativePath);
-  if (!absolutePath) throw new Error(`Refusing to write outside UPLOAD_DIR: ${relativePath}`);
-  await mkdir(path.dirname(absolutePath), { recursive: true });
-  // "wx": never overwrite an existing file.
-  await writeFile(absolutePath, image.data, { flag: "wx" });
-  return relativePath;
-}
-
-/** Deletes a stored file (Media.path). Missing files are ignored. */
-export async function removeStoredFile(relativePath: string): Promise<void> {
-  const absolutePath = resolveUploadPath(relativePath);
-  if (!absolutePath) return;
-  try {
-    await unlink(absolutePath);
-  } catch (error: unknown) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return;
-    throw error;
-  }
+/** Deletes a stored image (Media.bucket + Media.key). A missing object is not an error. */
+export async function removeStoredImage(stored: { bucket: string; key: string }): Promise<void> {
+  await deleteObject(stored.key, stored.bucket);
 }

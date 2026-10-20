@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
-import { type ReactElement, useRef } from "react";
-import { chapterReveal, genericReveals, panelWipes, sfxPop } from "../motion/effects";
-import { useScene } from "../motion/useScene";
-import { SceneRoot, type SceneProps } from "./SceneRoot";
+import { type ReactElement, useRef } from 'react';
+
+import { chapterReveal, genericReveals, panelWipes, sfxPop } from '../motion/effects';
+import { useScene } from '../motion/useScene';
+import { SceneRoot, type SceneProps } from './SceneRoot';
 
 /**
  * The common chapter choreography: the chapter header (sheet, inked title, typed narration),

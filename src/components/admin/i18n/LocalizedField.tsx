@@ -1,12 +1,16 @@
-"use client";
+'use client';
 
-import type { ReactElement, ReactNode } from "react";
-import { defaultLocale, localeNames, type Locale } from "@/i18n/locales";
-import type { FieldErrors } from "@/lib/admin/action-result";
-import type { LocalizedText } from "@/lib/i18n-text";
-import { describedBy, Field } from "../ui/Field";
-import { TextArea, TextInput } from "../ui/inputs";
-import { useEditLocale } from "./LocaleTabs";
+import { useTranslations } from 'next-intl';
+
+import { defaultLocale, localeNames, type Locale } from '@/i18n/locales';
+import type { FieldErrors } from '@/lib/admin/action-result';
+import type { LocalizedText } from '@/lib/i18n-text';
+
+import type { ReactElement, ReactNode } from 'react';
+
+import { describedBy, Field } from '../ui/Field';
+import { TextArea, TextInput } from '../ui/inputs';
+import { useEditLocale } from './LocaleTabs';
 
 export type LocalizedFieldProps = {
   /** Field name in the submitted object (used for error lookup: "title", "title.en"). */
@@ -46,21 +50,23 @@ export function LocalizedField({
   fieldErrors,
   maxLength,
   placeholder,
-  idPrefix = "f",
+  idPrefix = 'f',
 }: LocalizedFieldProps): ReactElement {
+  const t = useTranslations('admin.form.languages');
   const { locale } = useEditLocale();
-  const id = `${idPrefix}-${name.replace(/[^A-Za-z0-9_-]/g, "-")}-${locale}`;
-  const text = value[locale] ?? "";
-  const fallback = value[defaultLocale] ?? "";
+  const id = `${idPrefix}-${name.replace(/[^A-Za-z0-9_-]/g, '-')}-${locale}`;
+  const text = value[locale] ?? '';
+  const fallback = value[defaultLocale] ?? '';
   const isDefault = locale === defaultLocale;
   const error = errorForLocale(fieldErrors, name, locale);
 
   let effectiveHint: ReactNode = hint;
-  if (!isDefault && text.trim() === "" && fallback.trim() !== "") {
+  if (!isDefault && text.trim() === '' && fallback.trim() !== '') {
     const preview = fallback.length > 90 ? `${fallback.slice(0, 90)}…` : fallback;
     effectiveHint = (
       <>
-        Нет перевода — на сайте будет показан русский текст: «{preview}»{hint ? <> · {hint}</> : null}
+        {t('fallback', { preview })}
+        {hint ? <> · {hint}</> : null}
       </>
     );
   }
@@ -76,8 +82,8 @@ export function LocalizedField({
     placeholder,
     invalid: Boolean(error),
     lang: locale,
-    "aria-describedby": describedBy(id, effectiveHint, error),
-    "aria-required": (required && isDefault) || undefined,
+    'aria-describedby': describedBy(id, effectiveHint, error),
+    'aria-required': (required && isDefault) || undefined,
   };
 
   return (
@@ -88,15 +94,18 @@ export function LocalizedField({
       hint={effectiveHint}
       error={error}
       aside={
-        <span className="rounded bg-raised-hi px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-muted" title={localeNames[locale].ru}>
+        <span
+          className="rounded bg-raised-hi px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-muted"
+          title={localeNames[locale].ru}
+        >
           {localeNames[locale].short}
         </span>
       }
     >
       {multiline ? (
-        <TextArea {...commonProps} rows={rows} onChange={(event) => handleChange(event.target.value)} />
+        <TextArea {...commonProps} rows={rows} onChange={event => handleChange(event.target.value)} />
       ) : (
-        <TextInput {...commonProps} type="text" onChange={(event) => handleChange(event.target.value)} />
+        <TextInput {...commonProps} type="text" onChange={event => handleChange(event.target.value)} />
       )}
     </Field>
   );

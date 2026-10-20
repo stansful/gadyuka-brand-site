@@ -1,8 +1,9 @@
-import "server-only";
-import { type LeadFieldErrors, type LeadSubmission, validateLeadInput } from "@/lib/leads";
-import { checkRateLimit, LEAD_NOTIFY_CEILING, type RecentLeadCounter } from "@/lib/rate-limit";
-import type { TelegramLead } from "@/lib/telegram";
-import type { LeadMeta } from "./store";
+import 'server-only';
+import { type LeadFieldErrors, type LeadSubmission, validateLeadInput } from '@/lib/leads';
+import { checkRateLimit, LEAD_NOTIFY_CEILING, type RecentLeadCounter } from '@/lib/rate-limit';
+import type { TelegramLead } from '@/lib/telegram';
+
+import type { LeadMeta } from './store';
 
 /**
  * The lead submission flow without HTTP details (testable with fakes):
@@ -12,11 +13,6 @@ import type { LeadMeta } from "./store";
  * Site-wide flood guard: past LEAD_NOTIFY_CEILING leads are still saved, but marked
  * «не отправлено» instead of being pushed to Telegram (the owner can resend from the admin).
  */
-
-/** Lead.telegramError for leads saved while the site-wide notification ceiling was exceeded. */
-export const NOTIFY_CEILING_ERROR = `Не отправлено автоматически: больше ${LEAD_NOTIFY_CEILING.max} заявок за ${Math.round(
-  LEAD_NOTIFY_CEILING.windowMs / 60_000,
-)} минут (защита от флуда). Если заявка настоящая — отправьте её вручную.`;
 
 /** DB operations available inside the per-ipHash critical section. */
 export type LeadStore = {
@@ -40,6 +36,11 @@ export type SubmitLeadDeps = {
   withLock: <T>(ipHash: string, work: (store: LeadStore) => Promise<T>) => Promise<T>;
   /** Called with the saved lead; must not throw (sendLeadToTelegram never does). */
   notify: (lead: TelegramLead) => Promise<unknown>;
+  /**
+   * Lead.telegramError of a lead saved past the site-wide ceiling — the owner-facing message
+   * telegram.errors.notifyCeiling (production: notifyCeilingError in src/lib/telegram.ts).
+   */
+  ceilingError: (ceiling: typeof LEAD_NOTIFY_CEILING) => Promise<string>;
   /** Runs `task` after the response is sent (next/server `after` in the route). */
   schedule: (task: () => Promise<void>) => void;
   now?: () => Date;
@@ -52,15 +53,15 @@ export type SubmitLeadContext = {
 };
 
 export type SubmitLeadOutcome =
-  | { status: "created"; id: string; notified: boolean }
-  | { status: "ignored" }
-  | { status: "invalid"; errors: LeadFieldErrors }
-  | { status: "rate_limited"; retryAfterSeconds: number }
-  | { status: "failed"; error: unknown };
+  | { status: 'created'; id: string; notified: boolean }
+  | { status: 'ignored' }
+  | { status: 'invalid'; errors: LeadFieldErrors }
+  | { status: 'rate_limited'; retryAfterSeconds: number }
+  | { status: 'failed'; error: unknown };
 
 type LockedOutcome =
-  | { kind: "limited"; retryAfterSeconds: number }
-  | { kind: "saved"; lead: TelegramLead; notify: boolean };
+  | { kind: 'limited'; retryAfterSeconds: number }
+  | { kind: 'saved'; lead: TelegramLead; notify: boolean };
 
 function clip(value: string | null, max: number): string | null {
   return value === null ? null : value.slice(0, max);
@@ -73,8 +74,8 @@ export async function submitLead(
 ): Promise<SubmitLeadOutcome> {
   const validation = validateLeadInput(input);
   if (!validation.ok) {
-    if (validation.reason === "honeypot") return { status: "ignored" };
-    return { status: "invalid", errors: validation.errors };
+    if (validation.reason === 'honeypot') return { status: 'ignored' };
+    return { status: 'invalid', errors: validation.errors };
   }
 
   const now = deps.now?.() ?? new Date();
@@ -82,7 +83,7 @@ export async function submitLead(
     consentAt: now.toISOString(),
     userAgent: clip(context.userAgent, 300),
     referer: clip(context.referer, 500),
-    source: "site",
+    source: 'site',
   };
 
   let outcome: LockedOutcome;
@@ -93,27 +94,27 @@ export async function submitLead(
         oldestInWindow: store.oldestInWindow,
         now,
       });
-      if (limit.limited) return { kind: "limited", retryAfterSeconds: limit.retryAfterSeconds };
+      if (limit.limited) return { kind: 'limited', retryAfterSeconds: limit.retryAfterSeconds };
 
       const siteWide = await store.countAllRecent(new Date(now.getTime() - LEAD_NOTIFY_CEILING.windowMs));
       const notify = siteWide < LEAD_NOTIFY_CEILING.max;
       const lead = await store.insert(validation.data, context.ipHash, meta, {
-        telegramError: notify ? null : NOTIFY_CEILING_ERROR,
+        telegramError: notify ? null : await deps.ceilingError(LEAD_NOTIFY_CEILING),
       });
-      return { kind: "saved", lead, notify };
+      return { kind: 'saved', lead, notify };
     });
   } catch (error: unknown) {
-    return { status: "failed", error };
+    return { status: 'failed', error };
   }
 
-  if (outcome.kind === "limited") return { status: "rate_limited", retryAfterSeconds: outcome.retryAfterSeconds };
+  if (outcome.kind === 'limited') return { status: 'rate_limited', retryAfterSeconds: outcome.retryAfterSeconds };
 
   const saved = outcome.lead;
   if (!outcome.notify) {
     console.warn(
       `[leads] more than ${LEAD_NOTIFY_CEILING.max} leads in ${LEAD_NOTIFY_CEILING.windowMs / 60_000} min — lead ${saved.id} saved without a Telegram notification`,
     );
-    return { status: "created", id: saved.id, notified: false };
+    return { status: 'created', id: saved.id, notified: false };
   }
 
   deps.schedule(async () => {
@@ -124,5 +125,5 @@ export async function submitLead(
       console.error(`[leads] Telegram notification for lead ${saved.id} crashed:`, error);
     }
   });
-  return { status: "created", id: saved.id, notified: true };
+  return { status: 'created', id: saved.id, notified: true };
 }

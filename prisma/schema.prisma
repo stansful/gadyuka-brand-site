@@ -1,11 +1,13 @@
 // ГАДЮКА — data model. See docs/ARCHITECTURE.md («Модель данных»).
 //
 // Conventions
-// - Every translatable field is `Json` holding LocalizedText = { [locale]: string }
+// - Site UI copy lives in `Message` rows (key + locale), seeded from messages/<locale>.json —
+//   the JSON files are the defaults and the source of the key set; the admin edits the rows.
+// - Every translatable ENTITY field is `Json` holding LocalizedText = { [locale]: string }
 //   (validated with zod in src/lib/i18n-text.ts on read and write). Adding a language
 //   never requires a migration.
-// - Media.path is relative to UPLOAD_DIR (e.g. "seed/hoodie-white-logo.webp") and is
-//   publicly served as `/uploads/<path>`.
+// - Media files live in S3 (MinIO): Media.key = "<admin|user>/<ownerId>/<uuid>/image.webp",
+//   Media.url = the public link the site uses ("/media/<key>").
 // - Optional media references use onDelete: SetNull; required ones (gallery, product
 //   images) use Restrict so a file in use cannot be deleted by accident.
 
@@ -18,11 +20,22 @@ datasource db {
   provider = "postgresql"
 }
 
-enum ContentKind {
-  TEXT
-  RICHTEXT
-  IMAGE
-  LINK
+/// Who owns an upload; also the first segment of the S3 key ("admin/…", "user/…").
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum SocialType {
+  TELEGRAM
+  VK
+  INSTAGRAM
+  WHATSAPP
+  YOUTUBE
+  TIKTOK
+  PINTEREST
+  WEBSITE
+  OTHER
 }
 
 enum LeadType {
@@ -38,27 +51,61 @@ enum LeadStatus {
   SPAM
 }
 
-/// Single-value content of landing sections. `key` is the dotted key used in
-/// `data-edit` / `data-edit-img` attributes (e.g. "hero.cta", "tailoring.steps.0.title").
-model ContentBlock {
-  key       String      @id
-  section   String
-  kind      ContentKind @default(TEXT)
-  /// LocalizedText for TEXT / RICHTEXT / LINK (LINK: the href, may be the same for all locales)
-  value     Json?
-  mediaId   String?
-  media     Media?      @relation("ContentBlockMedia", fields: [mediaId], references: [id], onDelete: SetNull)
-  order     Int         @default(0)
-  updatedAt DateTime    @updatedAt
+/// Accounts. For now a single ADMIN row created by the seed (the admin still signs in with
+/// ADMIN_PASSWORD); USER rows are reserved for future site users (uploads, reviews).
+model User {
+  id        String   @id @default(cuid())
+  role      UserRole
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([section, order])
+  media   Media[]
+  reviews Review[]
+
+  @@index([role])
+}
+
+/// One translation of one site UI string. `key` is the dotted path in messages/<locale>.json
+/// (e.g. "hero.title", "forms.errors.required"). Rows are seeded from the JSON files; the
+/// JSON value is also the render-time fallback when a row is missing.
+model Message {
+  key       String
+  /// Locale code from src/i18n/locales.ts ("ru", "en")
+  locale    String
+  value     String    @db.Text
+  /// null = value came from the seed (a re-seed may update it to a newer default);
+  /// set = edited in the admin (the seed never touches it again unless SEED_OVERWRITE=1)
+  editedAt  DateTime?
+  updatedAt DateTime  @updatedAt
+
+  @@id([key, locale])
+  @@index([locale])
+}
+
+/// Landing images addressed by key (e.g. "about.image", "tailoring.image").
+model ContentImage {
+  key       String   @id
+  mediaId   String?
+  media     Media?   @relation("ContentImageMedia", fields: [mediaId], references: [id], onDelete: SetNull)
+  updatedAt DateTime @updatedAt
+
   @@index([mediaId])
 }
 
 model Media {
   id           String   @id @default(cuid())
-  /// Relative to UPLOAD_DIR, forward slashes, no leading slash. Public URL: /uploads/<path>
-  path         String   @unique
+  /// First segment of the S3 key: admin | user
+  ownerType    UserRole
+  ownerId      String
+  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  /// Per-upload folder in S3
+  uuid         String   @unique @default(uuid()) @db.Uuid
+  bucket       String
+  /// S3 object key: "<admin|user>/<ownerId>/<uuid>/image.webp" (CHECK in migration)
+  key          String
+  /// Public link of the file, used as-is by the site and the admin ("/media/<key>")
+  url          String
   mime         String
   width        Int
   height       Int
@@ -70,7 +117,7 @@ model Media {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  contentBlocks    ContentBlock[] @relation("ContentBlockMedia")
+  contentImages    ContentImage[] @relation("ContentImageMedia")
   collectionCovers Collection[]   @relation("CollectionCover")
   productImages    ProductImage[]
   reviewAvatars    Review[]       @relation("ReviewAvatar")
@@ -80,6 +127,8 @@ model Media {
   partnerLogos     Partner[]      @relation("PartnerLogo")
   ogImageSettings  SiteSettings[] @relation("SettingsOgImage")
 
+  @@unique([bucket, key])
+  @@index([ownerId, createdAt])
   @@index([createdAt])
 }
 
@@ -146,8 +195,12 @@ model Review {
   text      Json
   avatarId  String?
   avatar    Media?   @relation("ReviewAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
-  /// 1..5 (CHECK constraint in migration)
+  /// 1..SiteSettings.reviewRatingMax (CHECK 1..10 in migration; the upper bound is validated
+  /// against the current scale in the app)
   rating    Int?
+  /// Future: the site user who wrote the review (null = added in the admin)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   order     Int      @default(0)
   published Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -155,6 +208,7 @@ model Review {
 
   @@index([published, order])
   @@index([avatarId])
+  @@index([userId])
 }
 
 model NewsItem {
@@ -260,18 +314,50 @@ model Lead {
 
 /// Exactly one row with id = 1 (CHECK constraint in migration).
 model SiteSettings {
-  id             Int      @id @default(1)
-  phone          String   @default("")
-  email          String   @default("")
+  id              Int      @id @default(1)
+  phone           String   @default("")
+  email           String   @default("")
   /// LocalizedText
-  address        Json     @default("{}")
-  /// Array<{ type: string; url: string }>
-  socials        Json     @default("[]")
+  address         Json     @default("{}")
+  /// Max stars of a review rating (CHECK 1..10 in migration)
+  reviewRatingMax Int      @default(5)
   /// LocalizedText
-  seoTitle       Json     @default("{}")
+  seoTitle        Json     @default("{}")
   /// LocalizedText
-  seoDescription Json     @default("{}")
-  ogImageId      String?
-  ogImage        Media?   @relation("SettingsOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
-  updatedAt      DateTime @updatedAt
+  seoDescription  Json     @default("{}")
+  ogImageId       String?
+  ogImage         Media?   @relation("SettingsOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
+  updatedAt       DateTime @updatedAt
+}
+
+/// Site menu (header and/or footer). The admin can add, reorder, hide and remove items.
+model MenuItem {
+  id           String   @id @default(cuid())
+  /// LocalizedText
+  label        Json
+  /// "#catalog" (landing anchor), "/catalog/<slug>" (localized site path), "https://…", "mailto:", "tel:"
+  href         String
+  showInHeader Boolean  @default(true)
+  showInFooter Boolean  @default(true)
+  order        Int      @default(0)
+  published    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([published, order])
+}
+
+/// Social / messenger links shown in the contacts section and JSON-LD sameAs.
+model SocialLink {
+  id        String     @id @default(cuid())
+  type      SocialType
+  /// LocalizedText; empty = the default label from messages (social.<type>)
+  label     Json       @default("{}")
+  url       String
+  order     Int        @default(0)
+  published Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([published, order])
 }

@@ -4,7 +4,7 @@
  */
 
 /** Server-rendered on every scene root (SceneRoot); removed once the scene is set up (scheduler.ts). */
-export const SCENE_PENDING_ATTR = "data-scene-pending";
+export const SCENE_PENDING_ATTR = 'data-scene-pending';
 
 /**
  * Set by MOTION_BOOT's late gate (boot.ts, production) on a scene root that came on screen while
@@ -13,4 +13,4 @@ export const SCENE_PENDING_ATTR = "data-scene-pending";
  * its setup keeps what may already have been seen as rendered (effects.ts unseen()), so nothing hides and pops in
  * under the finger.
  */
-export const SCENE_LATE_ATTR = "data-scene-late";
+export const SCENE_LATE_ATTR = 'data-scene-late';

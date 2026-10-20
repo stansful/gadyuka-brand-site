@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
-import { type ReactElement, useRef } from "react";
-import { chapterReveal, panelWipes, sfxPop } from "../motion/effects";
-import { useScene } from "../motion/useScene";
-import { SceneRoot, type SceneProps } from "./SceneRoot";
+import { type ReactElement, useRef } from 'react';
+
+import { chapterReveal, panelWipes, sfxPop } from '../motion/effects';
+import { useScene } from '../motion/useScene';
+import { SceneRoot, type SceneProps } from './SceneRoot';
 
 /**
  * «О нас»: chapter header, ink-wipe panels, «ТССС!». The close-up snake flicking its tongue is

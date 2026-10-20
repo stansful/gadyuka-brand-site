@@ -1,17 +1,19 @@
-import "server-only";
-import { revalidateTag, updateTag } from "next/cache";
+import 'server-only';
+import { revalidateTag, updateTag } from 'next/cache';
 
 /**
  * Cache tags for the content read layer (Next 16 Cache Components model:
  * `"use cache"` + `cacheTag()` + `cacheLife()` inside the read functions).
  *
  * Every cached content function tags itself with CACHE_TAGS.content, so ONE call
- * refreshes the whole public site (all locales, landing + catalog pages + metadata).
+ * refreshes the whole public site (all locales, landing + catalog pages + metadata + the
+ * next-intl messages of getSiteMessages).
  */
 export const CACHE_TAGS = {
-  /** All public content: ContentBlock, Media, Collection, Product, Review, NewsItem,
-   *  GalleryItem, Offer, Partner, SiteSettings. */
-  content: "content",
+  /** All public content: Message (site UI copy, also next-intl's messages), ContentImage,
+   *  MenuItem, SocialLink, Media, Collection, Product, Review, NewsItem, GalleryItem, Offer,
+   *  Partner, SiteSettings. */
+  content: 'content',
 } as const;
 
 export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];
@@ -22,7 +24,7 @@ export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];
  * helpers below; the hourly revalidation is only a safety net for out-of-band
  * DB changes (seed, manual SQL).
  */
-export const CONTENT_CACHE_LIFE = "hours";
+export const CONTENT_CACHE_LIFE = 'hours';
 
 /**
  * Call at the end of every admin **Server Action** that writes public content.

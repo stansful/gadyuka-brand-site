@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   KeyboardSensor,
@@ -10,10 +10,11 @@ import {
   type SensorDescriptor,
   type SensorOptions,
   type UniqueIdentifier,
-} from "@dnd-kit/core";
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+} from '@dnd-kit/core';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { useTranslations } from 'next-intl';
 
-/** Shared drag & drop setup: pointer + keyboard sensors and Russian screen-reader texts. */
+/** Shared drag & drop setup: pointer + keyboard sensors and screen-reader texts (admin.list.dnd). */
 
 export function useSortableSensors(): SensorDescriptor<SensorOptions>[] {
   return useSensors(
@@ -22,24 +23,36 @@ export function useSortableSensors(): SensorDescriptor<SensorOptions>[] {
   );
 }
 
-export function makeAnnouncements(nameOf: (id: UniqueIdentifier) => string, positionOf: (id: UniqueIdentifier) => number): Announcements {
-  return {
-    onDragStart: ({ active }) => `Взят элемент «${nameOf(active.id)}».`,
+/**
+ * dnd-kit `accessibility` of a sortable list: what screen readers hear while an item is
+ * dragged (««Худи» перемещён на позицию 3.») and how to drag with the keyboard.
+ */
+export function useDndAccessibility(
+  nameOf: (id: UniqueIdentifier) => string,
+  positionOf: (id: UniqueIdentifier) => number,
+): { announcements: Announcements; screenReaderInstructions: ScreenReaderInstructions } {
+  const t = useTranslations('admin.list.dnd');
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => t('dragStart', { name: nameOf(active.id) }),
     onDragOver: ({ active, over }) =>
-      over ? `«${nameOf(active.id)}» над позицией ${positionOf(over.id) + 1}.` : `«${nameOf(active.id)}» вне списка.`,
+      over
+        ? t('dragOver', { name: nameOf(active.id), position: positionOf(over.id) + 1 })
+        : t('dragOutside', { name: nameOf(active.id) }),
     onDragEnd: ({ active, over }) =>
-      over ? `«${nameOf(active.id)}» перемещён на позицию ${positionOf(over.id) + 1}.` : `«${nameOf(active.id)}» отпущен.`,
-    onDragCancel: ({ active }) => `Перемещение «${nameOf(active.id)}» отменено.`,
+      over
+        ? t('dropped', { name: nameOf(active.id), position: positionOf(over.id) + 1 })
+        : t('released', { name: nameOf(active.id) }),
+    onDragCancel: ({ active }) => t('cancelled', { name: nameOf(active.id) }),
   };
+  return { announcements, screenReaderInstructions: { draggable: t('instructions') } };
 }
 
-export const screenReaderInstructions: ScreenReaderInstructions = {
-  draggable:
-    "Чтобы переместить элемент, нажмите пробел или Enter, перемещайте стрелками, затем снова нажмите пробел или Enter. Escape — отмена.",
-};
-
 /** Moves `ids` so that `activeId` takes the place of `overId`. Returns null when nothing changes. */
-export function moveId(ids: readonly string[], activeId: UniqueIdentifier, overId: UniqueIdentifier | null | undefined): string[] | null {
+export function moveId(
+  ids: readonly string[],
+  activeId: UniqueIdentifier,
+  overId: UniqueIdentifier | null | undefined,
+): string[] | null {
   if (overId === null || overId === undefined || activeId === overId) return null;
   const from = ids.indexOf(String(activeId));
   const to = ids.indexOf(String(overId));

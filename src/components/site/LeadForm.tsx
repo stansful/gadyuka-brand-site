@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   type ChangeEvent,
@@ -12,10 +12,11 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
-} from "react";
-import { flushSync } from "react-dom";
-import type { LeadType } from "@/generated/prisma/enums";
-import type { Locale } from "@/i18n/locales";
+} from 'react';
+import { flushSync } from 'react-dom';
+
+import type { LeadType } from '@/generated/prisma/enums';
+import type { Locale } from '@/i18n/locales';
 import {
   DEFAULT_LEAD_TYPE,
   LEAD_HONEYPOT_FIELD,
@@ -35,11 +36,12 @@ import {
   leadIntentFromSearch,
   needsEmailOrPhone,
   parseLeadIntent,
-} from "@/lib/lead-form-config";
-import type * as Leads from "@/lib/leads";
-import { fill, type FormMessages } from "./labels";
-import { motionEnabled } from "./motion/env";
-import { gsap } from "./motion/gsap";
+} from '@/lib/lead-form-config';
+import type * as Leads from '@/lib/leads';
+
+import { fill, splitTemplate, type FormMessages } from './labels';
+import { motionEnabled } from './motion/env';
+import { gsap } from './motion/gsap';
 
 /**
  * The site's lead form — «Письмо в редакцию» in the contacts section (client component,
@@ -76,33 +78,36 @@ type Values = {
   hp: string;
 };
 
-const EMPTY_VALUES: Values = { name: "", email: "", phone: "", message: "", consent: false, hp: "" };
+const EMPTY_VALUES: Values = { name: '', email: '', phone: '', message: '', consent: false, hp: '' };
 
 const noopSubscribe = (): (() => void) => () => {};
 
-type Status = "idle" | "pending" | "success" | "error";
+type Status = 'idle' | 'pending' | 'success' | 'error';
 
 /** Displayed error per field (already localized). */
 type ErrorMessages = Partial<Record<LeadErrorField, string>>;
 
 const INPUT_ATTRS: Readonly<
-  Record<LeadInputField, { type: string; autoComplete: string; inputMode?: "email" | "tel" | "text"; maxLength: number }>
+  Record<
+    LeadInputField,
+    { type: string; autoComplete: string; inputMode?: 'email' | 'tel' | 'text'; maxLength: number }
+  >
 > = {
-  name: { type: "text", autoComplete: "name", maxLength: LEAD_LIMITS.nameMax },
-  email: { type: "email", autoComplete: "email", inputMode: "email", maxLength: LEAD_LIMITS.emailMax },
-  phone: { type: "tel", autoComplete: "tel", inputMode: "tel", maxLength: LEAD_LIMITS.phoneMax },
-  message: { type: "text", autoComplete: "off", maxLength: LEAD_LIMITS.messageMax },
+  name: { type: 'text', autoComplete: 'name', maxLength: LEAD_LIMITS.nameMax },
+  email: { type: 'email', autoComplete: 'email', inputMode: 'email', maxLength: LEAD_LIMITS.emailMax },
+  phone: { type: 'tel', autoComplete: 'tel', inputMode: 'tel', maxLength: LEAD_LIMITS.phoneMax },
+  message: { type: 'text', autoComplete: 'off', maxLength: LEAD_LIMITS.messageMax },
 };
 
 /** Which displayed fields an error should mark as invalid. */
 function fieldsOf(errorField: LeadErrorField): LeadInputField[] {
   switch (errorField) {
-    case "contact":
-      return ["email", "phone"];
-    case "name":
-    case "email":
-    case "phone":
-    case "message":
+    case 'contact':
+      return ['email', 'phone'];
+    case 'name':
+    case 'email':
+    case 'phone':
+    case 'message':
       return [errorField];
     default:
       return [];
@@ -114,11 +119,11 @@ function clearIntentFromUrl(): void {
   const url = new URL(window.location.href);
   url.searchParams.delete(LEAD_INTENT_PARAMS.type);
   url.searchParams.delete(LEAD_INTENT_PARAMS.subject);
-  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
 /** The zod validator (src/lib/leads.ts): loaded when the form is approached or touched. */
-type LeadValidator = Pick<typeof Leads, "validateLeadInput" | "leadApiResponseSchema">;
+type LeadValidator = Pick<typeof Leads, 'validateLeadInput' | 'leadApiResponseSchema'>;
 
 let validatorPromise: Promise<LeadValidator> | null = null;
 
@@ -131,7 +136,7 @@ const VALIDATOR_QUIET_MS = 1000;
 
 /** One shared import for every form on the page; a failed load (offline) can be retried. */
 function loadValidator(): Promise<LeadValidator> {
-  validatorPromise ??= import("@/lib/leads").catch((error: unknown) => {
+  validatorPromise ??= import('@/lib/leads').catch((error: unknown) => {
     validatorPromise = null;
     throw error;
   });
@@ -140,9 +145,12 @@ function loadValidator(): Promise<LeadValidator> {
 
 export type LeadFormProps = {
   locale: Locale;
-  /** Copy from the CMS; empty strings fall back to messages (forms.*). */
+  /** The form's own copy, messages contacts.form.* (src/components/site/lead-form-copy.ts). */
   copy: LeadFormCopy;
-  /** messages/*.json `forms` (resolved on the server; templates filled with fill()). */
+  /**
+   * The system texts, messages forms.* (errors, «Отправляем…»; errors.tooShort / tooLong are
+   * registry kind "template", filled in with fill()).
+   */
   labels: FormMessages;
 };
 
@@ -150,13 +158,13 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
   const baseId = useId();
 
   const [type, setType] = useState<LeadType>(DEFAULT_LEAD_TYPE);
-  const [subject, setSubject] = useState("");
+  const [subject, setSubject] = useState('');
   const [values, setValues] = useState<Values>(EMPTY_VALUES);
   const [touched, setTouched] = useState<Partial<Record<LeadErrorField, boolean>>>({});
   const [serverErrors, setServerErrors] = useState<ErrorMessages>({});
   const [submitted, setSubmitted] = useState(false);
-  const [status, setStatus] = useState<Status>("idle");
-  const [statusMessage, setStatusMessage] = useState("");
+  const [status, setStatus] = useState<Status>('idle');
+  const [statusMessage, setStatusMessage] = useState('');
   /** The no-JS result notices (:target) are dropped once the form was used with JS. */
   const [usedWithJs, setUsedWithJs] = useState(false);
   /** false in the server HTML and during hydration: the browser validates `required` fields then. */
@@ -171,15 +179,15 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
   const againRef = useRef<HTMLButtonElement>(null);
   const okRef = useRef<HTMLParagraphElement>(null);
   /** The text last prefilled into the message (replaced by the next CTA unless edited). */
-  const prefillRef = useRef("");
+  const prefillRef = useRef('');
 
   const fields = leadFieldsFor(type);
   const showContactGroup = needsEmailOrPhone(type);
 
   const ensureValidator = useCallback(
     (): Promise<LeadValidator> =>
-      loadValidator().then((loaded) => {
-        setValidator((previous) => previous ?? loaded);
+      loadValidator().then(loaded => {
+        setValidator(previous => previous ?? loaded);
         return loaded;
       }),
     [],
@@ -194,17 +202,17 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
   // Focus / input load it at once anyway (preloadValidator).
   useEffect(() => {
     const root = rootRef.current;
-    if (!root || typeof IntersectionObserver === "undefined") return;
+    if (!root || typeof IntersectionObserver === 'undefined') return;
     let quietTimer = 0;
     let idle = 0;
     let armed = false;
     const cancelIdle = (): void => {
-      if (idle && typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(idle);
+      if (idle && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idle);
       idle = 0;
     };
     const load = (): void => {
       idle = 0;
-      window.removeEventListener("scroll", arm);
+      window.removeEventListener('scroll', arm);
       void ensureValidator().catch(() => undefined);
     };
     // Every scroll starts the quiet period again — and drops an idle callback already queued
@@ -214,26 +222,27 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
       window.clearTimeout(quietTimer);
       cancelIdle();
       quietTimer = window.setTimeout(() => {
-        if (typeof window.requestIdleCallback === "function") idle = window.requestIdleCallback(load, { timeout: 2000 });
+        if (typeof window.requestIdleCallback === 'function')
+          idle = window.requestIdleCallback(load, { timeout: 2000 });
         else load();
       }, VALIDATOR_QUIET_MS);
     }
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
+      entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
         observer.disconnect();
         armed = true;
-        window.addEventListener("scroll", arm, { passive: true });
+        window.addEventListener('scroll', arm, { passive: true });
         arm();
       },
-      { rootMargin: "100% 0px" },
+      { rootMargin: '100% 0px' },
     );
     observer.observe(root);
     return () => {
       observer.disconnect();
       window.clearTimeout(quietTimer);
       cancelIdle();
-      if (armed) window.removeEventListener("scroll", arm);
+      if (armed) window.removeEventListener('scroll', arm);
     };
   }, [ensureValidator]);
 
@@ -243,12 +252,12 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
       setType(intent.type);
       setSubject(intent.subject);
       setServerErrors({});
-      setStatus((previous) => (previous === "success" || previous === "error" ? "idle" : previous));
+      setStatus(previous => (previous === 'success' || previous === 'error' ? 'idle' : previous));
       // Replace the message only while it is empty or still exactly the previous prefill.
       const previousPrefill = prefillRef.current;
-      const prefill = intent.subject ? `${intent.subject}\n` : "";
-      setValues((previous) => {
-        const untouched = previous.message.trim() === "" || previous.message === previousPrefill;
+      const prefill = intent.subject ? `${intent.subject}\n` : '';
+      setValues(previous => {
+        const untouched = previous.message.trim() === '' || previous.message === previousPrefill;
         return untouched ? { ...previous, message: prefill } : previous;
       });
       prefillRef.current = prefill;
@@ -276,11 +285,11 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
 
   // Success: the «letter received» bubble pops in.
   useEffect(() => {
-    if (status !== "success" || !okRef.current || !motionEnabled()) return;
+    if (status !== 'success' || !okRef.current || !motionEnabled()) return;
     const tween = gsap.fromTo(
       okRef.current,
       { scale: 0.4, rotation: -8, opacity: 0 },
-      { scale: 1, rotation: -2, opacity: 1, duration: 0.6, ease: "back.out(2.4)" },
+      { scale: 1, rotation: -2, opacity: 1, duration: 0.6, ease: 'back.out(2.4)' },
     );
     return () => {
       tween.revert();
@@ -289,9 +298,9 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
 
   const translateError = (error: LeadFieldError): string => {
     switch (error.code) {
-      case "tooShort":
+      case 'tooShort':
         return fill(labels.errors.tooShort, { min: error.min });
-      case "tooLong":
+      case 'tooLong':
         return fill(labels.errors.tooLong, { max: error.max });
       default:
         return labels.errors[error.code];
@@ -300,13 +309,13 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
 
   /** Only the inputs of the selected topic are sent (a hidden phone never leaks into CONTACT). */
   const buildBody = (current: Values, leadType: LeadType): LeadRequestBody => {
-    const visible = new Set(leadFieldsFor(leadType).map((field) => field.name));
+    const visible = new Set(leadFieldsFor(leadType).map(field => field.name));
     return {
       type: leadType,
       locale,
       name: current.name,
-      email: visible.has("email") ? current.email : "",
-      phone: visible.has("phone") ? current.phone : "",
+      email: visible.has('email') ? current.email : '',
+      phone: visible.has('phone') ? current.phone : '',
       message: current.message,
       consent: current.consent,
       [LEAD_HONEYPOT_FIELD]: current.hp,
@@ -316,38 +325,42 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
   // An error is shown after submit, or once its field was left (the "email or phone"
   // group error only after both fields were visited).
   const isShown = (field: LeadErrorField): boolean =>
-    submitted || (field === "contact" ? touched.email === true && touched.phone === true : touched[field] === true);
+    submitted || (field === 'contact' ? touched.email === true && touched.phone === true : touched[field] === true);
 
   // Client-side errors are derived from the current values (no extra state). Before the
   // validator has loaded nothing was left or submitted yet, so there is nothing to show.
-  const validation = validator ? validator.validateLeadInput({ ...buildBody(values, type), [LEAD_HONEYPOT_FIELD]: "" }) : null;
+  const validation = validator
+    ? validator.validateLeadInput({ ...buildBody(values, type), [LEAD_HONEYPOT_FIELD]: '' })
+    : null;
   const clientErrors: ErrorMessages = {};
-  if (validation && !validation.ok && validation.reason === "invalid") {
-    for (const [field, error] of Object.entries(validation.errors) as Array<[LeadErrorField, LeadFieldError | undefined]>) {
+  if (validation && !validation.ok && validation.reason === 'invalid') {
+    for (const [field, error] of Object.entries(validation.errors) as Array<
+      [LeadErrorField, LeadFieldError | undefined]
+    >) {
       if (error && isShown(field)) clientErrors[field] = translateError(error);
     }
   }
   const errors: ErrorMessages = { ...serverErrors, ...clientErrors };
 
-  const labelFor = (field: LeadInputField): string => copy.labels[field].trim() || labels.fields[field];
+  const labelFor = (field: LeadInputField): string => copy.labels[field];
   const fieldId = (field: string): string => `${baseId}-${field}`;
   const errorId = (field: LeadErrorField): string => `${baseId}-${field}-error`;
 
   const isFieldInvalid = (field: LeadInputField): boolean =>
-    (Object.keys(errors) as LeadErrorField[]).some((key) => errors[key] && fieldsOf(key).includes(field));
+    (Object.keys(errors) as LeadErrorField[]).some(key => errors[key] && fieldsOf(key).includes(field));
 
   const describedBy = (field: LeadInputField): string | undefined => {
     const ids: string[] = [];
     if (errors[field]) ids.push(errorId(field));
-    if ((field === "email" || field === "phone") && showContactGroup) {
-      ids.push(errors.contact ? errorId("contact") : `${baseId}-contact-hint`);
+    if ((field === 'email' || field === 'phone') && showContactGroup) {
+      ids.push(errors.contact ? errorId('contact') : `${baseId}-contact-hint`);
     }
-    return ids.length > 0 ? ids.join(" ") : undefined;
+    return ids.length > 0 ? ids.join(' ') : undefined;
   };
 
   const clearServerError = (...keys: LeadErrorField[]): void => {
-    if (keys.some((key) => serverErrors[key])) {
-      setServerErrors((previous) => {
+    if (keys.some(key => serverErrors[key])) {
+      setServerErrors(previous => {
         const next = { ...previous };
         for (const key of keys) delete next[key];
         return next;
@@ -360,31 +373,39 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
     if (!isLeadType(next)) return;
     setType(next);
     setServerErrors({});
-    if (status === "error") setStatus("idle");
+    if (status === 'error') setStatus('idle');
   };
 
   const onFieldChange = (field: LeadInputField) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = event.target.value;
-    setValues((previous) => ({ ...previous, [field]: value }));
-    clearServerError(field, ...(field === "email" || field === "phone" ? (["contact"] as const) : []));
-    if (status === "error") setStatus("idle");
+    setValues(previous => ({ ...previous, [field]: value }));
+    clearServerError(field, ...(field === 'email' || field === 'phone' ? (['contact'] as const) : []));
+    if (status === 'error') setStatus('idle');
   };
 
   const onFieldBlur = (field: LeadInputField) => () => {
-    setTouched((previous) => (previous[field] ? previous : { ...previous, [field]: true }));
+    setTouched(previous => (previous[field] ? previous : { ...previous, [field]: true }));
   };
 
   const focusFirstInvalid = (messages: ErrorMessages): void => {
     const firstField = fields
-      .map((field) => field.name)
-      .find((field) => (Object.keys(messages) as LeadErrorField[]).some((key) => messages[key] && fieldsOf(key).includes(field)));
-    const target = firstField ? fieldId(firstField) : messages.consent ? fieldId("consent") : messages.type ? fieldId("topic") : null;
+      .map(field => field.name)
+      .find(field =>
+        (Object.keys(messages) as LeadErrorField[]).some(key => messages[key] && fieldsOf(key).includes(field)),
+      );
+    const target = firstField
+      ? fieldId(firstField)
+      : messages.consent
+        ? fieldId('consent')
+        : messages.type
+          ? fieldId('topic')
+          : null;
     if (target) document.getElementById(target)?.focus();
   };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    if (status === "pending" || awaitingValidatorRef.current) return;
+    if (status === 'pending' || awaitingValidatorRef.current) return;
     setUsedWithJs(true);
 
     let loaded: LeadValidator;
@@ -394,23 +415,25 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
       awaitingValidatorRef.current = true;
       loaded = validator ?? (await ensureValidator());
     } catch {
-      setStatus("error");
+      setStatus('error');
       setStatusMessage(labels.errors.network);
       return;
     } finally {
       awaitingValidatorRef.current = false;
     }
-    const check = loaded.validateLeadInput({ ...buildBody(values, type), [LEAD_HONEYPOT_FIELD]: "" });
-    if (!check.ok && check.reason === "invalid") {
+    const check = loaded.validateLeadInput({ ...buildBody(values, type), [LEAD_HONEYPOT_FIELD]: '' });
+    if (!check.ok && check.reason === 'invalid') {
       const messages: ErrorMessages = {};
-      for (const [field, error] of Object.entries(check.errors) as Array<[LeadErrorField, LeadFieldError | undefined]>) {
+      for (const [field, error] of Object.entries(check.errors) as Array<
+        [LeadErrorField, LeadFieldError | undefined]
+      >) {
         if (error) messages[field] = translateError(error);
       }
       // Commit the error markup (aria-invalid, aria-describedby, error text) first …
       flushSync(() => {
         setSubmitted(true);
         setServerErrors({});
-        setStatus("error");
+        setStatus('error');
         setStatusMessage(labels.errors.invalidForm);
       });
       // … then move focus, so the field is announced together with its error.
@@ -420,17 +443,17 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
 
     setSubmitted(true);
     setServerErrors({});
-    setStatus("pending");
+    setStatus('pending');
     setStatusMessage(labels.sending);
     try {
-      const response = await fetch("/api/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+      const response = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(buildBody(values, type)),
       });
       const parsed = loaded.leadApiResponseSchema.safeParse(await response.json().catch(() => null));
       if (!parsed.success) {
-        setStatus("error");
+        setStatus('error');
         setStatusMessage(labels.errors.server);
         return;
       }
@@ -439,26 +462,26 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
         // The form (and the focused submit button) is replaced by the success message:
         // render it, then put focus on «send another» so keyboard users keep their place.
         flushSync(() => {
-          setStatus("success");
-          setStatusMessage(copy.success.trim() || labels.successDefault);
+          setStatus('success');
+          setStatusMessage(copy.success);
           setValues(EMPTY_VALUES);
           setTouched({});
           setSubmitted(false);
-          setSubject("");
+          setSubject('');
         });
-        prefillRef.current = "";
+        prefillRef.current = '';
         againRef.current?.focus();
         return;
       }
       const fieldErrors = result.fieldErrors;
       flushSync(() => {
-        setStatus("error");
+        setStatus('error');
         setStatusMessage(result.message);
         if (fieldErrors) setServerErrors(fieldErrors);
       });
       if (fieldErrors) focusFirstInvalid(fieldErrors);
     } catch {
-      setStatus("error");
+      setStatus('error');
       setStatusMessage(labels.errors.network);
     }
   };
@@ -466,19 +489,21 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
   const resetAfterSuccess = (): void => {
     // The «send another» button disappears; continue in the first field of the new form.
     flushSync(() => {
-      setStatus("idle");
-      setStatusMessage("");
+      setStatus('idle');
+      setStatusMessage('');
     });
     const first = fields[0];
     if (first) document.getElementById(fieldId(first.name))?.focus();
   };
 
-  const pending = status === "pending";
+  const pending = status === 'pending';
+  /** contacts.form.subjectLine «По поводу: {subject}» around the subject set by a CTA. */
+  const subjectLine = splitTemplate(copy.subjectLine, '{subject}');
 
   /** "E-mail or phone" hint / group error — right after the phone field (tailoring, partnership). */
   const contactGroup: ReactNode = showContactGroup ? (
     errors.contact ? (
-      <p id={errorId("contact")} className="field__err">
+      <p id={errorId('contact')} className="field__err">
         {errors.contact}
       </p>
     ) : (
@@ -498,22 +523,24 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
   return (
     <div
       ref={rootRef}
-      className={`lead-form${status !== "idle" ? ` is-${status}` : ""}`}
+      className={`lead-form${status !== 'idle' ? ` is-${status}` : ''}`}
       data-lead-type={type}
       onFocusCapture={preloadValidator}
       onPointerDownCapture={preloadValidator}
       onKeyDownCapture={preloadValidator}
     >
-      {subject && status !== "success" ? (
+      {subject && status !== 'success' ? (
         <p className="letter__re">
-          <span data-edit="contacts.form.subjectLabel">{copy.subjectLabel}</span> <b>{subject}</b>
+          {subjectLine.before ? <span data-edit="contacts.form.subjectLine">{subjectLine.before}</span> : null}
+          <b>{subject}</b>
+          {subjectLine.after}
         </p>
       ) : null}
 
       {usedWithJs ? null : (
         <>
           <p id={LEAD_RESULT_ANCHORS.sent} className="form__notice">
-            {copy.success.trim() || labels.successDefault}
+            {copy.success}
           </p>
           <p id={LEAD_RESULT_ANCHORS.invalid} className="form__notice form__notice--error">
             {labels.noscriptInvalid}
@@ -524,36 +551,36 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
         </>
       )}
 
-      {status !== "success" ? (
+      {status !== 'success' ? (
         <form
           className="form"
           method="post"
           action="/api/leads"
           noValidate={hydrated}
           aria-busy={pending}
-          onSubmit={(event) => void onSubmit(event)}
+          onSubmit={event => void onSubmit(event)}
         >
           <input type="hidden" name="locale" value={locale} />
-          <div className={`field${errors.type ? " is-bad" : ""}`}>
-            <label htmlFor={fieldId("topic")} data-edit="contacts.form.topicLabel">
-              {copy.topicLabel.trim() || labels.topicDefault}
+          <div className={`field${errors.type ? ' is-bad' : ''}`}>
+            <label htmlFor={fieldId('topic')} data-edit="contacts.form.topicLabel">
+              {copy.topicLabel}
             </label>
             <select
-              id={fieldId("topic")}
+              id={fieldId('topic')}
               name="type"
               value={type}
               onChange={onTopicChange}
               disabled={pending}
               aria-invalid={errors.type ? true : undefined}
-              aria-describedby={errors.type ? errorId("type") : undefined}
+              aria-describedby={errors.type ? errorId('type') : undefined}
             >
-              {LEAD_TOPICS.map((topic) => (
+              {LEAD_TOPICS.map(topic => (
                 <option key={topic.type} value={topic.type}>
-                  {copy.topics[topic.type].trim() || labels.topics[topic.type]}
+                  {copy.topics[topic.type]}
                 </option>
               ))}
             </select>
-            {renderError("type")}
+            {renderError('type')}
           </div>
 
           {fields.map(({ name: field, required }) => {
@@ -566,24 +593,24 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
               maxLength: attrs.maxLength,
               placeholder: copy.placeholders[field] || undefined,
               required,
-              "aria-required": required || undefined,
-              "aria-invalid": invalid || undefined,
-              "aria-describedby": describedBy(field),
+              'aria-required': required || undefined,
+              'aria-invalid': invalid || undefined,
+              'aria-describedby': describedBy(field),
               onChange: onFieldChange(field),
               onBlur: onFieldBlur(field),
               readOnly: pending,
             };
             const input = (
-              <div key={field} className={`field field--${field}${invalid ? " is-bad" : ""}`}>
+              <div key={field} className={`field field--${field}${invalid ? ' is-bad' : ''}`}>
                 <label htmlFor={fieldId(field)}>
                   {labelFor(field)}
                   {required ? (
                     <span className="field__req" title={labels.requiredMark} aria-hidden="true">
-                      {" *"}
+                      {' *'}
                     </span>
                   ) : null}
                 </label>
-                {field === "message" ? (
+                {field === 'message' ? (
                   <textarea {...common} rows={4} />
                 ) : (
                   <input {...common} type={attrs.type} autoComplete={attrs.autoComplete} inputMode={attrs.inputMode} />
@@ -591,7 +618,7 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
                 {renderError(field)}
               </div>
             );
-            return field === "phone" ? (
+            return field === 'phone' ? (
               <Fragment key={field}>
                 {input}
                 {contactGroup}
@@ -611,13 +638,13 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
               tabIndex={-1}
               autoComplete="off"
               value={values.hp}
-              onChange={(event) => setValues((previous) => ({ ...previous, hp: event.target.value }))}
+              onChange={event => setValues(previous => ({ ...previous, hp: event.target.value }))}
             />
           </div>
 
-          <div className={`form__consent${errors.consent ? " is-bad" : ""}`}>
+          <div className={`form__consent${errors.consent ? ' is-bad' : ''}`}>
             <input
-              id={fieldId("consent")}
+              id={fieldId('consent')}
               name="consent"
               type="checkbox"
               className="form__check"
@@ -625,25 +652,25 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
               required
               aria-required="true"
               aria-invalid={errors.consent ? true : undefined}
-              aria-describedby={errors.consent ? errorId("consent") : undefined}
-              onChange={(event) => {
+              aria-describedby={errors.consent ? errorId('consent') : undefined}
+              onChange={event => {
                 if (pending) return;
                 const checked = event.target.checked;
-                setValues((previous) => ({ ...previous, consent: checked }));
-                setTouched((previous) => ({ ...previous, consent: true }));
-                clearServerError("consent");
+                setValues(previous => ({ ...previous, consent: checked }));
+                setTouched(previous => ({ ...previous, consent: true }));
+                clearServerError('consent');
               }}
             />
-            <label htmlFor={fieldId("consent")} data-edit="contacts.form.consent">
-              {copy.consent.trim() || labels.consent}
+            <label htmlFor={fieldId('consent')} data-edit="contacts.form.consent">
+              {copy.consent}
             </label>
-            {renderError("consent")}
+            {renderError('consent')}
           </div>
 
           {/* aria-disabled instead of disabled: the button keeps focus while sending. */}
           <button type="submit" className="btn btn--red form__submit" aria-disabled={pending || undefined}>
             <span className="btn__face" data-edit="contacts.form.submit">
-              {pending ? labels.sending : copy.submit.trim() || labels.submitDefault}
+              {pending ? labels.sending : copy.submit}
             </span>
           </button>
         </form>
@@ -652,16 +679,24 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
       {/* Persistent live region: announces sending / errors / success (also after the form is replaced). */}
       <p
         ref={okRef}
-        className={status === "success" ? "form__ok" : `form__status${status === "error" ? " is-error" : ""}`}
+        className={status === 'success' ? 'form__ok' : `form__status${status === 'error' ? ' is-error' : ''}`}
         role="status"
         aria-live="polite"
       >
-        {status === "idle" ? "" : statusMessage}
+        {status === 'idle' ? '' : statusMessage}
       </p>
 
-      {status === "success" ? (
-        <button ref={againRef} type="button" className="link-btn link-btn--paper form__again" onClick={resetAfterSuccess}>
-          {labels.sendAnother} <span className="glyph" aria-hidden="true">→</span>
+      {status === 'success' ? (
+        <button
+          ref={againRef}
+          type="button"
+          className="link-btn link-btn--paper form__again"
+          onClick={resetAfterSuccess}
+        >
+          {labels.sendAnother}{' '}
+          <span className="glyph" aria-hidden="true">
+            →
+          </span>
         </button>
       ) : null}
     </div>

@@ -1,6 +1,6 @@
-import type { LeadType } from "@/generated/prisma/enums";
-import type { Locale } from "@/i18n/locales";
-import type { TextKey } from "@/lib/content/registry";
+import type { LeadType } from '@/generated/prisma/enums';
+import type { Locale } from '@/i18n/locales';
+import type { TextKey } from '@/lib/content/registry';
 
 export {
   LEAD_INTENT_EVENT,
@@ -13,7 +13,7 @@ export {
   leadSubject,
   parseLeadIntent,
   type LeadIntent,
-} from "./lead-intent";
+} from './lead-intent';
 
 /**
  * The lead form's configuration, error codes and API contract types — ISOMORPHIC and zod-free.
@@ -34,46 +34,48 @@ export const LEAD_LIMITS = {
 } as const;
 
 /** Name of the honeypot input. Real users never see it; bots fill it in. */
-export const LEAD_HONEYPOT_FIELD = "hp";
+export const LEAD_HONEYPOT_FIELD = 'hp';
 
 // ─── Error codes ────────────────────────────────────────────────────────────
 
 /** Error codes = keys of `forms.errors.*` in messages/*.json. */
 export type LeadErrorCode =
-  | "required"
-  | "invalidEmail"
-  | "invalidPhone"
-  | "contactRequired"
-  | "tooShort"
-  | "tooLong"
-  | "consentRequired"
-  | "invalidType"
-  | "invalid";
+  | 'required'
+  | 'invalidEmail'
+  | 'invalidPhone'
+  | 'contactRequired'
+  | 'tooShort'
+  | 'tooLong'
+  | 'consentRequired'
+  | 'invalidType'
+  | 'invalid';
 
 export const LEAD_SIMPLE_ERROR_CODES = [
-  "required",
-  "invalidEmail",
-  "invalidPhone",
-  "contactRequired",
-  "consentRequired",
-  "invalidType",
-  "invalid",
+  'required',
+  'invalidEmail',
+  'invalidPhone',
+  'contactRequired',
+  'consentRequired',
+  'invalidType',
+  'invalid',
 ] as const satisfies ReadonlyArray<LeadErrorCode>;
 
 export type LeadSimpleErrorCode = (typeof LEAD_SIMPLE_ERROR_CODES)[number];
 
 export type LeadFieldError =
-  { code: LeadSimpleErrorCode } | { code: "tooShort"; min: number } | { code: "tooLong"; max: number };
+  | { code: LeadSimpleErrorCode }
+  | { code: 'tooShort'; min: number }
+  | { code: 'tooLong'; max: number };
 
 /** Fields that can carry an error. `contact` = "email or phone" group error. */
-export const LEAD_ERROR_FIELDS = ["type", "name", "email", "phone", "message", "consent", "contact"] as const;
+export const LEAD_ERROR_FIELDS = ['type', 'name', 'email', 'phone', 'message', 'consent', 'contact'] as const;
 export type LeadErrorField = (typeof LEAD_ERROR_FIELDS)[number];
 
 export type LeadFieldErrors = Partial<Record<LeadErrorField, LeadFieldError>>;
 
 // ─── Form configuration ─────────────────────────────────────────────────────
 
-export type LeadInputField = "name" | "email" | "phone" | "message";
+export type LeadInputField = 'name' | 'email' | 'phone' | 'message';
 
 export type LeadFieldConfig = { name: LeadInputField; required: boolean };
 
@@ -84,27 +86,27 @@ export type LeadFieldConfig = { name: LeadInputField; required: boolean };
  */
 export const LEAD_FORM_FIELDS: Readonly<Record<LeadType, ReadonlyArray<LeadFieldConfig>>> = {
   TAILORING: [
-    { name: "name", required: true },
-    { name: "phone", required: false },
-    { name: "email", required: false },
-    { name: "message", required: false },
+    { name: 'name', required: true },
+    { name: 'phone', required: false },
+    { name: 'email', required: false },
+    { name: 'message', required: false },
   ],
   PARTNERSHIP: [
-    { name: "name", required: true },
-    { name: "email", required: false },
-    { name: "phone", required: false },
-    { name: "message", required: false },
+    { name: 'name', required: true },
+    { name: 'email', required: false },
+    { name: 'phone', required: false },
+    { name: 'message', required: false },
   ],
   CONTACT: [
-    { name: "email", required: true },
-    { name: "name", required: true },
-    { name: "message", required: false },
+    { name: 'email', required: true },
+    { name: 'name', required: true },
+    { name: 'message', required: false },
   ],
 };
 
 /** True when the form shows the "email or phone" hint/group error. */
 export function needsEmailOrPhone(type: LeadType): boolean {
-  return type !== "CONTACT";
+  return type !== 'CONTACT';
 }
 
 // ─── The contact form («Письмо в редакцию») ──────────────────────────────────
@@ -114,18 +116,18 @@ export function needsEmailOrPhone(type: LeadType): boolean {
 // LeadIntent: data-lead-type / data-lead-subject on in-page links, or ?topic=…&subject=…
 // on links from other pages (e.g. the collection page).
 
-/** Topics of the form selector, in display order (ContentBlock key of the option label). */
+/** Topics of the form selector, in display order (message key of the option label). */
 export const LEAD_TOPICS: ReadonlyArray<{ type: LeadType; key: TextKey }> = [
-  { type: "TAILORING", key: "contacts.form.topics.tailoring" },
-  { type: "PARTNERSHIP", key: "contacts.form.topics.partnership" },
-  { type: "CONTACT", key: "contacts.form.topics.contact" },
+  { type: 'TAILORING', key: 'contacts.form.topics.tailoring' },
+  { type: 'PARTNERSHIP', key: 'contacts.form.topics.partnership' },
+  { type: 'CONTACT', key: 'contacts.form.topics.contact' },
 ];
 
 /** Topic selected when nothing preselected it. */
-export const DEFAULT_LEAD_TYPE: LeadType = "CONTACT";
+export const DEFAULT_LEAD_TYPE: LeadType = 'CONTACT';
 
 /** Display order of the inputs (as in the design: e-mail, name, …). */
-export const LEAD_FIELD_ORDER: ReadonlyArray<LeadInputField> = ["email", "name", "phone", "message"];
+export const LEAD_FIELD_ORDER: ReadonlyArray<LeadInputField> = ['email', 'name', 'phone', 'message'];
 
 /**
  * Inputs shown for a topic, in display order. Which fields exist and which are required
@@ -134,25 +136,30 @@ export const LEAD_FIELD_ORDER: ReadonlyArray<LeadInputField> = ["email", "name",
  * partnership, where "e-mail or phone" is enough).
  */
 export function leadFieldsFor(type: LeadType): LeadFieldConfig[] {
-  const byName = new Map(LEAD_FORM_FIELDS[type].map((field) => [field.name, field]));
-  return LEAD_FIELD_ORDER.flatMap((name) => {
+  const byName = new Map(LEAD_FORM_FIELDS[type].map(field => [field.name, field]));
+  return LEAD_FIELD_ORDER.flatMap(name => {
     const field = byName.get(name);
     return field ? [field] : [];
   });
 }
 
-/** Copy of the contact form (from ContentBlocks; "" = fall back to messages/forms.*). */
+/**
+ * Copy of the contact form: the site messages contacts.form.*, resolved on the server
+ * (src/components/site/lead-form-copy.ts — labels, topics, consent, button and success notice
+ * are never empty there). The form's system texts (errors, «Отправляем…») are messages forms.*.
+ */
 export type LeadFormCopy = {
   topicLabel: string;
   topics: Record<LeadType, string>;
-  subjectLabel: string;
+  /** «По поводу: {subject}» — the topic preselected by a CTA ("" = the subject alone). */
+  subjectLine: string;
   labels: Record<LeadInputField, string>;
+  /** "" = no placeholder. */
   placeholders: Record<LeadInputField, string>;
   consent: string;
   submit: string;
   success: string;
 };
-
 
 // ─── Plain HTML form posts (no JS yet / no JS at all) ───────────────────────
 
@@ -161,10 +168,9 @@ export type LeadFormCopy = {
  * application/x-www-form-urlencoded to POST /api/leads, which answers with a 303 back to the
  * landing at one of these anchors; the matching notice in the form is shown by CSS :target.
  */
-export const LEAD_RESULT_ANCHORS = { sent: "lead-sent", invalid: "lead-invalid", failed: "lead-failed" } as const;
+export const LEAD_RESULT_ANCHORS = { sent: 'lead-sent', invalid: 'lead-invalid', failed: 'lead-failed' } as const;
 
 export type LeadResult = keyof typeof LEAD_RESULT_ANCHORS;
-
 
 // ─── API contract (POST /api/leads) ─────────────────────────────────────────
 
@@ -182,7 +188,12 @@ export type LeadRequestBody = {
 };
 
 export type LeadApiErrorCode =
-  "invalid_form" | "bad_request" | "unsupported_media_type" | "payload_too_large" | "rate_limited" | "server_error";
+  | 'invalid_form'
+  | 'bad_request'
+  | 'unsupported_media_type'
+  | 'payload_too_large'
+  | 'rate_limited'
+  | 'server_error';
 
 /** 201 */
 export type LeadApiSuccess = { ok: true; id: string };

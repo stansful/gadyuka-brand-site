@@ -1,6 +1,10 @@
-import type { ReactElement } from "react";
-import { type ChapterId, chapterNumber, type LandingContent, type TextKey } from "@/lib/content";
-import { RichText } from "../RichText";
+import type { Locale } from '@/i18n/locales';
+import { type ChapterId, chapterNumber, type LandingContent, type TextKey } from '@/lib/content';
+
+import type { ReactElement } from 'react';
+
+import { formatNodes, formatText } from '../message-template';
+import { RichText } from '../RichText';
 
 /**
  * Shared pieces of the comic chapters (server components).
@@ -8,20 +12,36 @@ import { RichText } from "../RichText";
  * and the menu always follow the actual order of the sections.
  */
 
-type Texts = LandingContent["texts"];
+type Texts = LandingContent['texts'];
 
-/** «Глава 02 · О нас» — the word is a content block, the number is derived from the order. */
-export function ChapterLabel({ chapter, texts, suffixKey }: { chapter: ChapterId; texts: Texts; suffixKey?: TextKey }): ReactElement {
-  const suffix = suffixKey ? texts[suffixKey] : "";
+/**
+ * «Глава 02 · О нас» — the messages common.chapterNo («Глава {number}», the number derived
+ * from the order) and, with a suffix, common.chapterLabel («{chapter} · {label}»).
+ */
+export function ChapterLabel({
+  chapter,
+  texts,
+  locale,
+  suffixKey,
+}: {
+  chapter: ChapterId;
+  texts: Texts;
+  locale: Locale;
+  suffixKey?: TextKey;
+}): ReactElement {
+  const suffix = suffixKey ? texts[suffixKey] : '';
+  const number = (
+    <span data-edit="common.chapterNo">
+      {formatText(texts['common.chapterNo'], locale, { number: chapterNumber(chapter) })}
+    </span>
+  );
+  if (!suffix || !suffixKey) return <span>{number}</span>;
   return (
-    <span>
-      <span data-edit="common.chapter">{texts["common.chapter"]}</span> {chapterNumber(chapter)}
-      {suffix && suffixKey ? (
-        <>
-          {" · "}
-          <span data-edit={suffixKey}>{suffix}</span>
-        </>
-      ) : null}
+    <span data-edit="common.chapterLabel">
+      {formatNodes(texts['common.chapterLabel'], locale, {
+        chapter: number,
+        label: <span data-edit={suffixKey}>{suffix}</span>,
+      })}
     </span>
   );
 }
@@ -29,6 +49,7 @@ export function ChapterLabel({ chapter, texts, suffixKey }: { chapter: ChapterId
 type ChapterHeaderProps = {
   chapter: ChapterId;
   texts: Texts;
+  locale: Locale;
   titleKey: TextKey;
   narrationKey: TextKey;
   suffixKey?: TextKey;
@@ -36,14 +57,22 @@ type ChapterHeaderProps = {
 };
 
 /** Chapter opening: «Глава NN», the inked title (with the hatched offset shadow), the narration plate. */
-export function ChapterHeader({ chapter, texts, titleKey, narrationKey, suffixKey, headingId }: ChapterHeaderProps): ReactElement {
+export function ChapterHeader({
+  chapter,
+  texts,
+  locale,
+  titleKey,
+  narrationKey,
+  suffixKey,
+  headingId,
+}: ChapterHeaderProps): ReactElement {
   const title = texts[titleKey];
   const narration = texts[narrationKey];
   return (
     <header className="chapter">
       <span className="chapter__sheet" aria-hidden="true" />
       <p className="chapter__no">
-        <ChapterLabel chapter={chapter} texts={texts} suffixKey={suffixKey} />
+        <ChapterLabel chapter={chapter} texts={texts} locale={locale} suffixKey={suffixKey} />
       </p>
       <h2 className="chapter__title" id={headingId} data-edit={titleKey} data-text={title}>
         {title}
@@ -57,10 +86,10 @@ export function ChapterHeader({ chapter, texts, titleKey, narrationKey, suffixKe
   );
 }
 
-/** «— 02 —» at the bottom of a chapter page. */
+/** «— 02 —» at the bottom of a chapter page (an aria-hidden ornament: no copy, nothing to translate). */
 export function Folio({ chapter, paper = false }: { chapter: ChapterId; paper?: boolean }): ReactElement {
   return (
-    <span className={paper ? "folio folio--paper" : "folio"} aria-hidden="true">
+    <span className={paper ? 'folio folio--paper' : 'folio'} aria-hidden="true">
       — {chapterNumber(chapter)} —
     </span>
   );
@@ -69,7 +98,7 @@ export function Folio({ chapter, paper = false }: { chapter: ChapterId; paper?: 
 const ARROWS = /([←→])/;
 
 /**
- * CMS text with its arrows (← →) set in the system UI face, as in the concept: Tektur has no
+ * Message text with its arrows (← →) set in the system UI face, as in the concept: Tektur has no
  * arrows, and next/font's metric-adjusted Arial fallback would draw thin, long ones.
  */
 export function WithGlyphs({ text }: { text: string }): ReactElement {
@@ -89,8 +118,9 @@ export function WithGlyphs({ text }: { text: string }): ReactElement {
 }
 
 /**
- * Designed empty state: a dashed, inked frame with a hand-lettered text from the CMS. Rendered
- * as RichText, so a RICHTEXT block (news.text) keeps the paragraphs the admin separated.
+ * Designed empty state: a dashed, inked frame (with an aria-hidden «?» ornament) and a
+ * hand-lettered message. Rendered as RichText, so a richtext message (news.text) keeps the
+ * paragraphs the admin separated.
  */
 export function EmptyState({ text, editKey }: { text: string; editKey: TextKey }): ReactElement {
   return (

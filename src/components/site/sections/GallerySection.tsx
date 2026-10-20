@@ -1,19 +1,19 @@
-import { getMessages } from "next-intl/server";
-import type { ReactElement } from "react";
-import type { LandingContent } from "@/lib/content";
-import { SECTION_ANCHORS, chapterNumber } from "@/lib/content";
-import { pad2 } from "../format";
-import { imgAttrs } from "../image-props";
-import { fill } from "../labels";
-import { aspectOf, coverSizes, galleryLayout } from "../layout-rules";
-import { RichText } from "../RichText";
-import { GalleryGrid, type GalleryPicture, GalleryScene } from "../scenes/GalleryScene";
-import { ChapterHeader, EmptyState, Folio } from "./parts";
+import type { LandingContent } from '@/lib/content';
+import { SECTION_ANCHORS, chapterNumber } from '@/lib/content';
+
+import type { ReactElement } from 'react';
+
+import { pad2 } from '../format';
+import { imgAttrs } from '../image-props';
+import { aspectOf, coverSizes, galleryLayout } from '../layout-rules';
+import { formatText } from '../message-template';
+import { RichText } from '../RichText';
+import { GalleryGrid, type GalleryPicture, GalleryScene } from '../scenes/GalleryScene';
+import { ChapterHeader, EmptyState, Folio } from './parts';
 
 /** Глава 06 · Галерея — «evidence photos» printed in ink (colour on hover), opened in a lightbox. */
-export async function GallerySection({ content }: { content: LandingContent }): Promise<ReactElement> {
-  const { texts, gallery } = content;
-  const { common } = await getMessages();
+export function GallerySection({ content }: { content: LandingContent }): ReactElement {
+  const { texts, gallery, locale } = content;
   const cells = galleryLayout(gallery.length);
   // The pictures' attributes are computed here (next/image output): the grid renders plain <img>
   // (no next/image client component); the viewer derives its larger variant from them.
@@ -21,7 +21,11 @@ export async function GallerySection({ content }: { content: LandingContent }): 
     const cell = cells[i];
     if (!cell) return [];
     /** A gallery link is never nameless: its media alt, its caption, or «Фото 03». */
-    const alt = item.image.alt || item.caption || item.image.altDefault || fill(common.galleryPhoto, { number: pad2(i + 1) });
+    const alt =
+      item.image.alt ||
+      item.caption ||
+      item.image.altDefault ||
+      formatText(texts['common.galleryPhoto'], locale, { number: pad2(i + 1) });
     const { src, width, height } = item.image;
     return [
       {
@@ -34,14 +38,32 @@ export async function GallerySection({ content }: { content: LandingContent }): 
     ];
   });
   return (
-    <GalleryScene id={SECTION_ANCHORS.gallery} className="page" labelledBy="gallery-title" folio={chapterNumber("gallery")}>
+    <GalleryScene
+      id={SECTION_ANCHORS.gallery}
+      className="page"
+      labelledBy="gallery-title"
+      folio={chapterNumber('gallery')}
+    >
       <div className="wrap">
-        <ChapterHeader chapter="gallery" texts={texts} titleKey="gallery.title" narrationKey="gallery.narration" headingId="gallery-title" />
-        <RichText text={texts["gallery.text"]} editKey="gallery.text" className="lead lead--wide" reveal />
+        <ChapterHeader
+          chapter="gallery"
+          texts={texts}
+          locale={locale}
+          titleKey="gallery.title"
+          narrationKey="gallery.narration"
+          headingId="gallery-title"
+        />
+        <RichText text={texts['gallery.text']} editKey="gallery.text" className="lead lead--wide" reveal />
         <GalleryGrid
           pictures={pictures}
-          labels={{ imageViewer: common.imageViewer, previousImage: common.previousImage, nextImage: common.nextImage, closeViewer: common.closeViewer }}
-          empty={<EmptyState text={texts["gallery.empty"]} editKey="gallery.empty" />}
+          labels={{
+            imageViewer: texts['common.imageViewer'],
+            previousImage: texts['common.previousImage'],
+            nextImage: texts['common.nextImage'],
+            closeViewer: texts['common.closeViewer'],
+            counter: texts['gallery.counter'],
+          }}
+          empty={<EmptyState text={texts['gallery.empty']} editKey="gallery.empty" />}
         />
       </div>
       <Folio chapter="gallery" />

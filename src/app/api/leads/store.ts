@@ -1,9 +1,10 @@
-import "server-only";
-import type { Prisma } from "@/generated/prisma/client";
-import { db } from "@/lib/db";
-import type { LeadSubmission } from "@/lib/leads";
-import type { TelegramLead } from "@/lib/telegram";
-import type { LeadStore } from "./submit";
+import 'server-only';
+import type { Prisma } from '@/generated/prisma/client';
+import { db } from '@/lib/db';
+import type { LeadSubmission } from '@/lib/leads';
+import type { TelegramLead } from '@/lib/telegram';
+
+import type { LeadStore } from './submit';
 
 /**
  * DB access for POST /api/leads (kept separate so the flow can be tested with fakes).
@@ -22,7 +23,7 @@ export type LeadMeta = {
   consentAt: string;
   userAgent: string | null;
   referer: string | null;
-  source: "site";
+  source: 'site';
 };
 
 const telegramLeadSelect = {
@@ -42,12 +43,12 @@ function leadStore(tx: Prisma.TransactionClient): LeadStore {
     oldestInWindow: async (ipHash, since) => {
       const row = await tx.lead.findFirst({
         where: { ipHash, createdAt: { gte: since } },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: 'asc' },
         select: { createdAt: true },
       });
       return row?.createdAt ?? null;
     },
-    countAllRecent: (since) => tx.lead.count({ where: { createdAt: { gte: since } } }),
+    countAllRecent: since => tx.lead.count({ where: { createdAt: { gte: since } } }),
     insert: (lead: LeadSubmission, ipHash: string, meta: LeadMeta, options): Promise<TelegramLead> => {
       const metaJson: Prisma.InputJsonObject = {
         consentAt: meta.consentAt,
@@ -76,7 +77,7 @@ function leadStore(tx: Prisma.TransactionClient): LeadStore {
 /** Runs `work` in a transaction serialized per ipHash (pg_advisory_xact_lock). */
 export async function withLeadLock<T>(ipHash: string, work: (store: LeadStore) => Promise<T>): Promise<T> {
   return db.$transaction(
-    async (tx) => {
+    async tx => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LEAD_LOCK_NAMESPACE}::int4, hashtext(${ipHash}::text))`;
       return work(leadStore(tx));
     },

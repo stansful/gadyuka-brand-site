@@ -1,5 +1,7 @@
-import { z } from "zod";
-import { defaultLocale, isLocale, locales, type Locale } from "@/i18n/locales";
+import { z } from 'zod';
+
+import { defaultLocale, isLocale, locales, type Locale } from '@/i18n/locales';
+import type { AdminValidationKey } from '@/lib/admin/i18n';
 
 /**
  * LocalizedText — the shape of every translatable DB field (Prisma `Json`):
@@ -29,10 +31,13 @@ export const localizedTextSchema = z
     return out;
   });
 
-/** Like localizedTextSchema, but the default locale (ru) must be filled in. */
+/**
+ * Like localizedTextSchema, but the default locale (ru) must be filled in. Used by the admin
+ * forms: the issue message is an admin.validation key, translated by the admin's parseInput.
+ */
 export const requiredLocalizedTextSchema = localizedTextSchema.refine(
-  (value) => (value[defaultLocale] ?? "").length > 0,
-  { message: `Заполните текст на языке по умолчанию (${defaultLocale})` },
+  value => (value[defaultLocale] ?? '').length > 0,
+  { message: 'requiredText' satisfies AdminValidationKey, params: { locale: defaultLocale } },
 );
 
 /**
@@ -46,14 +51,14 @@ export function parseLocalizedText(value: unknown): LocalizedText {
   if (value === null || value === undefined) return {};
   const parsed = storedLocalizedTextSchema.safeParse(value);
   if (!parsed.success) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("[i18n-text] Ignoring malformed LocalizedText value:", value);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[i18n-text] Ignoring malformed LocalizedText value:', value);
     }
     return {};
   }
   const out: LocalizedText = {};
   for (const [key, text] of Object.entries(parsed.data)) {
-    if (isLocale(key) && typeof text === "string") out[key] = text;
+    if (isLocale(key) && typeof text === 'string') out[key] = text;
   }
   return out;
 }
@@ -71,8 +76,8 @@ export function readText(value: unknown, locale: Locale, options: ReadTextOption
   const text = parseLocalizedText(value);
   const own = text[locale]?.trim();
   if (own) return own;
-  if (options.fallback === false) return "";
-  return text[defaultLocale]?.trim() ?? "";
+  if (options.fallback === false) return '';
+  return text[defaultLocale]?.trim() ?? '';
 }
 
 /** Same as readText but returns null instead of "" (handy for optional UI parts). */
@@ -88,7 +93,7 @@ export function hasTranslation(value: unknown, locale: Locale): boolean {
 
 /** Locales that have no translation yet (for "needs translation" badges in the admin). */
 export function missingLocales(value: unknown): Locale[] {
-  return locales.filter((locale) => !hasTranslation(value, locale));
+  return locales.filter(locale => !hasTranslation(value, locale));
 }
 
 /** Build a LocalizedText, dropping empty values: lt({ ru: "Каталог", en: "Catalog" }). */

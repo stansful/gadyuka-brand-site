@@ -1,14 +1,14 @@
-import "server-only";
-import type { Prisma } from "@/generated/prisma/client";
-import { defaultLocale, type Locale } from "@/i18n/locales";
-import { readText } from "@/lib/i18n-text";
-import { mediaPublicUrl } from "@/lib/media-url";
-import type { ImageRef } from "./types";
+import 'server-only';
+import type { Prisma } from '@/generated/prisma/client';
+import { defaultLocale, type Locale } from '@/i18n/locales';
+import { readText } from '@/lib/i18n-text';
+
+import type { ImageRef } from './types';
 
 /** Prisma `select` for every media relation the read layer exposes. */
 export const mediaSelect = {
   id: true,
-  path: true,
+  url: true,
   width: true,
   height: true,
   mime: true,
@@ -21,7 +21,8 @@ export function toImageRef(media: MediaRow | null | undefined, locale: Locale): 
   if (!media) return null;
   return {
     id: media.id,
-    src: mediaPublicUrl(media.path),
+    // Media.url: the public link stored at upload time ("/media/<key>", src/lib/storage/keys.ts).
+    src: media.url,
     width: media.width,
     height: media.height,
     mime: media.mime,
@@ -36,8 +37,8 @@ export function toImageRef(media: MediaRow | null | undefined, locale: Locale): 
 export function toLines(text: string): string[] {
   return text
     .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
 }
 
 /** Build a fully-populated record from a key list. */

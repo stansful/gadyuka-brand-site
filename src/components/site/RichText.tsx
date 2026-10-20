@@ -1,8 +1,8 @@
-import type { ReactElement } from "react";
+import type { ReactElement } from 'react';
 
 type RichTextProps = {
   text: string;
-  /** data-edit key of the ContentBlock (omit for entity fields). */
+  /** data-edit: the message key (omit for entity fields). */
   editKey?: string;
   /** data-field of an entity field (inside a data-entity element). */
   field?: string;
@@ -18,11 +18,11 @@ type RichTextProps = {
 export function RichText({ text, editKey, field, className, reveal = false }: RichTextProps): ReactElement | null {
   const paragraphs = text
     .split(/\r?\n\s*\r?\n/)
-    .map((paragraph) => paragraph.trim())
-    .filter((paragraph) => paragraph.length > 0);
+    .map(paragraph => paragraph.trim())
+    .filter(paragraph => paragraph.length > 0);
   if (paragraphs.length === 0) return null;
   return (
-    <div className={className} data-edit={editKey} data-field={field} data-reveal={reveal ? "" : undefined}>
+    <div className={className} data-edit={editKey} data-field={field} data-reveal={reveal ? '' : undefined}>
       {paragraphs.map((paragraph, index) => (
         <p key={index}>
           {paragraph.split(/\r?\n/).map((line, lineIndex, lines) => (

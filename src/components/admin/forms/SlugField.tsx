@@ -1,10 +1,14 @@
-"use client";
+'use client';
 
-import { Wand } from "lucide-react";
-import type { ReactElement } from "react";
-import { slugify } from "@/lib/admin/slug";
-import { describedBy, Field } from "../ui/Field";
-import { TextInput } from "../ui/inputs";
+import { Wand } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+
+import { slugify } from '@/lib/admin/slug';
+
+import type { ReactElement } from 'react';
+
+import { describedBy, Field } from '../ui/Field';
+import { TextInput } from '../ui/inputs';
 
 /** URL slug input with «из названия» (transliterates the Russian title). */
 export function SlugField({
@@ -24,16 +28,17 @@ export function SlugField({
   /** Shown before the input, e.g. "/catalog/". */
   prefix?: string;
 }): ReactElement {
-  const hint = "Латиница, цифры и дефисы. Используется в адресе страницы и не должен повторяться.";
+  const t = useTranslations('admin.form.slug');
+  const hint = t('hint');
   return (
-    <Field htmlFor={id} label="Адрес (slug)" required hint={hint} error={error}>
+    <Field htmlFor={id} label={t('label')} required hint={hint} error={error}>
       <div className="flex items-stretch gap-2">
         <div className="flex min-w-0 flex-1 items-center rounded-md">
           {prefix ? <span className="mr-2 shrink-0 font-mono text-xs text-muted">{prefix}</span> : null}
           <TextInput
             id={id}
             value={value}
-            onChange={(event) => onChange(event.target.value.toLowerCase())}
+            onChange={event => onChange(event.target.value.toLowerCase())}
             invalid={Boolean(error)}
             aria-describedby={describedBy(id, hint, error)}
             aria-required
@@ -48,10 +53,10 @@ export function SlugField({
           onClick={() => onChange(slugify(source))}
           disabled={!source.trim()}
           className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-md border border-line-strong px-3 text-xs text-fg/80 hover:bg-raised disabled:opacity-40"
-          title="Сгенерировать из русского названия"
+          title={t('generateTitle')}
         >
           <Wand className="size-4" aria-hidden />
-          Из названия
+          {t('generate')}
         </button>
       </div>
     </Field>

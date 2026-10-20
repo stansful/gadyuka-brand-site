@@ -3,7 +3,7 @@
  * a separate root layout, so neither preflight nor utilities reach the public site.
  * Class detection is limited to the admin sources.
  */
-@import "tailwindcss" source(none);
+@import 'tailwindcss' source(none);
 @source "./";
 @source "../../components/admin";
 
@@ -26,8 +26,8 @@
   --color-red-hi: #e0193c;
   --color-red-fg: #ff8597;
 
-  --font-sans: var(--font-admin), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-sans: var(--font-admin), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 }
 
 @layer base {
@@ -58,7 +58,7 @@
     backdrop-filter: blur(2px);
   }
 
-  input[type="date"]::-webkit-calendar-picker-indicator {
+  input[type='date']::-webkit-calendar-picker-indicator {
     filter: invert(0.85);
   }
 }

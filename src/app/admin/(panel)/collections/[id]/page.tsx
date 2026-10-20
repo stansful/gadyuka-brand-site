@@ -1,29 +1,40 @@
-import type { Metadata } from "next";
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import type { ReactElement } from "react";
-import { CollectionForm } from "@/components/admin/forms/CollectionForm";
-import { PageHeader } from "@/components/admin/ui/layout";
-import { countRu } from "@/lib/admin/labels";
-import { getCollectionForm } from "@/lib/admin/queries";
+import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
-export const metadata: Metadata = { title: "Коллекция" };
+import { CollectionForm } from '@/components/admin/forms/CollectionForm';
+import { PageHeader } from '@/components/admin/ui/layout';
+import { adminPageMetadata } from '@/lib/admin/i18n-server';
+import { getCollectionForm } from '@/lib/admin/queries';
 
-export default async function EditCollectionPage({ params }: PageProps<"/admin/collections/[id]">): Promise<ReactElement> {
+import type { Metadata } from 'next';
+import type { ReactElement } from 'react';
+
+export function generateMetadata(): Promise<Metadata> {
+  return adminPageMetadata('collections.editTitle');
+}
+
+export default async function EditCollectionPage({
+  params,
+}: PageProps<'/admin/collections/[id]'>): Promise<ReactElement> {
   const { id } = await params;
-  const collection = await getCollectionForm(id);
+  const [collection, t, tCommon] = await Promise.all([
+    getCollectionForm(id),
+    getTranslations('admin.collections'),
+    getTranslations('admin.common'),
+  ]);
   if (!collection) notFound();
   return (
     <>
       <PageHeader
         title={collection.title.ru || collection.slug}
         backHref="/admin/collections"
-        backLabel="Все коллекции"
+        backLabel={t('back')}
         description={
           <>
-            {countRu(collection.productCount, "товар", "товара", "товаров")} ·{" "}
+            {tCommon('products', { count: collection.productCount })} ·{' '}
             <Link href="/admin/products" className="text-beige hover:underline">
-              перейти к товарам
+              {t('goToProducts')}
             </Link>
           </>
         }

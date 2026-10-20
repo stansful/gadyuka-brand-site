@@ -1,15 +1,22 @@
-import { clsx } from "clsx";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
-import type { ReactElement, ReactNode } from "react";
+import { clsx } from 'clsx';
+import { ArrowLeft } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 
-/** Page title row: optional back link, title, description, actions on the right. */
+import type { ReactElement, ReactNode } from 'react';
+
+/**
+ * Shared admin layout pieces (Server and Client Components: copy via useTranslations, which
+ * works in both — never call them from an async component's body, only render them).
+ */
+
+/** Page title row: optional back link («Назад» by default), title, description, actions on the right. */
 export function PageHeader({
   title,
   description,
   actions,
   backHref,
-  backLabel = "Назад",
+  backLabel,
 }: {
   title: ReactNode;
   description?: ReactNode;
@@ -17,6 +24,7 @@ export function PageHeader({
   backHref?: string;
   backLabel?: string;
 }): ReactElement {
+  const t = useTranslations('admin.ui');
   return (
     <header className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       <div className="min-w-0">
@@ -26,7 +34,7 @@ export function PageHeader({
             className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-muted transition-colors hover:text-beige"
           >
             <ArrowLeft className="size-3.5" aria-hidden />
-            {backLabel}
+            {backLabel ?? t('back')}
           </Link>
         ) : null}
         <h1 className="text-2xl font-semibold tracking-tight text-fg">{title}</h1>
@@ -54,7 +62,7 @@ export function Card({
   bodyClassName?: string;
 }): ReactElement {
   return (
-    <section className={clsx("rounded-xl border border-line bg-panel", className)}>
+    <section className={clsx('rounded-xl border border-line bg-panel', className)}>
       {title || actions ? (
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-3.5">
           <div>
@@ -64,26 +72,40 @@ export function Card({
           {actions}
         </div>
       ) : null}
-      <div className={clsx("p-5", bodyClassName)}>{children}</div>
+      <div className={clsx('p-5', bodyClassName)}>{children}</div>
     </section>
   );
 }
 
-export type BadgeTone = "neutral" | "beige" | "blue" | "red" | "outline";
+export type BadgeTone = 'neutral' | 'beige' | 'blue' | 'red' | 'outline';
 
 const tones: Record<BadgeTone, string> = {
-  neutral: "bg-raised-hi text-muted",
-  beige: "bg-beige/15 text-beige",
-  blue: "bg-blue text-blue-fg",
-  red: "bg-red/20 text-red-fg",
-  outline: "border border-line-strong text-muted",
+  neutral: 'bg-raised-hi text-muted',
+  beige: 'bg-beige/15 text-beige',
+  blue: 'bg-blue text-blue-fg',
+  red: 'bg-red/20 text-red-fg',
+  outline: 'border border-line-strong text-muted',
 };
 
-export function Badge({ tone = "neutral", children, className, title }: { tone?: BadgeTone; children: ReactNode; className?: string; title?: string }): ReactElement {
+export function Badge({
+  tone = 'neutral',
+  children,
+  className,
+  title,
+}: {
+  tone?: BadgeTone;
+  children: ReactNode;
+  className?: string;
+  title?: string;
+}): ReactElement {
   return (
     <span
       title={title}
-      className={clsx("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-4 whitespace-nowrap", tones[tone], className)}
+      className={clsx(
+        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-4 whitespace-nowrap',
+        tones[tone],
+        className,
+      )}
     >
       {children}
     </span>
@@ -115,14 +137,15 @@ export function EmptyState({
 }
 
 export function Skeleton({ className }: { className?: string }): ReactElement {
-  return <div aria-hidden className={clsx("animate-pulse rounded-md bg-raised-hi", className)} />;
+  return <div aria-hidden className={clsx('animate-pulse rounded-md bg-raised-hi', className)} />;
 }
 
 /** Generic page skeleton (loading.tsx). */
 export function PageSkeleton({ rows = 6 }: { rows?: number }): ReactElement {
+  const t = useTranslations('admin.ui');
   return (
     <div role="status" aria-live="polite" className="flex flex-col gap-6">
-      <span className="sr-only">Загрузка…</span>
+      <span className="sr-only">{t('loading')}</span>
       <div className="flex flex-col gap-2">
         <Skeleton className="h-7 w-56" />
         <Skeleton className="h-4 w-96 max-w-full" />

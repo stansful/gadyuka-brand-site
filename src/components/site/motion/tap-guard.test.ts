@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
-import { TAP_GUARD } from "./boot";
+import { describe, expect, it, vi } from 'vitest';
+
+import { TAP_GUARD } from './boot';
 import {
   TAP_AFTER_END_MS,
   TAP_MOVE_MIN_PX,
@@ -7,7 +8,7 @@ import {
   TAP_SLOP_PX,
   TAP_STALL_MARGIN_MS,
   TAP_TRAVEL_PX,
-} from "./tap-guard";
+} from './tap-guard';
 
 /** A nested scroller (the mobile menu, a row of collection covers) and what it holds. */
 class FakeScroller {
@@ -44,16 +45,20 @@ function boot() {
   const document = {};
   const window: BootWindow = { scrollY: 0 };
   const on = (type: string, fn: Handler, options?: boolean | { once?: boolean }): void => {
-    const once = typeof options === "object" && options.once === true;
+    const once = typeof options === 'object' && options.once === true;
     handlers.set(type, [...(handlers.get(type) ?? []), { fn, once }]);
   };
-  const run = new Function("d", "document", "window", "addEventListener", "performance", TAP_GUARD);
+  const run = new Function('d', 'document', 'window', 'addEventListener', 'performance', TAP_GUARD);
   run(d, document, window, on, { now: () => clock.now });
   const fire = (type: string, event: Record<string, unknown>): void => {
     const list = handlers.get(type);
     if (!list?.length) throw new Error(`no ${type} listener`);
     for (const l of [...list]) {
-      if (l.once) handlers.set(type, (handlers.get(type) ?? []).filter((x) => x !== l));
+      if (l.once)
+        handlers.set(
+          type,
+          (handlers.get(type) ?? []).filter(x => x !== l),
+        );
       l.fn({ type, ...event });
     }
   };
@@ -77,24 +82,30 @@ function boot() {
     scroll: (by = 40, target?: FakeScroller) => {
       if (target) {
         target.scrollLeft += by;
-        fire("scroll", { target });
+        fire('scroll', { target });
       } else {
         window.scrollY += by;
-        fire("scroll", { target: document });
+        fire('scroll', { target: document });
       }
     },
     /** A finger (identifier 0) put down at (x, y); `stamp` is when it landed (its event's timeStamp). */
     touch: (target: object = page, x = 100, y = 400, stamp?: number) =>
-      fire("touchstart", { target, timeStamp: stamp ?? clock.now, changedTouches: [{ identifier: 0, clientX: x, clientY: y }] }),
-    move: (x: number, y: number, id = 0) => fire("touchmove", { changedTouches: [{ identifier: id, clientX: x, clientY: y }] }),
-    lift: (x = 100, y = 400, id = 0) => fire("touchend", { changedTouches: [{ identifier: id, clientX: x, clientY: y }] }),
-    click: (event: Record<string, unknown> = {}) => cancelable("click", event),
-    mousedown: (event: Record<string, unknown> = {}) => cancelable("mousedown", event),
+      fire('touchstart', {
+        target,
+        timeStamp: stamp ?? clock.now,
+        changedTouches: [{ identifier: 0, clientX: x, clientY: y }],
+      }),
+    move: (x: number, y: number, id = 0) =>
+      fire('touchmove', { changedTouches: [{ identifier: id, clientX: x, clientY: y }] }),
+    lift: (x = 100, y = 400, id = 0) =>
+      fire('touchend', { changedTouches: [{ identifier: id, clientX: x, clientY: y }] }),
+    click: (event: Record<string, unknown> = {}) => cancelable('click', event),
+    mousedown: (event: Record<string, unknown> = {}) => cancelable('mousedown', event),
   };
 }
 
-describe("tap guard", () => {
-  it("lets a tap on a page at rest through (its mousedown too)", () => {
+describe('tap guard', () => {
+  it('lets a tap on a page at rest through (its mousedown too)', () => {
     const g = boot();
     g.at(1000);
     g.scroll();
@@ -106,7 +117,7 @@ describe("tap guard", () => {
     expect(g.window.__gadyukaTapsBlocked).toBeUndefined();
   });
 
-  it("cancels the mousedown and the click of a touch that landed on a moving page (a fling)", () => {
+  it('cancels the mousedown and the click of a touch that landed on a moving page (a fling)', () => {
     const g = boot();
     g.at(1000);
     g.scroll();
@@ -120,7 +131,7 @@ describe("tap guard", () => {
     expect(g.window.__gadyukaTapsBlocked).toBe(1);
   });
 
-  it("does not count scroll frames of a pixel or two (the end of an anchor tween) as moving", () => {
+  it('does not count scroll frames of a pixel or two (the end of an anchor tween) as moving', () => {
     const g = boot();
     g.at(1000);
     g.scroll(TAP_MOVE_MIN_PX - 1);
@@ -133,7 +144,7 @@ describe("tap guard", () => {
     expect(g.click()).toBe(true);
   });
 
-  it("widens the moving window by the delay of a late touchstart (a busy main thread)", () => {
+  it('widens the moving window by the delay of a late touchstart (a busy main thread)', () => {
     const g = boot();
     g.at(1000);
     g.scroll();
@@ -154,7 +165,7 @@ describe("tap guard", () => {
     expect(h.click()).toBe(true);
   });
 
-  it("cancels the click of a touch that moved the page before the finger lifted (a flick)", () => {
+  it('cancels the click of a touch that moved the page before the finger lifted (a flick)', () => {
     const g = boot();
     g.at(5000);
     g.touch();
@@ -164,7 +175,7 @@ describe("tap guard", () => {
     expect(g.click()).toBe(false);
   });
 
-  it("measures the page moving up to the lift, not what the tap itself shifts before its click", () => {
+  it('measures the page moving up to the lift, not what the tap itself shifts before its click', () => {
     const g = boot();
     g.at(5000);
     g.touch();
@@ -174,7 +185,7 @@ describe("tap guard", () => {
     expect(g.click()).toBe(true);
   });
 
-  it("lets a tap through when the page only shifted within the slop", () => {
+  it('lets a tap through when the page only shifted within the slop', () => {
     const g = boot();
     g.at(5000);
     g.touch();
@@ -183,7 +194,7 @@ describe("tap guard", () => {
     expect(g.click()).toBe(true);
   });
 
-  it("cancels the click of a whole flick taken for a tap (its finger travelled, the page still)", () => {
+  it('cancels the click of a whole flick taken for a tap (its finger travelled, the page still)', () => {
     const g = boot();
     g.at(5000);
     g.touch(g.page, 200, 700);
@@ -193,7 +204,7 @@ describe("tap guard", () => {
     expect(g.click()).toBe(false);
   });
 
-  it("cancels the click when the finger went away and came back", () => {
+  it('cancels the click when the finger went away and came back', () => {
     const g = boot();
     g.at(5000);
     g.touch(g.page, 200, 700);
@@ -202,7 +213,7 @@ describe("tap guard", () => {
     expect(g.click()).toBe(false);
   });
 
-  it("lets a tap through when the finger only wobbled within the slop", () => {
+  it('lets a tap through when the finger only wobbled within the slop', () => {
     const g = boot();
     g.at(5000);
     g.touch(g.page, 200, 700);
@@ -211,7 +222,7 @@ describe("tap guard", () => {
     expect(g.click()).toBe(true);
   });
 
-  it("follows the finger of the latest touchstart, not another one", () => {
+  it('follows the finger of the latest touchstart, not another one', () => {
     const g = boot();
     g.at(5000);
     g.touch(g.page, 200, 700);
@@ -229,10 +240,10 @@ describe("tap guard", () => {
     expect(g.click({ detail: 0 })).toBe(true);
     // a touch laptop: a finger swipe, then the trackpad
     expect(g.mousedown({ sourceCapabilities: { firesTouchEvents: false } })).toBe(true);
-    expect(g.click({ pointerType: "mouse" })).toBe(true);
-    expect(g.click({ pointerType: "pen" })).toBe(true);
+    expect(g.click({ pointerType: 'mouse' })).toBe(true);
+    expect(g.click({ pointerType: 'pen' })).toBe(true);
     // its own touch click is still judged
-    expect(g.click({ pointerType: "touch" })).toBe(false);
+    expect(g.click({ pointerType: 'touch' })).toBe(false);
   });
 
   it("judges only events within TAP_AFTER_END_MS of the touch's lift, and one click per touch", () => {
@@ -257,7 +268,7 @@ describe("tap guard", () => {
     expect(g.click()).toBe(true);
   });
 
-  it("counts a nested scroller moving only for touches inside it", () => {
+  it('counts a nested scroller moving only for touches inside it', () => {
     const g = boot();
     const covers = new FakeScroller();
     const cover = new FakeNode();
@@ -275,7 +286,7 @@ describe("tap guard", () => {
     expect(g.click()).toBe(true);
   });
 
-  it("cancels the click of a touch that swiped a nested scroller", () => {
+  it('cancels the click of a touch that swiped a nested scroller', () => {
     const g = boot();
     const covers = new FakeScroller();
     const cover = new FakeNode();
@@ -290,7 +301,7 @@ describe("tap guard", () => {
     expect(g.click({ target: cover })).toBe(false);
   });
 
-  it("cancels the click of a touch on a row that started scrolling during it (not the last scroller before)", () => {
+  it('cancels the click of a touch on a row that started scrolling during it (not the last scroller before)', () => {
     const g = boot();
     const rowA = new FakeScroller();
     const rowB = new FakeScroller();

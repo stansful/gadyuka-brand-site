@@ -1,18 +1,24 @@
-import type { Metadata, Viewport } from "next";
-import { Montserrat, Shantell_Sans, Tektur } from "next/font/google";
-import { notFound } from "next/navigation";
-import { hasLocale } from "next-intl";
-import type { ReactElement } from "react";
-import { toLocale } from "@/i18n/locales";
-import { routing } from "@/i18n/routing";
-import { buildRootMetadata } from "@/lib/seo/metadata";
-import { brandAssetStyle } from "@/components/site/brand/brand-assets";
-import { BrandDefs } from "@/components/site/brand/BrandDefs";
-import { MOTION_BOOT } from "@/components/site/motion/boot";
-import { BootScript } from "@/components/site/motion/BootScript";
-import { SmoothScroll } from "@/components/site/motion/SmoothScroll";
-import "lenis/dist/lenis.css";
-import "@/styles/noir.css";
+import { hasLocale } from 'next-intl';
+import { Montserrat, Shantell_Sans, Tektur } from 'next/font/google';
+import { notFound } from 'next/navigation';
+
+import { brandAssetStyle } from '@/components/site/brand/brand-assets';
+import { BrandDefs } from '@/components/site/brand/BrandDefs';
+import { errorCopyFromMessages } from '@/components/site/error-copy';
+import { ErrorCopyProvider } from '@/components/site/ErrorCopyProvider';
+import { MOTION_BOOT } from '@/components/site/motion/boot';
+import { BootScript } from '@/components/site/motion/BootScript';
+import { SmoothScroll } from '@/components/site/motion/SmoothScroll';
+import { toLocale } from '@/i18n/locales';
+import { routing } from '@/i18n/routing';
+import { loadSiteMessages } from '@/i18n/site-messages';
+import { buildRootMetadata } from '@/lib/seo/metadata';
+
+import type { Metadata, Viewport } from 'next';
+import type { ReactElement } from 'react';
+import 'lenis/dist/lenis.css';
+
+import '@/styles/noir.css';
 
 /* Typefaces of the «Нуар-комикс» design, self-hosted by next/font (Cyrillic included). */
 
@@ -24,18 +30,18 @@ import "@/styles/noir.css";
  * so a title could wrap onto another line and push the page down when the face swaps in.
  */
 const displayFont = Tektur({
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-tektur",
-  display: "swap",
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-tektur',
+  display: 'swap',
   adjustFontFallback: false,
-  fallback: ["Tektur Caps Fallback"],
+  fallback: ['Tektur Caps Fallback'],
 });
 
 /** Body text and navigation. */
 const bodyFont = Montserrat({
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-montserrat",
-  display: "swap",
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-montserrat',
+  display: 'swap',
 });
 
 /**
@@ -45,30 +51,34 @@ const bodyFont = Montserrat({
  * face when such text is laid out (with the chapters' near-viewport gate: when it comes close).
  */
 const letterFont = Shantell_Sans({
-  subsets: ["latin", "cyrillic"],
-  weight: "700",
-  variable: "--font-shantell",
-  display: "swap",
+  subsets: ['latin', 'cyrillic'],
+  weight: '700',
+  variable: '--font-shantell',
+  display: 'swap',
   preload: false,
 });
 
 /** Site-wide SEO defaults (metadataBase, title template, OG/Twitter) from SiteSettings. */
-export async function generateMetadata({ params }: LayoutProps<"/[locale]">): Promise<Metadata> {
+export async function generateMetadata({ params }: LayoutProps<'/[locale]'>): Promise<Metadata> {
   return buildRootMetadata(toLocale((await params).locale));
 }
 
 export const viewport: Viewport = {
-  themeColor: "#010101",
-  colorScheme: "dark",
+  themeColor: '#010101',
+  colorScheme: 'dark',
 };
 
 export function generateStaticParams(): Array<{ locale: string }> {
-  return routing.locales.map((locale) => ({ locale }));
+  return routing.locales.map(locale => ({ locale }));
 }
 
-export default async function LocaleLayout({ children, params }: LayoutProps<"/[locale]">): Promise<ReactElement> {
+export default async function LocaleLayout({ children, params }: LayoutProps<'/[locale]'>): Promise<ReactElement> {
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
+  // The client error boundary (./error.tsx) cannot read messages itself: resolve its copy here.
+  // Fail-soft (bundled defaults when the DB is down): nothing catches an error of this layout,
+  // and a database outage is exactly when the error page has to render.
+  const errorCopy = errorCopyFromMessages(await loadSiteMessages(locale));
 
   return (
     // The boot scripts add `motion` / `motion-pending` (/ `is-intro` on the landing) to <html> before hydration.
@@ -84,8 +94,9 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
         <BootScript code={MOTION_BOOT} />
         <BrandDefs />
         {/* No NextIntlClientProvider: the public client components get their copy as props,
-            resolved on the server (src/components/site/labels.ts) — no next-intl client runtime. */}
-        {children}
+            resolved on the server (src/components/site/labels.ts) — no next-intl client runtime.
+            The error boundary gets its few strings from ErrorCopyProvider. */}
+        <ErrorCopyProvider copy={errorCopy}>{children}</ErrorCopyProvider>
         <SmoothScroll />
         <div className="grain" aria-hidden="true" />
       </body>

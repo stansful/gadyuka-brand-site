@@ -1,10 +1,13 @@
-"use client";
+'use client';
 
-import type { ReactElement } from "react";
-import { Toaster } from "sonner";
+import { useTranslations } from 'next-intl';
+import { Toaster } from 'sonner';
 
-/** Toast host for the admin (sonner). Russian close label, dark theme. */
+import type { ReactElement } from 'react';
+
+/** Toast host for the admin (sonner): labels from admin.ui, dark theme. */
 export function AdminToaster(): ReactElement {
+  const t = useTranslations('admin.ui');
   return (
     <Toaster
       theme="dark"
@@ -12,10 +15,10 @@ export function AdminToaster(): ReactElement {
       richColors
       closeButton
       duration={4000}
-      containerAriaLabel="Уведомления"
+      containerAriaLabel={t('toasts')}
       toastOptions={{
-        style: { fontFamily: "var(--font-sans)" },
-        closeButtonAriaLabel: "Закрыть уведомление",
+        style: { fontFamily: 'var(--font-sans)' },
+        closeButtonAriaLabel: t('closeToast'),
       }}
     />
   );

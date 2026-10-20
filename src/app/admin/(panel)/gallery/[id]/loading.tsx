@@ -1,5 +1,6 @@
-import type { ReactElement } from "react";
-import { PageSkeleton } from "@/components/admin/ui/layout";
+import { PageSkeleton } from '@/components/admin/ui/layout';
+
+import type { ReactElement } from 'react';
 
 /**
  * <Suspense> boundary for this page: it reads cookies + uncached DB data, so navigations

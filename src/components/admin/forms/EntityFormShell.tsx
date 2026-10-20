@@ -1,19 +1,22 @@
-"use client";
+'use client';
 
-import { ExternalLink, Save, Trash } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useTransition, type ReactElement, type ReactNode } from "react";
-import { toast } from "sonner";
-import type { Locale } from "@/i18n/locales";
-import { deleteItem } from "@/lib/admin/actions/entities";
-import type { PublishableEntity } from "@/lib/admin/schemas";
-import { LocaleTabs, useFocusLocaleWithErrors } from "../i18n/LocaleTabs";
-import { Button } from "../ui/Button";
-import { Card } from "../ui/layout";
-import { NETWORK_ERROR_MESSAGE } from "../ui/useActionSubmit";
-import { useConfirm } from "../ui/useConfirm";
+import { ExternalLink, Save, Trash } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useTransition, type ReactElement, type ReactNode } from 'react';
+import { toast } from 'sonner';
 
-export type SiteLink = { label: string; href: string };
+import { localeNames, type Locale } from '@/i18n/locales';
+import { deleteItem } from '@/lib/admin/actions/entities';
+import type { PublishableEntity } from '@/lib/admin/schemas';
+
+import { LocaleTabs, useFocusLocaleWithErrors } from '../i18n/LocaleTabs';
+import { Button } from '../ui/Button';
+import { Card } from '../ui/layout';
+import { useConfirm } from '../ui/useConfirm';
+
+/** «На сайте RU» — a link to where the edited thing is shown, per site language. */
+export type SiteLink = { locale: Locale; href: string };
 
 /**
  * Common frame of every entity edit form: sticky bar with language tabs and «Сохранить»
@@ -39,9 +42,17 @@ export function EntityFormShell({
   aside?: ReactNode;
   children: ReactNode;
   siteLinks?: SiteLink[];
-  /** Delete button (existing rows only). */
-  remove?: { entity: PublishableEntity; id: string; noun: string; listHref: string; warning?: string };
+  /** Delete button (existing rows only); confirmations name it admin.entities.accusative.<entity>. */
+  remove?: {
+    entity: PublishableEntity;
+    id: string;
+    listHref: string;
+    warning?: string;
+    /** The row has pictures: say they stay in the media library (default true). */
+    withMedia?: boolean;
+  };
 }): ReactElement {
+  const t = useTranslations('admin');
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const [deleting, startDelete] = useTransition();
@@ -50,26 +61,26 @@ export function EntityFormShell({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
         // Not while a dialog (media library, confirmation) is open on top of the form.
-        if (document.querySelector("dialog[open]")) return;
+        if (document.querySelector('dialog[open]')) return;
         formRef.current?.requestSubmit();
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   const onDelete = async (): Promise<void> => {
     if (!remove) return;
     const confirmed = await confirm({
-      title: `Удалить ${remove.noun}?`,
+      title: t('form.deleteTitle', { noun: t(`entities.accusative.${remove.entity}`) }),
       description: (
         <>
-          Действие нельзя отменить.
+          {t('form.irreversible')}
           {remove.warning ? <strong className="mt-2 block text-red-fg">{remove.warning}</strong> : null}
-          <span className="mt-2 block">Изображения останутся в медиатеке.</span>
+          {remove.withMedia === false ? null : <span className="mt-2 block">{t('form.mediaStays')}</span>}
         </>
       ),
     });
@@ -81,10 +92,10 @@ export function EntityFormShell({
           toast.error(result.error);
           return;
         }
-        toast.success(result.message ?? "Удалено");
+        toast.success(result.message ?? t('form.deleted'));
         router.push(remove.listHref);
       } catch {
-        toast.error(NETWORK_ERROR_MESSAGE);
+        toast.error(t('errors.network'));
       }
     });
   };
@@ -93,7 +104,7 @@ export function EntityFormShell({
     <form
       ref={formRef}
       noValidate
-      onSubmit={(event) => {
+      onSubmit={event => {
         event.preventDefault();
         if (!pending) onSubmit();
       }}
@@ -102,7 +113,7 @@ export function EntityFormShell({
       <div className="sticky top-14 z-20 -mx-4 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-ink/90 px-4 py-3 backdrop-blur md:-mx-6 md:px-6 lg:top-0 lg:-mx-8 lg:px-8">
         <LocaleTabs gaps={localeGaps} errors={localeErrors} />
         <div className="flex flex-wrap items-center gap-2">
-          {siteLinks?.map((link) => (
+          {siteLinks?.map(link => (
             <a
               key={link.href}
               href={link.href}
@@ -111,11 +122,11 @@ export function EntityFormShell({
               className="inline-flex h-10 items-center gap-1.5 rounded-md px-3 text-sm text-fg/80 hover:bg-raised-hi hover:text-fg"
             >
               <ExternalLink className="size-4" aria-hidden />
-              {link.label}
+              {t('form.onSite', { language: localeNames[link.locale].short })}
             </a>
           ))}
           <Button type="submit" variant="primary" pending={pending} icon={<Save className="size-4" aria-hidden />}>
-            {isNew ? "Создать" : "Сохранить"}
+            {t(isNew ? 'form.create' : 'form.save')}
           </Button>
         </div>
       </div>
@@ -125,8 +136,10 @@ export function EntityFormShell({
         <div className="flex min-w-0 flex-col gap-6">
           {aside}
           {remove ? (
-            <Card title="Удаление" bodyClassName="flex flex-col gap-3">
-              <p className="text-xs text-muted">Удалить {remove.noun} с сайта и из базы. Это действие нельзя отменить.</p>
+            <Card title={t('form.deletion')} bodyClassName="flex flex-col gap-3">
+              <p className="text-xs text-muted">
+                {t('form.deletionText', { noun: t(`entities.accusative.${remove.entity}`) })}
+              </p>
               <div>
                 <Button
                   variant="danger"
@@ -135,7 +148,7 @@ export function EntityFormShell({
                   icon={<Trash className="size-4" aria-hidden />}
                   onClick={() => void onDelete()}
                 >
-                  Удалить
+                  {t('form.delete')}
                 </Button>
               </div>
             </Card>

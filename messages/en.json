@@ -1,18 +1,187 @@
 {
+  "header": {
+    "menuCaption": "In this issue",
+    "cta": "Send a request"
+  },
+  "hero": {
+    "title": "GADYUKA",
+    "subtitle": "Designer streetwear from Krasnodar",
+    "heading": "{title} — {subtitle}",
+    "slogan": "They will remember me",
+    "captionTop": "Krasnodar. Night.",
+    "captionBottom": "The «They Will Remember Me» collection",
+    "issue": "Fall ’26",
+    "issueMeta": "Krasnodar · 2026",
+    "sfx": "HSSSS…",
+    "hint": "Tap the cover to turn to the «About» chapter",
+    "cursor": "About →"
+  },
+  "catalog": {
+    "title": "The Catalog",
+    "narration": "In this issue…",
+    "subtitle": "Clothes with character",
+    "text": "GADYUKA makes stylish, comfortable clothing built on original, in-house design. Our philosophy is comfort and beauty in one — never a cliché. We create clothes that bring out what makes each person unique, cut for the rhythm of the big city.",
+    "seriesKicker": "Collection · {models}",
+    "collectionTitle": "«{title}»",
+    "openCollection": "View the collection",
+    "priceLabel": "price",
+    "priceOnRequest": "Price on request",
+    "orderCta": "Order",
+    "orderSubject": "Order: {product}",
+    "detailsLabel": "Details",
+    "productNo": "#{number}",
+    "soonTab": "New collections — soon",
+    "soonTitle": "The next collection is in the works",
+    "soon": "New collections will appear here — stay tuned.",
+    "models": "{count, plural, =0 {new pieces coming soon} one {# piece} other {# pieces}}",
+    "breadcrumbHome": "Home",
+    "breadcrumbCatalog": "Catalog"
+  },
+  "about": {
+    "label": "About",
+    "title": "Why GADYUKA",
+    "narration": "An origin story.",
+    "imageCaption": "He never turns around. They know him anyway.",
+    "sfx": "SHHH!",
+    "text": "Our brand offers stylish, comfortable clothing with original, in-house design. We pay close attention to quality and detail so you feel confident and look sharp. Choosing GADYUKA means choosing quality and individuality.",
+    "cta": "Customer reviews",
+    "partnersCta": "Brand partners",
+    "advantages": {
+      "0": {
+        "title": "Original designs",
+        "text": "Every piece is designed in-house — no clichés."
+      },
+      "1": {
+        "title": "Quality and detail",
+        "text": "Close attention to fabric, fit and every small detail."
+      },
+      "2": {
+        "title": "Individuality",
+        "text": "Clothes that bring out your character and keep pace with the big city."
+      }
+    },
+    "closeupCaption": "Close-up. Choose GADYUKA — choose quality and individuality."
+  },
+  "tailoring": {
+    "title": "Made to Measure",
+    "narration": "Meanwhile, in the workshop…",
+    "imageCaption": "Patterns — the foundation of every piece",
+    "sfx": "SNIP!",
+    "subtitle": "Sewn to your measurements",
+    "text": "Order a piece made just for you. We create one-of-a-kind garments that fit you perfectly. Tell us what you have in mind — and we'll bring it to life.",
+    "cta": "Submit a request",
+    "steps": {
+      "0": {
+        "title": "Cut to your measurements",
+        "text": "Clothing tailored to your individual measurements and wishes — a chance to create a unique look that matches your style."
+      },
+      "1": {
+        "title": "Why made to measure",
+        "text": "A perfect fit, your choice of fabric and design, and a look no one else has."
+      },
+      "2": {
+        "title": "How to order",
+        "text": "Describe what you have in mind, then choose a model and fabric. Our team will help you create a look that is entirely yours."
+      }
+    }
+  },
+  "offers": {
+    "title": "Special Offers",
+    "narration": "This issue only!",
+    "text": "Discover special offers and promotions that help you save on GADYUKA clothing.",
+    "couponNo": "Coupon #{number}",
+    "subject": "Coupon: {offer}",
+    "validUntil": "Valid until {date}",
+    "fine": "* Ask our team for the full terms of each offer.",
+    "empty": "No offers right now — watch for the next issue."
+  },
+  "news": {
+    "edition": "Extra edition",
+    "city": "Krasnodar",
+    "kicker": "The GADYUKA Gazette",
+    "title": "News & Events",
+    "tickerLabel": "Breaking:",
+    "text": "New pieces, pop-ups and brand events — keep up with GADYUKA.",
+    "readMore": "Read more"
+  },
+  "gallery": {
+    "title": "Gallery",
+    "narration": "The case files.",
+    "text": "Explore the range of designs and styles in our gallery — and see how our clothes can bring out your individuality and style.",
+    "empty": "The case files are still coming in — check back soon.",
+    "counter": "{current} / {total}"
+  },
+  "reviews": {
+    "title": "Customer reviews",
+    "narration": "The witnesses speak.",
+    "text": "GADYUKA's original designs pair a sharp look with the comfort that big-city life demands.",
+    "empty": "The witnesses are keeping quiet — for now. Wearing GADYUKA? Tell us — write to the editor."
+  },
+  "partners": {
+    "title": "GADYUKA Partners",
+    "narration": "Crossover.",
+    "crossoverKicker": "Special issue",
+    "crossoverLeft": "Gadyuka",
+    "crossoverRight": "your brand",
+    "text": "We collaborate with other brands and organisations to bring you the best products and services. Learn more about our partnerships and how we work together to create stylish, comfortable clothing.",
+    "cta": "Apply for a partnership",
+    "slotPlaceholder": "Your brand here"
+  },
+  "contacts": {
+    "title": "Contact",
+    "narration": "A letter to the editor.",
+    "text": "Reach us by phone or email for more information.",
+    "phoneLabel": "Phone",
+    "emailLabel": "Email",
+    "addressLabel": "Address",
+    "socialsLabel": "Social media",
+    "form": {
+      "to": "To: the GADYUKA editorial desk, Krasnodar",
+      "title": "Write to us",
+      "subjectLine": "Regarding: {subject}",
+      "topicLabel": "Topic",
+      "topics": {
+        "contact": "A question or something else",
+        "tailoring": "Made to measure",
+        "partnership": "Partnership"
+      },
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@mail.com",
+      "nameLabel": "Name",
+      "namePlaceholder": "What should we call you?",
+      "phoneLabel": "Phone",
+      "phonePlaceholder": "+7 900 000-00-00",
+      "commentLabel": "Comment",
+      "commentPlaceholder": "Tell us what you have in mind",
+      "consent": "I agree to the processing of my personal data so you can reply to my letter",
+      "submit": "Get in touch",
+      "success": "Thank you! We'll be in touch soon."
+    }
+  },
+  "footer": {
+    "end": "End of issue.",
+    "tbc": "To be continued…",
+    "copyright": "© GADYUKA {year}",
+    "trademark": "GADYUKA is a registered trademark. All rights reserved.",
+    "top": "Back to top"
+  },
+  "brand": {
+    "name": "GADYUKA",
+    "city": "Krasnodar",
+    "pageTitle": "{title} — {brand}"
+  },
   "common": {
+    "chapterNo": "Chapter {number}",
+    "chapterLabel": "{chapter} · {label}",
     "skipToContent": "Skip to content",
     "mainNavigation": "Main navigation",
     "languageSwitcher": "Site language",
     "switchLanguageTo": "Switch language to <lang>{language}</lang>",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "backToTop": "Back to top",
-    "close": "Close",
-    "previous": "Previous",
-    "next": "Next",
-    "loading": "Loading…",
-    "opensInNewTab": "opens in a new tab",
+    "opensInNewTab": "(opens in a new tab)",
     "homeLink": "GADYUKA — home",
+    "backHome": "Back to home",
     "breadcrumbs": "Breadcrumb",
     "mobileMenu": "Mobile menu",
     "footerNavigation": "Footer menu",
@@ -22,11 +191,8 @@
     "nextImage": "Next image",
     "closeViewer": "Close viewer",
     "galleryPhoto": "Photo {number}",
-    "rating": "Rated {rating} out of 5",
+    "rating": "Rated {rating} out of {max}",
     "productPhoto": "{product} — photo {number}"
-  },
-  "catalog": {
-    "models": "{count, plural, =0 {new pieces coming soon} one {# piece} other {# pieces}}"
   },
   "forms": {
     "sending": "Sending…",
@@ -50,41 +216,64 @@
       "payloadTooLarge": "Too much data in the request. Please shorten your message.",
       "unsupportedMediaType": "Unsupported request format."
     },
-    "consent": "I agree to the processing of my personal data to handle this request",
-    "submitDefault": "Send",
-    "successDefault": "Thank you! Your request has been sent — we will get back to you soon.",
     "sendAnother": "Send another request",
-    "optional": "optional",
     "contactHint": "Leave an email or a phone number — whichever you prefer",
-    "fields": {
-      "name": "Name",
-      "email": "Email",
-      "phone": "Phone",
-      "message": "Message"
-    },
-    "topicDefault": "Topic",
-    "topics": {
-      "TAILORING": "Made to measure",
-      "PARTNERSHIP": "Partnership",
-      "CONTACT": "A question or something else"
-    },
     "noscriptInvalid": "Your request was not sent: fill in the required fields (marked *), tick the consent box and send it again."
+  },
+  "social": {
+    "TELEGRAM": "Telegram",
+    "VK": "VK",
+    "INSTAGRAM": "Instagram",
+    "WHATSAPP": "WhatsApp",
+    "YOUTUBE": "YouTube",
+    "TIKTOK": "TikTok",
+    "PINTEREST": "Pinterest",
+    "WEBSITE": "Website",
+    "OTHER": "Link"
   },
   "notFound": {
     "title": "Page not found",
     "text": "This page doesn't exist — it may have been moved or removed.",
-    "backHome": "Back to home",
     "kicker": "Error 404",
-    "caption": "Dead end. Nothing here but the rain."
+    "caption": "Dead end. Nothing here but the rain.",
+    "mark": "404"
   },
   "error": {
     "title": "Something went wrong",
     "text": "We're on it. Please try reloading the page.",
     "retry": "Try again",
     "kicker": "Error",
-    "caption": "Trouble at the printing press."
+    "caption": "Trouble at the printing press.",
+    "mark": "!?"
   },
-  "media": {
-    "imagePlaceholder": "Image coming soon"
+  "telegram": {
+    "newLead": "New request: {type}",
+    "leadTypes": {
+      "TAILORING": "Made to measure",
+      "PARTNERSHIP": "Partnership",
+      "CONTACT": "Get in touch"
+    },
+    "name": "Name:",
+    "phone": "Phone:",
+    "email": "Email:",
+    "locale": "Site language:",
+    "message": "Message:",
+    "time": "{time} (Moscow time)",
+    "openAdmin": "Open the requests in the admin",
+    "errors": {
+      "dryRun": "Not sent: test mode TELEGRAM_DRY_RUN=1 is on (no messages go to Telegram)",
+      "notifyCeiling": "Not sent automatically: more than {max} requests in {minutes} minutes (flood protection). If the request is genuine, send it manually.",
+      "notConfigured": "Telegram is not set up: set TELEGRAM_BOT_TOKEN and TELEGRAM_OWNER_ID in .env",
+      "badToken": "Telegram is not set up: TELEGRAM_BOT_TOKEN has an invalid format",
+      "timeout": "Telegram did not answer in time",
+      "network": "network error ({details})",
+      "api": "Telegram rejected the message (code {status}): {details}",
+      "internal": "internal sending error: {details}",
+      "unknown": "unknown error",
+      "invalidId": "Invalid request id",
+      "loadFailed": "Could not load the request from the database",
+      "notFound": "Request not found",
+      "sendFailed": "Could not send to Telegram"
+    }
   }
 }

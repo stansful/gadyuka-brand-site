@@ -1,18 +1,20 @@
-"use server";
+'use server';
 
-import { db } from "@/lib/db";
-import { revalidateContent } from "@/lib/content/cache";
-import { adminAction, findMissingMediaIds, MISSING_MEDIA_MESSAGE } from "../action-helpers";
-import { actionFail, actionOk, type ActionResult } from "../action-result";
-import { collectionInputSchema, idSchema, type CollectionInput } from "../schemas";
-import { parseInput } from "../validation";
+import { revalidateContent } from '@/lib/content/cache';
+import { db } from '@/lib/db';
+
+import { adminAction, errorFailure, missingMediaFailure } from '../action-helpers';
+import { actionFail, actionOk, type ActionResult } from '../action-result';
+import { getAdminTranslations } from '../i18n-server';
+import { collectionInputSchema, idSchema, type CollectionInput } from '../schemas';
+import { parseInput } from '../validation';
 
 /** Create (id = null) or update a collection. */
 export async function saveCollection(id: string | null, input: CollectionInput): Promise<ActionResult<{ id: string }>> {
-  return adminAction("saveCollection", async () => {
+  return adminAction('saveCollection', async () => {
     const parsedId = id === null ? null : idSchema.safeParse(id);
-    if (parsedId && !parsedId.success) return actionFail("Некорректный идентификатор");
-    const parsed = parseInput(collectionInputSchema, input);
+    if (parsedId && !parsedId.success) return errorFailure('invalidId');
+    const parsed = await parseInput(collectionInputSchema, input);
     if (!parsed.success) return actionFail(parsed.message, parsed.fieldErrors);
     const data = parsed.data;
     const currentId = parsedId?.data ?? null;
@@ -21,10 +23,11 @@ export async function saveCollection(id: string | null, input: CollectionInput):
       where: { slug: data.slug, ...(currentId ? { NOT: { id: currentId } } : {}) },
       select: { id: true },
     });
-    if (slugTaken) return actionFail("Адрес уже занят", { slug: "Коллекция с таким адресом уже есть" });
-    if ((await findMissingMediaIds([data.coverId])).length > 0) {
-      return actionFail(MISSING_MEDIA_MESSAGE, { coverId: MISSING_MEDIA_MESSAGE });
-    }
+    const t = await getAdminTranslations('admin.collections');
+    if (slugTaken)
+      return actionFail((await getAdminTranslations('admin.errors'))('slugTaken'), { slug: t('slugTaken') });
+    const missingMedia = await missingMediaFailure([data.coverId], ['coverId']);
+    if (missingMedia) return missingMedia;
 
     const fields = {
       slug: data.slug,
@@ -47,6 +50,6 @@ export async function saveCollection(id: string | null, input: CollectionInput):
       savedId = row.id;
     }
     revalidateContent();
-    return actionOk({ id: savedId }, currentId ? "Коллекция сохранена" : "Коллекция создана");
+    return actionOk({ id: savedId }, t(currentId ? 'saved' : 'created'));
   });
 }

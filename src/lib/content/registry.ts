@@ -1,45 +1,76 @@
-import type { ContentKind } from "../../generated/prisma/enums";
+import type { Locale } from '@/i18n/locales';
+import { hasMessageSyntax } from '@/i18n/message-format';
+import {
+  MESSAGE_KEYS,
+  defaultMessageTranslations,
+  isMessageKey,
+  messageNamespace,
+  type MessageKey,
+  type MessageNamespace,
+} from '@/i18n/messages';
 
 /**
- * Registry of every ContentBlock the landing page uses.
+ * Metadata registry of the editable site copy, for the admin «Тексты сайта» editor.
  *
- * - The key is the dotted `section.key` used in `data-edit` / `data-edit-img`
- *   attributes and as ContentBlock.key in the DB.
- * - `label` is the Russian admin label; `section` groups blocks in the admin; `required` blocks
- *   (headings, menu items, buttons) cannot be saved empty in Russian.
- * - kind TEXT      — one line of plain text;
- *   kind RICHTEXT  — plain text with paragraphs separated by an empty line (no HTML);
- *   kind IMAGE     — ContentBlock.mediaId (value is null);
- *   kind LINK      — LocalizedText holding a URL/anchor.
+ * THE KEY SET IS messages/ru.json: every string leaf is one `Message` (key = dotted path,
+ * e.g. "hero.title"), and its top-level namespace is the admin section it is listed in. This
+ * file never lists keys again — it only adds what the JSON cannot say:
+ * - CONTENT_SECTIONS: the display order of every namespace (TypeScript fails when a namespace
+ *   of ru.json has no entry);
+ * - MESSAGE_META: optional per-key overrides — kind, `required`;
+ * - CONTENT_IMAGES: the landing images (ContentImage rows, not messages).
+ * The Russian admin names of the sections, texts and images are admin copy:
+ * admin.siteTexts.sections / labels / images in messages/admin/ru.json (src/lib/admin/site-texts.ts).
  *
- * Isomorphic (no server-only imports): safe to use in admin client components and in
- * prisma/seed.ts. To add a block: add it here, add its copy in ./default-copy.ts,
- * run `npm run db:seed`, then render it in src/components/site/sections/*.
+ * Isomorphic (no server-only imports): safe in admin client components and in prisma/seed.ts.
  *
- * Keys removed from this registry are simply no longer shown in the admin; their old rows stay
- * in the DB untouched (the seed never deletes content).
+ * To add copy: add the key to messages/<locale>.json (every locale; key-parity test), give it
+ * an admin label in messages/admin/ru.json (admin.siteTexts.labels.<key>) if the key alone is
+ * not clear, render it on the site, run `npm run db:seed`.
+ * Keys removed from the JSON are no longer shown or rendered; their old rows stay in the DB
+ * (the seed reports them as orphans and never deletes content).
  */
 
+/**
+ * Admin sections = the top-level namespaces of messages/ru.json, in the admin's order: the page
+ * from top to bottom, then the shared and system copy (names: admin.siteTexts.sections.<id>).
+ */
 export const CONTENT_SECTIONS = [
-  { id: "header", label: "Шапка и меню" },
-  { id: "hero", label: "Главная (обложка)" },
-  { id: "catalog", label: "Каталог" },
-  { id: "about", label: "О нас" },
-  { id: "tailoring", label: "Индивидуальный пошив" },
-  { id: "offers", label: "Специальные предложения" },
-  { id: "news", label: "Новости и события" },
-  { id: "gallery", label: "Галерея" },
-  { id: "reviews", label: "Отзывы" },
-  { id: "partners", label: "Партнёры" },
-  { id: "contacts", label: "Контакты и форма" },
-  { id: "footer", label: "Подвал" },
-  { id: "common", label: "Общие подписи" },
-] as const;
+  { id: 'header' },
+  { id: 'hero' },
+  { id: 'catalog' },
+  { id: 'about' },
+  { id: 'tailoring' },
+  { id: 'offers' },
+  { id: 'news' },
+  { id: 'gallery' },
+  { id: 'reviews' },
+  { id: 'partners' },
+  { id: 'contacts' },
+  { id: 'footer' },
+  { id: 'brand' },
+  { id: 'common' },
+  { id: 'forms' },
+  { id: 'social' },
+  { id: 'notFound' },
+  { id: 'error' },
+  { id: 'telegram' },
+] as const satisfies ReadonlyArray<{ id: MessageNamespace }>;
 
-export type SectionId = (typeof CONTENT_SECTIONS)[number]["id"];
+/** An admin «Контент» section = a top-level namespace of the site messages. */
+export type SectionId = (typeof CONTENT_SECTIONS)[number]['id'];
+
+/** Compile-time check: every namespace of messages/ru.json has a section entry above. */
+type UnlistedNamespace = Exclude<MessageNamespace, SectionId>;
+const everyNamespaceListed: [UnlistedNamespace] extends [never] ? true : UnlistedNamespace = true;
+void everyNamespaceListed;
+
+export function isSectionId(value: unknown): value is SectionId {
+  return typeof value === 'string' && CONTENT_SECTIONS.some(section => section.id === value);
+}
 
 /** Section anchors live in ./anchors (tiny, imported by client components); re-exported here. */
-export { LEAD_FORM_ANCHOR, SECTION_ANCHORS } from "./anchors";
+export { LEAD_FORM_ANCHOR, SECTION_ANCHORS } from './anchors';
 
 /**
  * Landing chapters in page order (the owner's): «Глава 01» = catalog, 02 about, [the red band],
@@ -48,225 +79,329 @@ export { LEAD_FORM_ANCHOR, SECTION_ANCHORS } from "./anchors";
  * so they always follow the actual order of the sections.
  */
 export const CHAPTER_ORDER = [
-  "catalog",
-  "about",
-  "tailoring",
-  "offers",
-  "news",
-  "gallery",
-  "reviews",
-  "partners",
-  "contacts",
+  'catalog',
+  'about',
+  'tailoring',
+  'offers',
+  'news',
+  'gallery',
+  'reviews',
+  'partners',
+  'contacts',
 ] as const satisfies ReadonlyArray<SectionId>;
 
 export type ChapterId = (typeof CHAPTER_ORDER)[number];
 
 /** "02" for about. */
 export function chapterNumber(id: ChapterId): string {
-  return String(CHAPTER_ORDER.indexOf(id) + 1).padStart(2, "0");
+  return String(CHAPTER_ORDER.indexOf(id) + 1).padStart(2, '0');
 }
 
-type BlockDefinition = {
-  readonly section: SectionId;
-  readonly kind: ContentKind;
-  readonly label: string;
+// ── messages ────────────────────────────────────────────────────────────────
+
+/** Re-exported for the content layer: a site message key ("hero.title"). */
+export type { MessageKey, MessageNamespace };
+export { MESSAGE_KEYS, isMessageKey };
+
+/**
+ * Key of a landing text: texts["hero.title"]. Same as MessageKey (the landing reads every
+ * site message); the name is kept for the site sections.
+ */
+export type TextKey = MessageKey;
+/** All site message keys (= MESSAGE_KEYS), the keys of LandingContent.texts. */
+export const TEXT_KEYS: readonly TextKey[] = MESSAGE_KEYS;
+
+/**
+ * How the admin edits a message and how the site uses it:
+ * - text     — one line of plain text;
+ * - richtext — plain text with paragraphs separated by an empty line (no HTML);
+ * - icu      — an ICU template with {arguments}, plural forms or <tags> filled in by the code
+ *              on the server (next-intl t(), formatText / formatNodes);
+ * - template — a simple template the public CLIENT components fill in themselves, without an
+ *              ICU runtime (fill / splitTemplate in src/components/site/labels.ts): plain text
+ *              with the default's bare {arguments} and <tags> — no plural forms or formats;
+ * - link     — a URL or an in-page anchor.
+ * Edits of "icu" and "template" texts are validated with validateMessageValue from
+ * @/i18n/message-format (syntax "template" for the latter).
+ * Default: "icu" when a default value contains ICU syntax, otherwise "text" — a key the client
+ * fills in must be listed below as "template".
+ */
+export type MessageKind = 'text' | 'richtext' | 'icu' | 'template' | 'link';
+
+type MessageMeta = {
+  readonly kind?: MessageKind;
   /**
    * Must not be saved empty in the default locale (ru): headings (h1/h2, the targets of
-   * aria-labelledby), menu items and buttons whose only other content is an aria-hidden arrow.
+   * aria-labelledby), buttons whose only other content is an aria-hidden arrow, links, the
+   * only accessible name of a control (glyph / icon buttons, the logo link), of a dialog or of
+   * a navigation landmark, and the error texts and states of the lead form.
+   * Other locales may be left blank: they then show the Russian text.
    */
   readonly required?: true;
 };
 
-export const CONTENT_BLOCKS = {
-  // ── header ───────────────────────────────────────────────────────────────
-  "header.nav.home": { section: "header", kind: "TEXT", label: "Меню: Главная", required: true },
-  "header.nav.catalog": { section: "header", kind: "TEXT", label: "Меню: Каталог", required: true },
-  "header.nav.about": { section: "header", kind: "TEXT", label: "Меню: О нас", required: true },
-  "header.nav.tailoring": { section: "header", kind: "TEXT", label: "Меню: Индивидуальный пошив", required: true },
-  "header.nav.offers": { section: "header", kind: "TEXT", label: "Меню: Специальное предложение", required: true },
-  "header.nav.contacts": { section: "header", kind: "TEXT", label: "Меню: Контакты", required: true },
-  "header.menuCaption": { section: "header", kind: "TEXT", label: "Мобильное меню: подпись над пунктами" },
-  "header.cta": { section: "header", kind: "TEXT", label: "Мобильное меню: кнопка «Оставить заявку» (ведёт к форме)", required: true },
+const REQUIRED = { required: true } as const;
+const TEMPLATE = { kind: 'template' } as const;
+const REQUIRED_TEMPLATE = { kind: 'template', required: true } as const;
 
-  // ── hero ─────────────────────────────────────────────────────────────────
-  "hero.title": { section: "hero", kind: "TEXT", label: "Заголовок H1 (скрыт, для поисковиков и экранных дикторов)", required: true },
-  "hero.subtitle": { section: "hero", kind: "TEXT", label: "Продолжение H1 (скрыто, после тире)" },
-  "hero.slogan": { section: "hero", kind: "TEXT", label: "Слоган под вордмарком" },
-  "hero.captionTop": { section: "hero", kind: "TEXT", label: "Подпись-плашка слева вверху" },
-  "hero.captionBottom": {
-    section: "hero",
-    kind: "TEXT",
-    label: "Плашка справа внизу — кнопка: ведёт на первую опубликованную коллекцию (первую по порядку в разделе «Коллекции»)",
-  },
-  "hero.issue": { section: "hero", kind: "TEXT", label: "Сезон / выпуск в углу обложки (крупно)" },
-  "hero.issueMeta": { section: "hero", kind: "TEXT", label: "Строка под сезоном (город · год)" },
-  "hero.sfx": { section: "hero", kind: "TEXT", label: "Звукоподражание на обложке" },
-  "hero.hint": { section: "hero", kind: "TEXT", label: "Подсказка внизу обложки (обложка ведёт к «О нас»)" },
-  "hero.cursor": { section: "hero", kind: "TEXT", label: "Плашка у курсора над обложкой" },
+/**
+ * Per-key overrides. Keys must exist in messages/ru.json (checked by TypeScript); a key without
+ * an entry is optional, with an auto-detected kind.
+ */
+const MESSAGE_META: { readonly [K in MessageKey]?: MessageMeta } = {
+  // ── header ────────────────────────────────────────────────────────────────
+  'header.cta': REQUIRED,
 
-  // ── catalog ──────────────────────────────────────────────────────────────
-  "catalog.title": { section: "catalog", kind: "TEXT", label: "Заголовок главы", required: true },
-  "catalog.narration": { section: "catalog", kind: "TEXT", label: "Плашка-подпись под заголовком" },
-  "catalog.subtitle": { section: "catalog", kind: "TEXT", label: "Заголовок вступительной панели" },
-  "catalog.text": { section: "catalog", kind: "RICHTEXT", label: "Вступительный текст" },
-  "catalog.seriesLabel": { section: "catalog", kind: "TEXT", label: "Подпись «Коллекция» над названием" },
-  "catalog.openCollection": { section: "catalog", kind: "TEXT", label: "Ссылка на страницу коллекции", required: true },
-  "catalog.priceLabel": { section: "catalog", kind: "TEXT", label: "Подпись над ценой на обложке товара" },
-  "catalog.priceOnRequest": { section: "catalog", kind: "TEXT", label: "Подпись «Цена по запросу»" },
-  "catalog.orderCta": { section: "catalog", kind: "TEXT", label: "Кнопка заказа товара", required: true },
-  "catalog.orderSubject": { section: "catalog", kind: "TEXT", label: "Тема письма при заказе (перед названием товара)" },
-  "catalog.detailsLabel": { section: "catalog", kind: "TEXT", label: "Подпись «Детали» (страница коллекции)" },
-  "catalog.soonTab": { section: "catalog", kind: "TEXT", label: "Вкладка «Новые коллекции — скоро»" },
-  "catalog.soonTitle": { section: "catalog", kind: "TEXT", label: "Карточка «скоро»: заголовок" },
-  "catalog.soon": { section: "catalog", kind: "TEXT", label: "Карточка «скоро»: текст" },
+  // ── hero ──────────────────────────────────────────────────────────────────
+  'hero.title': REQUIRED,
+  'hero.heading': REQUIRED,
 
-  // ── about ────────────────────────────────────────────────────────────────
-  "about.label": { section: "about", kind: "TEXT", label: "Подпись после номера главы («Глава 02 · …»)" },
-  "about.title": { section: "about", kind: "TEXT", label: "Заголовок главы", required: true },
-  "about.narration": { section: "about", kind: "TEXT", label: "Плашка-подпись под заголовком" },
-  "about.image": { section: "about", kind: "IMAGE", label: "Фото" },
-  "about.imageCaption": { section: "about", kind: "TEXT", label: "Плашка на фото" },
-  "about.sfx": { section: "about", kind: "TEXT", label: "Звукоподражание на фото" },
-  "about.text": { section: "about", kind: "RICHTEXT", label: "Текст" },
-  "about.cta": { section: "about", kind: "TEXT", label: "Кнопка «Отзывы покупателей» (ведёт к отзывам)", required: true },
-  "about.partnersCta": { section: "about", kind: "TEXT", label: "Кнопка «Партнёры бренда» (ведёт к партнёрам)", required: true },
-  "about.advantages.0.title": { section: "about", kind: "TEXT", label: "Преимущество 1: заголовок" },
-  "about.advantages.0.text": { section: "about", kind: "TEXT", label: "Преимущество 1: текст" },
-  "about.advantages.1.title": { section: "about", kind: "TEXT", label: "Преимущество 2: заголовок" },
-  "about.advantages.1.text": { section: "about", kind: "TEXT", label: "Преимущество 2: текст" },
-  "about.advantages.2.title": { section: "about", kind: "TEXT", label: "Преимущество 3: заголовок" },
-  "about.advantages.2.text": { section: "about", kind: "TEXT", label: "Преимущество 3: текст" },
-  "about.closeupCaption": { section: "about", kind: "TEXT", label: "Плашка на «крупном плане» змеи" },
+  // ── catalog ───────────────────────────────────────────────────────────────
+  'catalog.title': REQUIRED,
+  'catalog.text': { kind: 'richtext' },
+  'catalog.collectionTitle': REQUIRED,
+  'catalog.openCollection': REQUIRED,
+  'catalog.orderCta': REQUIRED,
+  'catalog.breadcrumbHome': REQUIRED,
+  'catalog.breadcrumbCatalog': REQUIRED,
 
-  // ── tailoring ────────────────────────────────────────────────────────────
-  "tailoring.title": { section: "tailoring", kind: "TEXT", label: "Заголовок главы", required: true },
-  "tailoring.narration": { section: "tailoring", kind: "TEXT", label: "Плашка-подпись под заголовком" },
-  "tailoring.image": { section: "tailoring", kind: "IMAGE", label: "Фото «стойка с лекалами»" },
-  "tailoring.imageCaption": { section: "tailoring", kind: "TEXT", label: "Плашка на фото" },
-  "tailoring.sfx": { section: "tailoring", kind: "TEXT", label: "Звукоподражание на фото" },
-  "tailoring.subtitle": { section: "tailoring", kind: "TEXT", label: "Заголовок панели с текстом" },
-  "tailoring.text": { section: "tailoring", kind: "RICHTEXT", label: "Вступительный текст" },
-  "tailoring.cta": { section: "tailoring", kind: "TEXT", label: "Кнопка «Оставить заявку» (ведёт к форме, тема «Индивидуальный пошив»)", required: true },
-  "tailoring.steps.0.title": { section: "tailoring", kind: "TEXT", label: "Пункт 1: заголовок" },
-  "tailoring.steps.0.text": { section: "tailoring", kind: "RICHTEXT", label: "Пункт 1: текст" },
-  "tailoring.steps.1.title": { section: "tailoring", kind: "TEXT", label: "Пункт 2: заголовок" },
-  "tailoring.steps.1.text": { section: "tailoring", kind: "RICHTEXT", label: "Пункт 2: текст" },
-  "tailoring.steps.2.title": { section: "tailoring", kind: "TEXT", label: "Пункт 3: заголовок" },
-  "tailoring.steps.2.text": { section: "tailoring", kind: "RICHTEXT", label: "Пункт 3: текст" },
+  // ── about ─────────────────────────────────────────────────────────────────
+  'about.title': REQUIRED,
+  'about.text': { kind: 'richtext' },
+  'about.cta': REQUIRED,
+  'about.partnersCta': REQUIRED,
 
-  // ── reviews ──────────────────────────────────────────────────────────────
-  "reviews.title": { section: "reviews", kind: "TEXT", label: "Заголовок главы", required: true },
-  "reviews.narration": { section: "reviews", kind: "TEXT", label: "Плашка-подпись под заголовком" },
-  "reviews.text": { section: "reviews", kind: "RICHTEXT", label: "Вступительный текст" },
-  "reviews.empty": { section: "reviews", kind: "TEXT", label: "Текст, когда отзывов нет" },
+  // ── tailoring ─────────────────────────────────────────────────────────────
+  'tailoring.title': REQUIRED,
+  'tailoring.text': { kind: 'richtext' },
+  'tailoring.cta': REQUIRED,
+  'tailoring.steps.0.text': { kind: 'richtext' },
+  'tailoring.steps.1.text': { kind: 'richtext' },
+  'tailoring.steps.2.text': { kind: 'richtext' },
 
-  // ── news ─────────────────────────────────────────────────────────────────
-  "news.edition": { section: "news", kind: "TEXT", label: "Шапка газеты: слева" },
-  "news.city": { section: "news", kind: "TEXT", label: "Шапка газеты: по центру" },
-  "news.kicker": { section: "news", kind: "TEXT", label: "Подпись после номера главы («Глава 05 · …»)" },
-  "news.title": { section: "news", kind: "TEXT", label: "Заголовок главы", required: true },
-  "news.tickerLabel": { section: "news", kind: "TEXT", label: "Бегущая строка: слово перед заголовками новостей" },
-  "news.text": { section: "news", kind: "RICHTEXT", label: "Текст, когда новостей нет" },
-  "news.readMore": { section: "news", kind: "TEXT", label: "Ссылка «Подробнее»", required: true },
+  // ── offers ────────────────────────────────────────────────────────────────
+  'offers.title': REQUIRED,
+  'offers.text': { kind: 'richtext' },
 
-  // ── gallery ──────────────────────────────────────────────────────────────
-  "gallery.title": { section: "gallery", kind: "TEXT", label: "Заголовок главы", required: true },
-  "gallery.narration": { section: "gallery", kind: "TEXT", label: "Плашка-подпись под заголовком" },
-  "gallery.text": { section: "gallery", kind: "RICHTEXT", label: "Вступительный текст" },
-  "gallery.empty": { section: "gallery", kind: "TEXT", label: "Текст, когда в галерее нет фото" },
+  // ── news ──────────────────────────────────────────────────────────────────
+  'news.title': REQUIRED,
+  'news.text': { kind: 'richtext' },
+  'news.readMore': REQUIRED,
 
-  // ── offers ───────────────────────────────────────────────────────────────
-  "offers.title": { section: "offers", kind: "TEXT", label: "Заголовок главы", required: true },
-  "offers.narration": { section: "offers", kind: "TEXT", label: "Плашка-подпись под заголовком" },
-  "offers.text": { section: "offers", kind: "RICHTEXT", label: "Вступительный текст" },
-  "offers.couponLabel": { section: "offers", kind: "TEXT", label: "Подпись «Купон» на карточке (номер добавляется)" },
-  "offers.subject": { section: "offers", kind: "TEXT", label: "Тема письма по купону (перед названием предложения)" },
-  "offers.validUntilLabel": { section: "offers", kind: "TEXT", label: "Подпись «Действует до»" },
-  "offers.fine": { section: "offers", kind: "TEXT", label: "Сноска под купонами (пусто — не показывать)" },
-  "offers.empty": { section: "offers", kind: "TEXT", label: "Текст, когда предложений нет" },
+  // ── gallery ───────────────────────────────────────────────────────────────
+  'gallery.title': REQUIRED,
+  'gallery.text': { kind: 'richtext' },
+  'gallery.counter': TEMPLATE, // GalleryScene: fill()
 
-  // ── partners ─────────────────────────────────────────────────────────────
-  "partners.title": { section: "partners", kind: "TEXT", label: "Заголовок главы", required: true },
-  "partners.narration": { section: "partners", kind: "TEXT", label: "Плашка-подпись под заголовком" },
-  "partners.crossoverKicker": { section: "partners", kind: "TEXT", label: "Панель «кроссовер»: надзаголовок" },
-  "partners.crossoverLeft": { section: "partners", kind: "TEXT", label: "Панель «кроссовер»: слева от «×»" },
-  "partners.crossoverRight": { section: "partners", kind: "TEXT", label: "Панель «кроссовер»: справа от «×»" },
-  "partners.text": { section: "partners", kind: "RICHTEXT", label: "Вступительный текст" },
-  "partners.cta": { section: "partners", kind: "TEXT", label: "Кнопка «Оставить заявку для сотрудничества» (тема «Сотрудничество»)", required: true },
-  "partners.slotPlaceholder": { section: "partners", kind: "TEXT", label: "Пустая ячейка «Место для партнёра»" },
+  // ── reviews ───────────────────────────────────────────────────────────────
+  'reviews.title': REQUIRED,
+  'reviews.text': { kind: 'richtext' },
 
-  // ── contacts ─────────────────────────────────────────────────────────────
-  "contacts.title": { section: "contacts", kind: "TEXT", label: "Заголовок главы", required: true },
-  "contacts.narration": { section: "contacts", kind: "TEXT", label: "Плашка-подпись под заголовком" },
-  "contacts.text": { section: "contacts", kind: "RICHTEXT", label: "Вступительный текст" },
-  "contacts.phoneLabel": { section: "contacts", kind: "TEXT", label: "Подпись «Телефон»" },
-  "contacts.emailLabel": { section: "contacts", kind: "TEXT", label: "Подпись «E-mail»" },
-  "contacts.addressLabel": { section: "contacts", kind: "TEXT", label: "Подпись «Адрес»" },
-  "contacts.socialsLabel": { section: "contacts", kind: "TEXT", label: "Подпись «Соцсети»" },
-  "contacts.form.to": { section: "contacts", kind: "TEXT", label: "Форма: строка «Кому» над заголовком" },
-  "contacts.form.title": { section: "contacts", kind: "TEXT", label: "Форма: заголовок", required: true },
-  "contacts.form.subjectLabel": { section: "contacts", kind: "TEXT", label: "Форма: подпись темы, выбранной кнопкой на сайте" },
-  "contacts.form.topicLabel": { section: "contacts", kind: "TEXT", label: "Форма: поле «Тема»" },
-  "contacts.form.topics.contact": { section: "contacts", kind: "TEXT", label: "Тема: вопрос / другое (заявка «Связаться»)" },
-  "contacts.form.topics.tailoring": { section: "contacts", kind: "TEXT", label: "Тема: индивидуальный пошив" },
-  "contacts.form.topics.partnership": { section: "contacts", kind: "TEXT", label: "Тема: сотрудничество" },
-  "contacts.form.emailLabel": { section: "contacts", kind: "TEXT", label: "Форма: поле «E-mail»" },
-  "contacts.form.emailPlaceholder": { section: "contacts", kind: "TEXT", label: "Форма: подсказка в поле «E-mail»" },
-  "contacts.form.nameLabel": { section: "contacts", kind: "TEXT", label: "Форма: поле «Имя»" },
-  "contacts.form.namePlaceholder": { section: "contacts", kind: "TEXT", label: "Форма: подсказка в поле «Имя»" },
-  "contacts.form.phoneLabel": { section: "contacts", kind: "TEXT", label: "Форма: поле «Телефон» (темы «пошив» и «сотрудничество»)" },
-  "contacts.form.phonePlaceholder": { section: "contacts", kind: "TEXT", label: "Форма: подсказка в поле «Телефон»" },
-  "contacts.form.commentLabel": { section: "contacts", kind: "TEXT", label: "Форма: поле «Комментарий»" },
-  "contacts.form.commentPlaceholder": { section: "contacts", kind: "TEXT", label: "Форма: подсказка в поле «Комментарий»" },
-  "contacts.form.consent": { section: "contacts", kind: "TEXT", label: "Форма: согласие на обработку персональных данных" },
-  "contacts.form.submit": { section: "contacts", kind: "TEXT", label: "Форма: кнопка «Связаться»" },
-  "contacts.form.success": { section: "contacts", kind: "TEXT", label: "Форма: сообщение об успехе" },
+  // ── partners ──────────────────────────────────────────────────────────────
+  'partners.title': REQUIRED,
+  'partners.text': { kind: 'richtext' },
+  'partners.cta': REQUIRED,
 
-  // ── footer ───────────────────────────────────────────────────────────────
-  "footer.end": { section: "footer", kind: "TEXT", label: "Плашка над «Продолжение следует…»" },
-  "footer.tbc": { section: "footer", kind: "TEXT", label: "«Продолжение следует…»" },
-  "footer.copyright": { section: "footer", kind: "TEXT", label: "Копирайт (год добавляется автоматически)" },
-  "footer.trademark": { section: "footer", kind: "TEXT", label: "Строка о товарном знаке под подвалом (пусто в обоих языках — не показывать; пустой EN покажет русский текст)" },
-  "footer.top": { section: "footer", kind: "TEXT", label: "Ссылка «Наверх»", required: true },
+  // ── contacts ──────────────────────────────────────────────────────────────
+  'contacts.title': REQUIRED,
+  'contacts.text': { kind: 'richtext' },
+  'contacts.form.title': REQUIRED,
+  'contacts.form.subjectLine': TEMPLATE, // LeadForm: splitTemplate(…, '{subject}')
+  'contacts.form.topicLabel': REQUIRED,
+  'contacts.form.topics.contact': REQUIRED,
+  'contacts.form.topics.tailoring': REQUIRED,
+  'contacts.form.topics.partnership': REQUIRED,
+  'contacts.form.emailLabel': REQUIRED,
+  'contacts.form.nameLabel': REQUIRED,
+  'contacts.form.phoneLabel': REQUIRED,
+  'contacts.form.commentLabel': REQUIRED,
+  'contacts.form.consent': REQUIRED,
+  'contacts.form.submit': REQUIRED,
+  'contacts.form.success': REQUIRED,
 
-  // ── common ───────────────────────────────────────────────────────────────
-  "common.chapter": { section: "common", kind: "TEXT", label: "Слово «Глава» перед номером главы (номер добавляется)" },
-} as const satisfies Record<string, BlockDefinition>;
+  // ── footer ────────────────────────────────────────────────────────────────
+  'footer.top': REQUIRED,
 
-type Blocks = typeof CONTENT_BLOCKS;
+  // ── brand ─────────────────────────────────────────────────────────────────
+  'brand.name': REQUIRED,
+  'brand.pageTitle': REQUIRED,
 
-/** Every ContentBlock key. */
-export type ContentKey = keyof Blocks;
-/** Keys whose value is LocalizedText (TEXT / RICHTEXT / LINK). */
-export type TextKey = { [K in ContentKey]: Blocks[K]["kind"] extends "IMAGE" ? never : K }[ContentKey];
-/** Keys whose value is a Media reference (IMAGE). */
-export type ImageKey = { [K in ContentKey]: Blocks[K]["kind"] extends "IMAGE" ? K : never }[ContentKey];
+  // ── common ────────────────────────────────────────────────────────────────
+  'common.skipToContent': REQUIRED,
+  'common.mainNavigation': REQUIRED,
+  'common.languageSwitcher': REQUIRED,
+  'common.switchLanguageTo': REQUIRED_TEMPLATE, // SiteHeader: splitLanguageTemplate()
+  'common.openMenu': REQUIRED,
+  'common.closeMenu': REQUIRED,
+  'common.homeLink': REQUIRED,
+  'common.backHome': REQUIRED,
+  'common.breadcrumbs': REQUIRED,
+  'common.mobileMenu': REQUIRED,
+  'common.footerNavigation': REQUIRED,
+  'common.imageViewer': REQUIRED,
+  'common.previousImage': REQUIRED,
+  'common.nextImage': REQUIRED,
+  'common.closeViewer': REQUIRED,
 
-export function isContentKey(value: string): value is ContentKey {
-  return Object.prototype.hasOwnProperty.call(CONTENT_BLOCKS, value);
+  // ── forms (lead form states and errors; LeadForm and /api/leads) ──────────
+  'forms.sending': REQUIRED,
+  'forms.errors.required': REQUIRED,
+  'forms.errors.invalidEmail': REQUIRED,
+  'forms.errors.invalidPhone': REQUIRED,
+  'forms.errors.contactRequired': REQUIRED,
+  'forms.errors.tooShort': REQUIRED_TEMPLATE, // LeadForm: fill()
+  'forms.errors.tooLong': REQUIRED_TEMPLATE, // LeadForm: fill()
+  'forms.errors.rateLimited': REQUIRED,
+  'forms.errors.server': REQUIRED,
+  'forms.errors.network': REQUIRED,
+  'forms.errors.invalidForm': REQUIRED,
+  'forms.errors.consentRequired': REQUIRED,
+  'forms.errors.invalid': REQUIRED,
+  'forms.errors.invalidType': REQUIRED,
+  'forms.errors.badRequest': REQUIRED,
+  'forms.errors.payloadTooLarge': REQUIRED,
+  'forms.errors.unsupportedMediaType': REQUIRED,
+  'forms.sendAnother': REQUIRED,
+  'forms.noscriptInvalid': REQUIRED,
+
+  // ── social ────────────────────────────────────────────────────────────────
+  'social.TELEGRAM': REQUIRED,
+  'social.VK': REQUIRED,
+  'social.INSTAGRAM': REQUIRED,
+  'social.WHATSAPP': REQUIRED,
+  'social.YOUTUBE': REQUIRED,
+  'social.TIKTOK': REQUIRED,
+  'social.PINTEREST': REQUIRED,
+  'social.WEBSITE': REQUIRED,
+  'social.OTHER': REQUIRED,
+
+  // ── notFound ──────────────────────────────────────────────────────────────
+  'notFound.title': REQUIRED,
+
+  // ── error ─────────────────────────────────────────────────────────────────
+  'error.title': REQUIRED,
+  'error.retry': REQUIRED,
+
+  // ── telegram (owner notifications; read in the default locale only) ──────
+  'telegram.newLead': REQUIRED,
+  'telegram.leadTypes.TAILORING': REQUIRED,
+  'telegram.leadTypes.PARTNERSHIP': REQUIRED,
+  'telegram.leadTypes.CONTACT': REQUIRED,
+  'telegram.name': REQUIRED,
+  'telegram.phone': REQUIRED,
+  'telegram.email': REQUIRED,
+  'telegram.locale': REQUIRED,
+  'telegram.message': REQUIRED,
+  'telegram.time': REQUIRED,
+  'telegram.openAdmin': REQUIRED,
+  'telegram.errors.dryRun': REQUIRED,
+  'telegram.errors.notifyCeiling': REQUIRED,
+  'telegram.errors.notConfigured': REQUIRED,
+  'telegram.errors.badToken': REQUIRED,
+  'telegram.errors.timeout': REQUIRED,
+  'telegram.errors.network': REQUIRED,
+  'telegram.errors.api': REQUIRED,
+  'telegram.errors.internal': REQUIRED,
+  'telegram.errors.unknown': REQUIRED,
+  'telegram.errors.invalidId': REQUIRED,
+  'telegram.errors.loadFailed': REQUIRED,
+  'telegram.errors.notFound': REQUIRED,
+  'telegram.errors.sendFailed': REQUIRED,
+};
+
+function metaOf(key: MessageKey): MessageMeta {
+  return MESSAGE_META[key] ?? {};
+}
+
+/** The admin section of a key ("hero.title" → "hero"). */
+export function messageSection(key: MessageKey): SectionId {
+  return messageNamespace(key);
+}
+
+/** Kind of a key: the override, else "icu" when any default uses ICU syntax, else "text". */
+export function messageKind(key: MessageKey): MessageKind {
+  const kind = metaOf(key).kind;
+  if (kind) return kind;
+  const defaults = defaultMessageTranslations(key);
+  return Object.values(defaults).some(hasMessageSyntax) ? 'icu' : 'text';
+}
+
+/** True for keys that must have text in the default locale (MessageMeta.required). */
+export function isRequiredKey(key: MessageKey): boolean {
+  return metaOf(key).required === true;
+}
+
+/** Everything the admin editor needs about one key. */
+export type MessageDefinition = {
+  key: MessageKey;
+  section: SectionId;
+  kind: MessageKind;
+  required: boolean;
+  /** Position inside its section (messages/ru.json order). */
+  order: number;
+  /** The messages/<locale>.json value of every locale (what «сбросить» restores). */
+  defaults: Record<Locale, string>;
+};
+
+const KEYS_BY_SECTION: ReadonlyMap<SectionId, readonly MessageKey[]> = (() => {
+  const map = new Map<SectionId, MessageKey[]>();
+  for (const key of MESSAGE_KEYS) {
+    const section = messageSection(key);
+    const keys = map.get(section);
+    if (keys) keys.push(key);
+    else map.set(section, [key]);
+  }
+  return map;
+})();
+
+/** Keys of a section in messages/ru.json order. */
+export function sectionMessageKeys(section: SectionId): readonly MessageKey[] {
+  return KEYS_BY_SECTION.get(section) ?? [];
+}
+
+export function messageDefinition(key: MessageKey): MessageDefinition {
+  const section = messageSection(key);
+  return {
+    key,
+    section,
+    kind: messageKind(key),
+    required: isRequiredKey(key),
+    order: sectionMessageKeys(section).indexOf(key),
+    defaults: defaultMessageTranslations(key),
+  };
+}
+
+/** Definitions of every key of a section, in display order (the admin section editor). */
+export function sectionMessageDefinitions(section: SectionId): MessageDefinition[] {
+  return sectionMessageKeys(section).map(messageDefinition);
+}
+
+// ── images ──────────────────────────────────────────────────────────────────
+
+/**
+ * Landing images addressed by key — `ContentImage` rows (key → Media), edited in the admin
+ * section they belong to (names: admin.siteTexts.images.<key>). Not messages: the keys never
+ * appear in messages/*.json.
+ */
+export const CONTENT_IMAGES = {
+  'about.image': { section: 'about' },
+  'tailoring.image': { section: 'tailoring' },
+} as const satisfies Readonly<Record<string, { section: SectionId }>>;
+
+/** A ContentImage key ("about.image"). */
+export type ImageKey = keyof typeof CONTENT_IMAGES;
+
+function isOwnKey<T extends object>(record: T, key: PropertyKey): key is keyof T {
+  return Object.prototype.hasOwnProperty.call(record, key);
 }
 
 export function isImageKey(value: string): value is ImageKey {
-  return isContentKey(value) && CONTENT_BLOCKS[value].kind === "IMAGE";
+  return isOwnKey(CONTENT_IMAGES, value);
 }
 
-export function isTextKey(value: string): value is TextKey {
-  return isContentKey(value) && CONTENT_BLOCKS[value].kind !== "IMAGE";
-}
+export const IMAGE_KEYS: readonly ImageKey[] = Object.keys(CONTENT_IMAGES).filter(isImageKey);
 
-/** True for blocks that must have text in the default locale (BlockDefinition.required). */
-export function isRequiredKey(key: ContentKey): boolean {
-  const definition: BlockDefinition = CONTENT_BLOCKS[key];
-  return definition.required === true;
-}
-
-/** All keys in declaration order (= display order inside each section). */
-export const CONTENT_KEYS: readonly ContentKey[] = Object.keys(CONTENT_BLOCKS).filter(isContentKey);
-export const TEXT_KEYS: readonly TextKey[] = CONTENT_KEYS.filter(isTextKey);
-export const IMAGE_KEYS: readonly ImageKey[] = CONTENT_KEYS.filter(isImageKey);
-
-/** Order of a key inside its section (used as ContentBlock.order). */
-export function contentKeyOrder(key: ContentKey): number {
-  const section = CONTENT_BLOCKS[key].section;
-  return CONTENT_KEYS.filter((k) => CONTENT_BLOCKS[k].section === section).indexOf(key);
+/** Image keys of a section (the admin shows them with the section's texts). */
+export function sectionImageKeys(section: SectionId): readonly ImageKey[] {
+  return IMAGE_KEYS.filter(key => CONTENT_IMAGES[key].section === section);
 }

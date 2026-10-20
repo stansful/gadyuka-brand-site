@@ -6,14 +6,14 @@
 
 export class BodyTooLargeError extends Error {
   constructor() {
-    super("Request body too large");
-    this.name = "BodyTooLargeError";
+    super('Request body too large');
+    this.name = 'BodyTooLargeError';
   }
 }
 
 /** Reads the whole body, throwing BodyTooLargeError as soon as it exceeds `maxBytes`. */
 export async function readBodyBytes(request: Request, maxBytes: number): Promise<Uint8Array<ArrayBuffer>> {
-  const declared = Number(request.headers.get("content-length") ?? "");
+  const declared = Number(request.headers.get('content-length') ?? '');
   if (Number.isFinite(declared) && declared > maxBytes) throw new BodyTooLargeError();
   if (!request.body) return new Uint8Array(0);
   const reader = request.body.getReader();
@@ -40,7 +40,7 @@ export async function readBodyBytes(request: Request, maxBytes: number): Promise
 
 /** Reads the body as UTF-8 text with the same limit. */
 export async function readBodyText(request: Request, maxBytes: number): Promise<string> {
-  return new TextDecoder("utf-8").decode(await readBodyBytes(request, maxBytes));
+  return new TextDecoder('utf-8').decode(await readBodyBytes(request, maxBytes));
 }
 
 /**
@@ -49,6 +49,6 @@ export async function readBodyText(request: Request, maxBytes: number): Promise<
  */
 export async function readFormData(request: Request, maxBytes: number): Promise<FormData> {
   const bytes = await readBodyBytes(request, maxBytes);
-  const contentType = request.headers.get("content-type") ?? "";
-  return new Response(bytes, { headers: { "content-type": contentType } }).formData();
+  const contentType = request.headers.get('content-type') ?? '';
+  return new Response(bytes, { headers: { 'content-type': contentType } }).formData();
 }

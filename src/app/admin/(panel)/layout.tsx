@@ -1,5 +1,6 @@
-import { Suspense, type ReactElement, type ReactNode } from "react";
-import { AdminFrame, AdminFrameFallback } from "@/components/admin/layout/AdminFrame";
+import { Suspense, type ReactElement, type ReactNode } from 'react';
+
+import { AdminFrame, AdminFrameFallback } from '@/components/admin/layout/AdminFrame';
 
 /**
  * Authenticated part of the admin. The access check reads cookies (request-time), so the

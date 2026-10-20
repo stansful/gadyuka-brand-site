@@ -1,7 +1,7 @@
 # ГАДЮКА — Caddy (automatic HTTPS via Let's Encrypt). DOMAIN comes from .env (docker-compose.yml).
 #
-#   /uploads/*  → files straight from the uploads volume (mounted read-only at /srv/uploads)
-#   everything else → Next.js (app:3000)
+#   everything → Next.js (app:3000), including /media/* — the app streams media from the private
+#   MinIO bucket (src/app/media/[...key]/route.ts) with its own caching and sandbox headers
 
 {$DOMAIN} {
 	# Compression, in order of preference: zstd at its "better" level (about zstd -7; the HTML
@@ -26,10 +26,11 @@
 		-Server
 	}
 
-	# Baseline CSP for pages, the admin and the API (/uploads/* has its own sandbox CSP below).
-	# No script-src yet: tighten with nonces later, starting with /admin.
-	@notUploads not path /uploads/*
-	header @notUploads {
+	# Baseline CSP for pages, the admin and the API. /media/* is left alone: the app sends a
+	# stricter sandbox CSP with every media file. No script-src yet: tighten with nonces later,
+	# starting with /admin.
+	@notMedia not path /media/*
+	header @notMedia {
 		Content-Security-Policy "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'"
 		defer
 	}
@@ -48,15 +49,6 @@
 
 	# The admin is never indexed (in addition to robots.txt / noindex meta).
 	header /admin* X-Robots-Tag "noindex, nofollow"
-
-	handle /uploads/* {
-		root * /srv
-		header Cache-Control "public, max-age=31536000, immutable"
-		header Content-Security-Policy "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"
-		file_server {
-			hide .*
-		}
-	}
 
 	handle {
 		reverse_proxy app:3000 {

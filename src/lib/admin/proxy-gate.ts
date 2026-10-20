@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { resolveAdminGate } from "./admin-gate";
-import { ADMIN_COOKIE_NAME, ADMIN_LOGIN_PATH } from "./auth-constants";
-import { deriveSessionKey, verifyAdminSession } from "./session-token";
+import { NextResponse, type NextRequest } from 'next/server';
+
+import { resolveAdminGate } from './admin-gate';
+import { ADMIN_COOKIE_NAME, ADMIN_LOGIN_PATH } from './auth-constants';
+import { deriveSessionKey, verifyAdminSession } from './session-token';
 
 /**
  * Optimistic admin gate, run by src/proxy.ts for /admin/** page requests.
@@ -18,19 +19,19 @@ import { deriveSessionKey, verifyAdminSession } from "./session-token";
  */
 export async function adminProxyGate(request: NextRequest): Promise<NextResponse> {
   const gate = resolveAdminGate();
-  if (gate.kind === "open") return NextResponse.next();
+  if (gate.kind === 'open') return NextResponse.next();
 
   const { pathname, search } = request.nextUrl;
   if (pathname === ADMIN_LOGIN_PATH || pathname.startsWith(`${ADMIN_LOGIN_PATH}/`)) return NextResponse.next();
-  if (request.method !== "GET" && request.method !== "HEAD") return NextResponse.next();
+  if (request.method !== 'GET' && request.method !== 'HEAD') return NextResponse.next();
 
-  if (gate.kind === "password") {
-    const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value ?? "";
+  if (gate.kind === 'password') {
+    const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value ?? '';
     const key = token ? await deriveSessionKey(gate.password, gate.sessionSecret) : null;
     if (key && (await verifyAdminSession(token, key))) return NextResponse.next();
   }
 
   const loginUrl = new URL(ADMIN_LOGIN_PATH, request.url);
-  if (pathname !== "/admin") loginUrl.searchParams.set("next", `${pathname}${search}`);
+  if (pathname !== '/admin') loginUrl.searchParams.set('next', `${pathname}${search}`);
   return NextResponse.redirect(loginUrl, 307);
 }

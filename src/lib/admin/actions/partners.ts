@@ -1,25 +1,26 @@
-"use server";
+'use server';
 
-import { db } from "@/lib/db";
-import { revalidateContent } from "@/lib/content/cache";
-import { adminAction, findMissingMediaIds, MISSING_MEDIA_MESSAGE } from "../action-helpers";
-import { actionFail, actionOk, type ActionResult } from "../action-result";
-import { idSchema, partnerInputSchema, type PartnerInput } from "../schemas";
-import { parseInput } from "../validation";
+import { revalidateContent } from '@/lib/content/cache';
+import { db } from '@/lib/db';
+
+import { adminAction, errorFailure, missingMediaFailure } from '../action-helpers';
+import { actionFail, actionOk, type ActionResult } from '../action-result';
+import { getAdminTranslations } from '../i18n-server';
+import { idSchema, partnerInputSchema, type PartnerInput } from '../schemas';
+import { parseInput } from '../validation';
 
 /** Create (id = null) or update a partner. */
 export async function savePartner(id: string | null, input: PartnerInput): Promise<ActionResult<{ id: string }>> {
-  return adminAction("savePartner", async () => {
+  return adminAction('savePartner', async () => {
     const parsedId = id === null ? null : idSchema.safeParse(id);
-    if (parsedId && !parsedId.success) return actionFail("Некорректный идентификатор");
-    const parsed = parseInput(partnerInputSchema, input);
+    if (parsedId && !parsedId.success) return errorFailure('invalidId');
+    const parsed = await parseInput(partnerInputSchema, input);
     if (!parsed.success) return actionFail(parsed.message, parsed.fieldErrors);
     const data = parsed.data;
     const currentId = parsedId?.data ?? null;
 
-    if ((await findMissingMediaIds([data.logoId])).length > 0) {
-      return actionFail(MISSING_MEDIA_MESSAGE, { logoId: MISSING_MEDIA_MESSAGE });
-    }
+    const missingMedia = await missingMediaFailure([data.logoId], ['logoId']);
+    if (missingMedia) return missingMedia;
     const fields = {
       name: data.name,
       url: data.url,
@@ -38,6 +39,7 @@ export async function savePartner(id: string | null, input: PartnerInput): Promi
       ).id;
     }
     revalidateContent();
-    return actionOk({ id: savedId }, currentId ? "Партнёр сохранён" : "Партнёр добавлен");
+    const t = await getAdminTranslations('admin.partners');
+    return actionOk({ id: savedId }, t(currentId ? 'saved' : 'created'));
   });
 }

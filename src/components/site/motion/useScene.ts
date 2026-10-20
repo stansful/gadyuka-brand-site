@@ -1,13 +1,14 @@
-"use client";
+'use client';
 
-import { type RefObject, useEffect, useLayoutEffect, useRef } from "react";
-import { withRevealsOff } from "./effects";
-import { motionEnabled, PENDING_CLASS, SCENE_LATE_ATTR } from "./env";
-import { gsap } from "./gsap";
-import { markSceneReady, scheduleScene } from "./scheduler";
+import { type RefObject, useEffect, useLayoutEffect, useRef } from 'react';
+
+import { withRevealsOff } from './effects';
+import { motionEnabled, PENDING_CLASS, SCENE_LATE_ATTR } from './env';
+import { gsap } from './gsap';
+import { markSceneReady, scheduleScene } from './scheduler';
 
 /** useLayoutEffect on the client (runs before paint), useEffect during SSR (no warning). */
-export const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+export const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 export type SceneSetup<E extends HTMLElement> = (root: E, ctx: gsap.Context) => void | (() => void);
 
@@ -17,7 +18,10 @@ export type SceneSetup<E extends HTMLElement> = (root: E, ctx: gsap.Context) => 
  * try/finally, so an exception escaping it would leave the (soon reverted) context current and
  * every later tween on the page would be recorded into it.
  */
-export function addSafely(ctx: gsap.Context, setup: () => void | (() => void)): { ok: true } | { ok: false; error: unknown } {
+export function addSafely(
+  ctx: gsap.Context,
+  setup: () => void | (() => void),
+): { ok: true } | { ok: false; error: unknown } {
   const outcome: { failed: boolean; error: unknown } = { failed: false, error: undefined };
   ctx.add(() => {
     try {

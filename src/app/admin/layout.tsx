@@ -1,26 +1,39 @@
-import type { Metadata, Viewport } from "next";
-import { Montserrat } from "next/font/google";
-import type { ReactElement, ReactNode } from "react";
-import { AdminToaster } from "@/components/admin/ui/AdminToaster";
-import "./admin.css";
+import { createTranslator, NextIntlClientProvider } from 'next-intl';
+import { Montserrat } from 'next/font/google';
+
+import { AdminToaster } from '@/components/admin/ui/AdminToaster';
+import { ADMIN_LOCALE } from '@/lib/admin/i18n';
+
+import type { Metadata, Viewport } from 'next';
+import type { ReactElement, ReactNode } from 'react';
+
+import adminRu from '../../../messages/admin/ru.json';
+import './admin.css';
 
 /**
  * Root layout of the admin (/admin/**). Separate from the site root layout
  * (src/app/[locale]/layout.tsx): Russian only, own stylesheet (Tailwind), never indexed.
  * Access control lives in (panel)/layout.tsx + every query/action (src/lib/admin/auth.ts).
+ *
+ * UI copy: messages/admin/ru.json (src/lib/admin/i18n.ts). The client provider gets ONLY the
+ * "admin" namespace — the site messages never reach the admin's browser bundle. The layout takes
+ * that static file directly instead of getMessages() / getTranslations(): those also load the
+ * DB-backed site messages, which the admin shell (/admin/login included) has no use for.
  */
 
 const adminFont = Montserrat({
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-admin",
-  display: "swap",
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-admin',
+  display: 'swap',
 });
 
 /** The admin reads cookies and the DB on every request; navigations may block. */
 export const instant = false;
 
+const metaText = createTranslator({ locale: ADMIN_LOCALE, messages: adminRu, namespace: 'admin.meta' });
+
 export const metadata: Metadata = {
-  title: { default: "Админка — ГАДЮКА", template: "%s — админка ГАДЮКА" },
+  title: { default: metaText('default'), template: metaText('template') },
   robots: {
     index: false,
     follow: false,
@@ -30,16 +43,18 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#010101",
-  colorScheme: "dark",
+  themeColor: '#010101',
+  colorScheme: 'dark',
 };
 
 export default function AdminRootLayout({ children }: { children: ReactNode }): ReactElement {
   return (
-    <html lang="ru" className={adminFont.variable}>
+    <html lang={ADMIN_LOCALE} className={adminFont.variable}>
       <body className="min-h-dvh bg-ink text-fg antialiased">
-        {children}
-        <AdminToaster />
+        <NextIntlClientProvider locale={ADMIN_LOCALE} messages={{ admin: adminRu.admin }}>
+          {children}
+          <AdminToaster />
+        </NextIntlClientProvider>
       </body>
     </html>
   );

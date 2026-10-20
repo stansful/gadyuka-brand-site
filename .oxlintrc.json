@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react", "nextjs", "jsx-a11y", "import"],
+  "ignorePatterns": ["src/generated/**", "concepts/**", "assets/**", "next-env.d.ts"],
+  "rules": {
+    "unicorn/prefer-number-properties": "off",
+    "typescript/no-non-null-assertion": "off",
+    "typescript/consistent-type-imports": "off",
+    "eslint/no-param-reassign": "warn",
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-invalid-void-type": "off",
+    "typescript/no-extraneous-class": "off",
+    "unicorn/no-static-only-class": "off",
+    "unicorn/no-array-for-each": "off",
+    "eslint/radix": "off",
+    "eslint/no-unused-vars": "error",
+    "eslint/no-unneeded-ternary": "warn"
+  }
+}

@@ -1,39 +1,40 @@
-import { Plus } from "lucide-react";
-import type { Metadata } from "next";
-import Link from "next/link";
-import type { ReactElement } from "react";
-import { EntityList } from "@/components/admin/lists/EntityList";
-import { buttonClasses } from "@/components/admin/ui/Button";
-import { PageHeader } from "@/components/admin/ui/layout";
-import { listNewsAdmin } from "@/lib/admin/queries";
+import { Plus } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
 
-export const metadata: Metadata = { title: "Новости" };
+import { EntityList } from '@/components/admin/lists/EntityList';
+import { buttonClasses } from '@/components/admin/ui/Button';
+import { PageHeader } from '@/components/admin/ui/layout';
+import { adminPageMetadata } from '@/lib/admin/i18n-server';
+import { listNewsAdmin } from '@/lib/admin/queries';
+
+import type { Metadata } from 'next';
+import type { ReactElement } from 'react';
+
+export function generateMetadata(): Promise<Metadata> {
+  return adminPageMetadata('news.title');
+}
 
 export default async function ListPage(): Promise<ReactElement> {
-  const rows = await listNewsAdmin();
+  const [rows, t] = await Promise.all([listNewsAdmin(), getTranslations('admin.news')]);
   const addLink = (
-    <Link href="/admin/news/new" className={buttonClasses("primary")}>
+    <Link href="/admin/news/new" className={buttonClasses('primary')}>
       <Plus className="size-4" aria-hidden />
-      Новая новость
+      {t('add')}
     </Link>
   );
   return (
     <>
-      <PageHeader
-        title="Новости"
-        description="Новости и события. На сайте они идут по дате — от новых к старым."
-        actions={
-          <>
-            {addLink}
-          </>
-        }
-      />
+      <PageHeader title={t('title')} description={t('description')} actions={<>{addLink}</>} />
       <EntityList
         entity="news"
         rows={rows}
         sortable={false}
-        nounAccusative="новость"
-        empty={{ title: "Новостей пока нет", description: "Расскажите о запуске коллекции, поп-апах и событиях бренда.", action: addLink }}
+        empty={{
+          title: t('empty'),
+          description: t('emptyHint'),
+          action: addLink,
+        }}
       />
     </>
   );

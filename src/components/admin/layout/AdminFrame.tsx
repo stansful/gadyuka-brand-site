@@ -1,9 +1,13 @@
-import { TriangleAlert } from "lucide-react";
-import type { ReactElement, ReactNode } from "react";
-import { requireAdminPage } from "@/lib/admin/auth";
-import { getNewLeadCount } from "@/lib/admin/queries";
-import { isTelegramDryRun } from "@/lib/telegram";
-import { AdminSidebar } from "./AdminSidebar";
+import { TriangleAlert } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
+
+import { requireAdminPage } from '@/lib/admin/auth';
+import { getNewLeadCount } from '@/lib/admin/queries';
+import { isTelegramDryRun } from '@/lib/telegram';
+
+import type { ReactElement, ReactNode } from 'react';
+
+import { AdminSidebar } from './AdminSidebar';
 
 /**
  * Authenticated admin chrome (rendered inside <Suspense> by the (panel) layout):
@@ -13,26 +17,34 @@ import { AdminSidebar } from "./AdminSidebar";
  */
 export async function AdminFrame({ children }: { children: ReactNode }): Promise<ReactElement> {
   const access = await requireAdminPage();
-  const newLeads = await getNewLeadCount();
-  const telegramDryRunInProduction = process.env.NODE_ENV === "production" && isTelegramDryRun();
+  const [newLeads, t] = await Promise.all([getNewLeadCount(), getTranslations('admin.frame')]);
+  const telegramDryRunInProduction = process.env.NODE_ENV === 'production' && isTelegramDryRun();
 
   return (
     <div className="min-h-dvh">
-      <AdminSidebar newLeads={newLeads} canLogout={access.mode === "password"} />
+      <AdminSidebar newLeads={newLeads} canLogout={access.mode === 'password'} />
       <div className="lg:pl-60">
-        {access.mode === "open" ? (
-          <div role="note" className="flex items-center gap-2 border-b border-yellow-500/30 bg-yellow-400/10 px-4 py-2 text-xs text-yellow-200 md:px-6 lg:px-8">
+        {access.mode === 'open' ? (
+          <div
+            role="note"
+            className="flex items-center gap-2 border-b border-yellow-500/30 bg-yellow-400/10 px-4 py-2 text-xs text-yellow-200 md:px-6 lg:px-8"
+          >
             <TriangleAlert className="size-4 shrink-0 text-yellow-300" aria-hidden />
             <span>
-              Админка открыта для всех — задайте <code className="font-mono text-yellow-100">ADMIN_PASSWORD</code>
+              {t.rich('openAdmin', { code: chunks => <code className="font-mono text-yellow-100">{chunks}</code> })}
             </span>
           </div>
         ) : null}
         {telegramDryRunInProduction ? (
-          <div role="note" className="flex items-center gap-2 border-b border-yellow-500/30 bg-yellow-400/10 px-4 py-2 text-xs text-yellow-200 md:px-6 lg:px-8">
+          <div
+            role="note"
+            className="flex items-center gap-2 border-b border-yellow-500/30 bg-yellow-400/10 px-4 py-2 text-xs text-yellow-200 md:px-6 lg:px-8"
+          >
             <TriangleAlert className="size-4 shrink-0 text-yellow-300" aria-hidden />
             <span>
-              Заявки не отправляются в Telegram: включён <code className="font-mono text-yellow-100">TELEGRAM_DRY_RUN=1</code>
+              {t.rich('telegramDryRun', {
+                code: chunks => <code className="font-mono text-yellow-100">{chunks}</code>,
+              })}
             </span>
           </div>
         ) : null}
@@ -45,10 +57,11 @@ export async function AdminFrame({ children }: { children: ReactNode }): Promise
 }
 
 /** Static fallback while the frame (auth + sidebar) streams in. */
-export function AdminFrameFallback(): ReactElement {
+export async function AdminFrameFallback(): Promise<ReactElement> {
+  const t = await getTranslations('admin.frame');
   return (
     <div className="min-h-dvh" role="status" aria-live="polite">
-      <span className="sr-only">Загрузка админки…</span>
+      <span className="sr-only">{t('loading')}</span>
       <div className="fixed inset-y-0 left-0 hidden w-60 border-r border-line bg-panel lg:block" />
       <div className="h-14 border-b border-line bg-panel lg:hidden" />
       <div className="lg:pl-60">

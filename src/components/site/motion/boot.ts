@@ -26,9 +26,17 @@
  * The hero scene removes the class once the intro animations have finished.
  */
 
-import { SCROLLBAR_CLASS, SCROLLBAR_FAILSAFE_MS, SCROLLBAR_READY_CLASS, SNAKE_OFF_CLASS } from "../chrome/snake-bar";
-import { FINE_HOVER_QUERY, HERO_PX_CLASS, IN_APP_CLASS, IN_APP_UA, IOS_WEBVIEW_UA, LITE_CLASS, STANDALONE_QUERY } from "./in-app";
-import { SCENE_LATE_ATTR, SCENE_PENDING_ATTR } from "./scene-attrs";
+import { SCROLLBAR_CLASS, SCROLLBAR_FAILSAFE_MS, SCROLLBAR_READY_CLASS, SNAKE_OFF_CLASS } from '../chrome/snake-bar';
+import {
+  FINE_HOVER_QUERY,
+  HERO_PX_CLASS,
+  IN_APP_CLASS,
+  IN_APP_UA,
+  IOS_WEBVIEW_UA,
+  LITE_CLASS,
+  STANDALONE_QUERY,
+} from './in-app';
+import { SCENE_LATE_ATTR, SCENE_PENDING_ATTR } from './scene-attrs';
 import {
   TAP_AFTER_END_MS,
   TAP_MOVE_MIN_PX,
@@ -37,7 +45,7 @@ import {
   TAP_STALL_MARGIN_MS,
   TAP_STALL_MS,
   TAP_TRAVEL_PX,
-} from "./tap-guard";
+} from './tap-guard';
 
 /**
  * Gated by NEAR_GATE, with how far ahead of the viewport each opens: the landing chapters
@@ -46,17 +54,17 @@ import {
  * collection on a phone) 1.5 screens would fetch the lettering face with the first screen.
  */
 const NEAR_TARGETS: ReadonlyArray<readonly [selector: string, rootMargin: string]> = [
-  ["main > section.page[id]", "150% 0px"],
-  [".ftr", "50% 0px"],
+  ['main > section.page[id]', '150% 0px'],
+  ['.ftr', '50% 0px'],
 ];
 /** Hand-lettered text (noir.css `--f-letter`) whose face NEAR_GATE requests ahead of its layout. */
-const LETTER_TEXT = ".say__bubble p, .ftr__tbc";
+const LETTER_TEXT = '.say__bubble p, .ftr__tbc';
 /** The hand-lettering face (next/font `Shantell_Sans`, weight 700 — src/app/[locale]/layout.tsx). */
 const LETTER_FONT = '700 1em "Shantell Sans"';
 /** noir.css «near-viewport gate»: set on a gated element once it comes near (NEAR_TARGETS). */
-const NEAR_ATTR = "data-near";
+const NEAR_ATTR = 'data-near';
 /** noir.css «near-viewport gate»: on <html> while the gate is closed for elements without NEAR_ATTR. */
-export const NEAR_GATE_CLASS = "near-gate";
+export const NEAR_GATE_CLASS = 'near-gate';
 
 /**
  * Near-viewport gate (production): under `html.near-gate`, noir.css holds back what a landing
@@ -74,9 +82,9 @@ export const NEAR_GATE_CLASS = "near-gate";
  * below <body>'s children would need to lift the gate.
  */
 const NEAR_GATE =
-  process.env.NODE_ENV === "production"
-    ? `if(window.IntersectionObserver){d.classList.add('${NEAR_GATE_CLASS}');document.addEventListener('DOMContentLoaded',function(){var f=[];function w(s,m){var o=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return;var t=e.target,l=t.querySelector('${LETTER_TEXT}');o.unobserve(t);t.setAttribute('${NEAR_ATTR}','');if(l&&document.fonts)document.fonts.load('${LETTER_FONT}',l.textContent||'А').catch(function(){})})},{rootMargin:m});function a(){document.querySelectorAll(s).forEach(function(t){if(!t.hasAttribute('${NEAR_ATTR}'))o.observe(t)})}a();f.push(a)}${NEAR_TARGETS.map(([selector, margin]) => `w('${selector}','${margin}');`).join("")}if(window.MutationObserver)new MutationObserver(function(){f.forEach(function(a){a()})}).observe(document.body,{childList:true})})}`
-    : "";
+  process.env.NODE_ENV === 'production'
+    ? `if(window.IntersectionObserver){d.classList.add('${NEAR_GATE_CLASS}');document.addEventListener('DOMContentLoaded',function(){var f=[];function w(s,m){var o=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return;var t=e.target,l=t.querySelector('${LETTER_TEXT}');o.unobserve(t);t.setAttribute('${NEAR_ATTR}','');if(l&&document.fonts)document.fonts.load('${LETTER_FONT}',l.textContent||'А').catch(function(){})})},{rootMargin:m});function a(){document.querySelectorAll(s).forEach(function(t){if(!t.hasAttribute('${NEAR_ATTR}'))o.observe(t)})}a();f.push(a)}${NEAR_TARGETS.map(([selector, margin]) => `w('${selector}','${margin}');`).join('')}if(window.MutationObserver)new MutationObserver(function(){f.forEach(function(a){a()})}).observe(document.body,{childList:true})})}`
+    : '';
 
 /**
  * In-app browsers (`ia`): `html.in-app`. They and every touch screen (no fine hovering pointer):
@@ -126,12 +134,12 @@ const SCROLLBAR_FAILSAFE = `if(!snakeOff){d.classList.add('${SCROLLBAR_CLASS}');
  * Development builds leave it off (an attribute set before hydration shows up in React's
  * hydration diff there), like NEAR_GATE.
  */
-const LATE_AHEAD = "50% 0px";
+const LATE_AHEAD = '50% 0px';
 /** Input that makes a following scroll the visitor's own (as scroll-tween.ts USER_SCROLL_EVENTS). */
-const USER_INPUT = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+const USER_INPUT = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
 
 export function lateGate(enabled: boolean): string {
-  if (!enabled) return "";
+  if (!enabled) return '';
   const P = SCENE_PENDING_ATTR;
   const L = SCENE_LATE_ATTR;
   return (
@@ -148,7 +156,7 @@ export function lateGate(enabled: boolean): string {
   );
 }
 
-const LATE_GATE = lateGate(process.env.NODE_ENV === "production");
+const LATE_GATE = lateGate(process.env.NODE_ENV === 'production');
 
 /**
  * Tap guard (every page, every engine, with or without motion; numbers in tap-guard.ts): the

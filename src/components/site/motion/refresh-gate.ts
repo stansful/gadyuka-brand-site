@@ -25,11 +25,11 @@ export const TOUCH_MIN_HEIGHT_DELTA = 96;
 
 export type RefreshDecision =
   /** Mouse / trackpad: GSAP's refresh(true). */
-  | { kind: "safe" }
+  | { kind: 'safe' }
   /** Touch screen, page still: refresh() right away. */
-  | { kind: "now" }
+  | { kind: 'now' }
   /** Touch screen, not still yet (or hidden): look again in `ms`. */
-  | { kind: "wait"; ms: number };
+  | { kind: 'wait'; ms: number };
 
 export type RefreshState = {
   /** Touch is the primary input (no hover + fine pointer). */
@@ -43,10 +43,10 @@ export type RefreshState = {
 };
 
 export function refreshDecision({ touch, activeTouches, stillForMs, hidden }: RefreshState): RefreshDecision {
-  if (!touch) return { kind: "safe" };
-  if (activeTouches > 0 || hidden) return { kind: "wait", ms: TOUCH_STILL_MS };
-  if (stillForMs < TOUCH_STILL_MS) return { kind: "wait", ms: Math.max(150, Math.ceil(TOUCH_STILL_MS - stillForMs)) };
-  return { kind: "now" };
+  if (!touch) return { kind: 'safe' };
+  if (activeTouches > 0 || hidden) return { kind: 'wait', ms: TOUCH_STILL_MS };
+  if (stillForMs < TOUCH_STILL_MS) return { kind: 'wait', ms: Math.max(150, Math.ceil(TOUCH_STILL_MS - stillForMs)) };
+  return { kind: 'now' };
 }
 
 /** Whether a document-height change asks for a refresh (`refreshedHeight`: the height the last one measured). */

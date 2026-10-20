@@ -1,21 +1,24 @@
-"use client";
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useState, type ReactElement } from "react";
-import { errorFor } from "@/lib/admin/action-result";
-import { saveGalleryItem } from "@/lib/admin/actions/gallery";
-import type { AdminMediaRef, GalleryFormData } from "@/lib/admin/types";
-import type { LocalizedText } from "@/lib/i18n-text";
-import { EditLocaleProvider, localesWithErrors, translationGaps } from "../i18n/LocaleTabs";
-import { LocalizedField } from "../i18n/LocalizedField";
-import { MediaPicker } from "../media/MediaPicker";
-import { Card } from "../ui/layout";
-import { Switch } from "../ui/Switch";
-import { useActionSubmit } from "../ui/useActionSubmit";
-import { EntityFormShell } from "./EntityFormShell";
-import { siteLinksFor } from "./site-links";
+import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
+import { useState, type ReactElement } from 'react';
 
-const LOCALIZED = ["caption"] as const;
+import { errorFor } from '@/lib/admin/action-result';
+import { saveGalleryItem } from '@/lib/admin/actions/gallery';
+import type { AdminMediaRef, GalleryFormData } from '@/lib/admin/types';
+import type { LocalizedText } from '@/lib/i18n-text';
+
+import { EditLocaleProvider, localesWithErrors, translationGaps } from '../i18n/LocaleTabs';
+import { LocalizedField } from '../i18n/LocalizedField';
+import { MediaPicker } from '../media/MediaPicker';
+import { Card } from '../ui/layout';
+import { Switch } from '../ui/Switch';
+import { useActionSubmit } from '../ui/useActionSubmit';
+import { EntityFormShell } from './EntityFormShell';
+import { siteLinksFor } from './site-links';
+
+const LOCALIZED = ['caption'] as const;
 
 export function GalleryForm({ initial }: { initial: GalleryFormData | null }): ReactElement {
   return (
@@ -26,6 +29,7 @@ export function GalleryForm({ initial }: { initial: GalleryFormData | null }): R
 }
 
 function GalleryFormInner({ initial }: { initial: GalleryFormData | null }): ReactElement {
+  const t = useTranslations('admin');
   const router = useRouter();
   const [media, setMedia] = useState<AdminMediaRef | null>(initial?.media ?? null);
   const [caption, setCaption] = useState<LocalizedText>(initial?.caption ?? {});
@@ -34,11 +38,11 @@ function GalleryFormInner({ initial }: { initial: GalleryFormData | null }): Rea
 
   const submit = (): void => {
     if (!media) {
-      setFieldErrors({ mediaId: "Выберите изображение" });
+      setFieldErrors({ mediaId: t('gallery.form.chooseImage') });
       return;
     }
     run(() => saveGalleryItem(initial?.id ?? null, { mediaId: media.id, caption, published }), {
-      onSuccess: (data) => {
+      onSuccess: data => {
         if (!initial) router.replace(`/admin/gallery/${data.id}`);
       },
     });
@@ -51,26 +55,33 @@ function GalleryFormInner({ initial }: { initial: GalleryFormData | null }): Rea
       isNew={initial === null}
       localeGaps={translationGaps([caption])}
       localeErrors={localesWithErrors(fieldErrors, LOCALIZED)}
-      siteLinks={initial ? siteLinksFor("gallery") : undefined}
-      remove={initial ? { entity: "gallery", id: initial.id, noun: "фото из галереи", listHref: "/admin/gallery" } : undefined}
+      siteLinks={initial ? siteLinksFor('gallery') : undefined}
+      remove={initial ? { entity: 'gallery', id: initial.id, listHref: '/admin/gallery' } : undefined}
       aside={
-        <Card title="Публикация">
-          <Switch checked={published} onCheckedChange={setPublished} label="Показывать на сайте" />
+        <Card title={t('form.publication')}>
+          <Switch checked={published} onCheckedChange={setPublished} label={t('form.showOnSite')} />
         </Card>
       }
     >
-      <Card title="Фото" bodyClassName="flex flex-col gap-5">
+      <Card title={t('gallery.form.main')} bodyClassName="flex flex-col gap-5">
         <MediaPicker
           id="gallery-media"
-          label="Изображение"
+          label={t('gallery.form.image')}
           required
           value={media}
           onChange={setMedia}
           aspect="wide"
-          error={errorFor(fieldErrors, "mediaId")}
-          hint="Описание (alt) для незрячих задаётся в медиатеке."
+          error={errorFor(fieldErrors, 'mediaId')}
+          hint={t('gallery.form.altHint')}
         />
-        <LocalizedField name="caption" label="Подпись" value={caption} onChange={setCaption} fieldErrors={fieldErrors} maxLength={300} />
+        <LocalizedField
+          name="caption"
+          label={t('gallery.form.caption')}
+          value={caption}
+          onChange={setCaption}
+          fieldErrors={fieldErrors}
+          maxLength={300}
+        />
       </Card>
     </EntityFormShell>
   );

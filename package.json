@@ -2,15 +2,12 @@
   "name": "gadyuka-site",
   "version": "0.1.0",
   "private": true,
-  "engines": {
-    "node": ">=22.12.0"
-  },
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
     "postbuild": "node scripts/clean-standalone-env.mjs",
     "start": "next start --port 3001",
-    "lint": "eslint",
+    "lint": "oxlint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
@@ -19,18 +16,24 @@
     "db:generate": "prisma generate",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1148.0",
     "@dnd-kit/core": "6.3.1",
     "@dnd-kit/sortable": "10.0.0",
     "@dnd-kit/utilities": "3.2.2",
+    "@formatjs/icu-messageformat-parser": "3.5.21",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
     "clsx": "2.1.1",
     "dotenv": "18.0.8",
     "file-type": "22.2.0",
     "gsap": "3.15.0",
+    "intl-messageformat": "11.2.15",
     "jose": "6.2.12",
     "lenis": "1.3.27",
     "lucide-react": "1.58.0",
@@ -50,12 +53,15 @@
     "@types/pg": "8.23.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "eslint": "9.39.5",
-    "eslint-config-next": "16.4.2",
+    "oxfmt": "0.73.0",
+    "oxlint": "1.88.0",
     "prisma": "7.10.1",
     "tailwindcss": "4.3.3",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vitest": "5.0.5"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }
