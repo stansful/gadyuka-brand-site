@@ -455,21 +455,80 @@ ensure_volume_dirs() {
 ${spec}
 EOF
     mkdir -p "${volumes}/${rel}"
-    chmod "${mode}" "${volumes}/${rel}"
-    [ "${SKIP_HOST_SETUP}" = "1" ] && continue
-    case "${rel}" in
-      # Written only by the node user: fix whatever an earlier manual `docker compose up` created as root.
-      backend/logs | frontend/*) chown -R "${uid}:${gid}" "${volumes}/${rel}" ;;
-      # The images fix their own data on start (postgres) or run as root.
-      *) chown "${uid}:${gid}" "${volumes}/${rel}" ;;
-    esac
   done
   if [ "${SKIP_HOST_SETUP}" != "1" ] && [ -n "${SUDO_USER:-}" ]; then
     chown "${SUDO_USER}" "${volumes}" "${volumes}/backend" "${volumes}/frontend"
   fi
+  # Owners are set from INSIDE a container (and then checked the same way): the daemon maps the uids,
+  # so this is right for rootful, rootless and userns-remapped Docker alike and needs no host root —
+  # a host-side `chown 70` is wrong for rootless Docker, and skipped altogether by --skip-host-setup.
+  for spec in ${specs}; do
+    IFS=: read -r rel uid gid mode <<EOF
+${spec}
+EOF
+    case "${rel}" in
+      # Written only by the node user: fix whatever an earlier manual `docker compose up` created as root.
+      backend/logs | frontend/*) set_volume_owner "${volumes}/${rel}" "${uid}:${gid}" "${mode}" -R ;;
+      # The images fix their own data on start (postgres) or run as root.
+      *) set_volume_owner "${volumes}/${rel}" "${uid}:${gid}" "${mode}" ;;
+    esac
+    check_volume_writable "${volumes}/${rel}" "${uid}:${gid}"
+  done
   local names=""
   for spec in ${specs}; do names="${names:+${names},}${spec%%:*}"; done
-  log "data folders: ${volumes}/{${names}}"
+  log "data folders: ${volumes}/{${names}} (owners set and write-checked from a container)"
+}
+
+# Any image of the stack with a shell and busybox chown: the helper containers below use it.
+VOLUME_HELPER_IMAGE="postgres:18.1-alpine3.23"
+
+# Runs `sh -c <script>` in a throw-away helper container with <dir> mounted at /v.
+volume_helper() {
+  local dir="$1" user="$2" script="$3"
+  docker run --rm --network none --user "${user}" --entrypoint sh -v "${dir}:/v" "${VOLUME_HELPER_IMAGE}" -c "${script}"
+}
+
+# chown [-R] uid:gid + chmod of a data folder, done by the container's root.
+set_volume_owner() {
+  local dir="$1" owner="$2" mode="$3" recursive="${4:-}"
+  volume_helper "${dir}" 0:0 "chown ${recursive} ${owner} /v && chmod ${mode} /v" >/dev/null 2>&1 ||
+    volume_access_failure "${dir}" "root inside a container cannot change it"
+}
+
+# The uid the service runs as must be able to create a file in its folder.
+check_volume_writable() {
+  local dir="$1" owner="$2"
+  volume_helper "${dir}" "${owner}" ': > /v/.gadyuka-write-test && rm -f /v/.gadyuka-write-test' >/dev/null 2>&1 ||
+    volume_access_failure "${dir}" "uid ${owner%%:*} inside a container cannot write to it"
+}
+
+# Explains why a container cannot write to a host folder (the usual cause: not the standard Docker
+# Engine) and stops before `up` (otherwise postgres would restart forever with "Permission denied").
+volume_access_failure() {
+  local dir="$1" reason="$2" security mode="the standard (rootful) Docker Engine"
+  security="$(docker info --format '{{range .SecurityOptions}}{{.}} {{end}}' 2>/dev/null || true)"
+  case "${security}" in
+    *rootless*) mode="ROOTLESS Docker" ;;
+    *userns*) mode="Docker with userns-remap" ;;
+  esac
+  if command -v snap >/dev/null 2>&1 && snap list docker >/dev/null 2>&1; then mode="Docker from SNAP"; fi
+  print_generated_password
+  cat >&2 <<EOF
+${C_ERR}ERROR:${C_OFF} the data folder ${dir} is not usable: ${reason}.
+  This host runs ${mode} (docker info: ${security:-n/a}).
+  ls -ld: $(ls -ld "${dir}" 2>&1)
+  How to fix:
+  - Docker from snap is confined and cannot write to these folders: remove it and let the script install
+    the official Docker Engine:  sudo snap remove docker && sudo ./deploy/up-${PROXY:-caddy}.sh
+  - Rootless Docker: the folders must belong to the user that runs the rootless daemon:
+      sudo chown -R "\$(id -u):\$(id -g)" "$(dirname "${dir}")" && ./deploy/up-${PROXY:-caddy}.sh
+  - userns-remap: the folders must belong to the remapped root (first id in /etc/subuid for dockremap),
+    or point VOLUMES_DIR in .env to a folder owned by it.
+  - On a normal Linux server run the script with sudo and WITHOUT --skip-host-setup (that option is only
+    for Docker Desktop on macOS / Windows).
+  - Check the mount of that folder (read-only, NFS root_squash, noexec): findmnt -T "${dir}"
+EOF
+  exit 1
 }
 
 # Daily rotation of the backend's own log file (stdout logs are rotated by Docker: 5 × 10 MB).

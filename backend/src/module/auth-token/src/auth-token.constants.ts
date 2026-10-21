@@ -1,7 +1,9 @@
+import { Algorithm } from 'jsonwebtoken';
+
 export const SESSION_REPOSITORY = Symbol('session-repository');
 
 /** HS256 JWT of the access tokens: issuer and audience are checked on every request. */
-export const ACCESS_TOKEN_ALGORITHM = 'HS256';
+export const ACCESS_TOKEN_ALGORITHM: Algorithm = 'HS512';
 export const ACCESS_TOKEN_ISSUER = 'gadyuka-backend';
 export const ACCESS_TOKEN_AUDIENCE = 'gadyuka-admin';
 

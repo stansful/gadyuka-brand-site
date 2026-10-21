@@ -223,15 +223,16 @@ Docker публикует порты в обход UFW — поэтому в com
 
 ## Частые проблемы
 
-| Симптом                                    | Что проверить                                                                                          |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| сертификат не выпускается                  | `dig +short <домен>` = IP сервера? открыты 80 и 443? `docker compose logs caddy` (или `certbot`)       |
-| скрипт: «port 80 is already in use»        | на сервере уже есть веб-сервер: `systemctl disable --now apache2 nginx`                                |
-| сборка падает / сервер зависает при сборке | мало памяти — добавьте swap (выше)                                                                     |
-| в ссылках / sitemap не тот домен           | `DOMAIN` и `SITE_URL` в `.env` → запуск скрипта (фронтенд пересоберётся)                               |
-| картинки не грузятся, `/media/…` 502       | `docker compose ps minio backend`, `docker compose logs minio-init backend`                            |
-| заявки не приходят в Telegram              | `TELEGRAM_DRY_RUN=0`? бот запущен (Start)? верный `TELEGRAM_OWNER_ID`? ошибка видна у заявки в админке |
-| `seed` или `migrate` завершились с ошибкой | `docker compose logs seed migrate`; после исправления — запуск скрипта                                 |
+| Симптом                                               | Что проверить                                                                                                                                                                                                                            |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| сертификат не выпускается                             | `dig +short <домен>` = IP сервера? открыты 80 и 443? `docker compose logs caddy` (или `certbot`)                                                                                                                                         |
+| скрипт: «port 80 is already in use»                   | на сервере уже есть веб-сервер: `systemctl disable --now apache2 nginx`                                                                                                                                                                  |
+| сборка падает / сервер зависает при сборке            | мало памяти — добавьте swap (выше)                                                                                                                                                                                                       |
+| в ссылках / sitemap не тот домен                      | `DOMAIN` и `SITE_URL` в `.env` → запуск скрипта (фронтенд пересоберётся)                                                                                                                                                                 |
+| картинки не грузятся, `/media/…` 502                  | `docker compose ps minio backend`, `docker compose logs minio-init backend`                                                                                                                                                              |
+| заявки не приходят в Telegram                         | `TELEGRAM_DRY_RUN=0`? бот запущен (Start)? верный `TELEGRAM_OWNER_ID`? ошибка видна у заявки в админке                                                                                                                                   |
+| `seed` или `migrate` завершились с ошибкой            | `docker compose logs seed migrate`; после исправления — запуск скрипта                                                                                                                                                                   |
+| postgres перезапускается, `mkdir … Permission denied` | Docker не может писать в папку данных: на сервере запускайте `sudo ./deploy/up-caddy.sh` **без** `--skip-host-setup`; скрипт сам выставит владельцев и, если не получится, скажет почему (rootless Docker, Docker из snap, userns-remap) |
 
 ## Ограничения
 
@@ -253,7 +254,7 @@ cd frontend && npm ci && cp .env.example .env   # INTERNAL_API_KEY = значе�
 npm run dev -- -H localhost
 ```
 
-Весь продакшен-стек локально (Docker Desktop / OrbStack, без проверок ОС и установки пакетов):
+Весь продакшен-стек локально (только Docker Desktop / OrbStack на macOS или Windows — на Linux-сервере этот флаг не нужен, запускайте через `sudo` без него):
 `DOMAIN=localhost HTTP_PORT=8080 HTTPS_PORT=8443 ./deploy/up-caddy.sh --skip-host-setup` → `https://localhost:8443`
 (у Caddy свой локальный сертификат; для nginx — `./deploy/up-nginx.sh --self-signed --skip-host-setup`).
 

@@ -11,7 +11,7 @@
 # `git pull` (README.md).
 #
 # Options:
-#   --skip-host-setup   local test on a machine that already runs Docker (e.g. Docker Desktop): no
+#   --skip-host-setup   ONLY for a local test on Docker Desktop / OrbStack (macOS, Windows): no
 #                       OS / root checks, no package installation, no ownership changes
 #   -h, --help          this text
 set -euo pipefail
