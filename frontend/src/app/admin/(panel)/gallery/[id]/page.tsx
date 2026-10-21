@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { GalleryForm } from '@/components/admin/forms/GalleryForm';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { getGalleryForm } from '@/lib/admin/queries';
+import { getGalleryForm } from '@/lib/admin/queries/content';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

@@ -1,70 +1,43 @@
 import { createTranslator } from 'next-intl';
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LeadApiResponse } from '@/lib/leads';
+import en from '@shared/messages/en.json';
+import ru from '@shared/messages/ru.json';
 
-import type * as NextServer from 'next/server';
-
-import type { LeadStore } from './submit';
-
-import en from '../../../../messages/en.json';
-import ru from '../../../../messages/ru.json';
-
-// ── mocks: no DB, no Telegram, no Next request scope ─────────────────────────
-const scheduled: Array<() => Promise<void>> = [];
-vi.mock('next/server', async importOriginal => {
-  const actual = await importOriginal<typeof NextServer>();
-  return { ...actual, after: (task: () => Promise<void>) => void scheduled.push(task) };
-});
+// ── mocks: the backend is a stubbed fetch, the request scope a header holder ──
+let requestHeaders = new Headers();
+vi.mock('next/headers', () => ({ headers: async () => requestHeaders }));
 
 vi.mock('next-intl/server', () => ({
   getTranslations: async ({ locale, namespace }: { locale: 'ru' | 'en'; namespace: 'forms.errors' }) =>
     createTranslator({ locale, messages: locale === 'en' ? en : ru, namespace }),
 }));
 
-const store = {
-  countRecentLeads: vi.fn(async (_ipHash: string, _since: Date) => 0),
-  oldestLeadInWindow: vi.fn(async (_ipHash: string, _since: Date): Promise<Date | null> => null),
-  countAllRecentLeads: vi.fn(async (_since: Date) => 0),
-  insertLead: vi.fn(
-    async (lead: {
-      type: 'TAILORING' | 'PARTNERSHIP' | 'CONTACT';
-      name: string;
-      email: string | null;
-      phone: string | null;
-      message: string;
-      locale: string;
-    }) => ({
-      id: 'lead-42',
-      ...lead,
-      createdAt: new Date('2026-10-16T12:00:00Z'),
-    }),
-  ),
-};
-const storeModule = {
-  withLeadLock: async <T>(_ipHash: string, work: (current: LeadStore) => Promise<T>): Promise<T> =>
-    work({
-      countRecent: store.countRecentLeads,
-      oldestInWindow: store.oldestLeadInWindow,
-      countAllRecent: store.countAllRecentLeads,
-      insert: lead => store.insertLead(lead),
-    }),
-};
-vi.mock('./store', () => storeModule);
-
-const sendLeadToTelegram = vi.fn(async () => ({ ok: true }));
-const notifyCeilingError = vi.fn(async () => 'ceiling');
-vi.mock('@/lib/telegram', () => ({ sendLeadToTelegram, notifyCeilingError }));
-
 const { POST } = await import('./route');
 
+const KEY = 'k'.repeat(40);
+const BACKEND = 'http://backend.test:4000';
+const fetchMock = vi.fn<typeof fetch>();
+
+function backendAnswer(body: unknown, status = 201): Response {
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+}
+
+function sent(): { url: string; headers: Headers; body: unknown } {
+  const [url, init = {}] = fetchMock.mock.calls[0] ?? [];
+  return { url: String(url), headers: new Headers(init.headers), body: JSON.parse(String(init.body)) };
+}
+
 function request(body: string | object, headers: Record<string, string> = {}): NextRequest {
-  return new NextRequest('http://localhost:3000/api/leads', {
+  const req = new NextRequest('http://localhost:3000/api/leads', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-real-ip': '203.0.113.7', ...headers },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
+  requestHeaders = req.headers;
+  return req;
 }
 
 async function call(req: NextRequest): Promise<{ status: number; body: LeadApiResponse; headers: Headers }> {
@@ -83,25 +56,62 @@ const valid = {
 };
 
 beforeEach(() => {
-  scheduled.length = 0;
-  store.countRecentLeads.mockClear().mockResolvedValue(0);
-  store.insertLead.mockClear();
-  sendLeadToTelegram.mockClear();
+  vi.stubEnv('BACKEND_URL', BACKEND);
+  vi.stubEnv('INTERNAL_API_KEY', KEY);
+  vi.stubGlobal('fetch', fetchMock);
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValue(backendAnswer({ id: 'lead-42' }));
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('POST /api/leads', () => {
-  it('201: saves the lead and sends it to Telegram after the response', async () => {
-    const { status, body, headers } = await call(request(valid));
+  it('201: forwards the form to the backend for the visitor and answers its id', async () => {
+    const { status, body, headers } = await call(
+      request(
+        { ...valid, debug: true },
+        { referer: 'https://gadyuka.ru/', 'user-agent': 'Mozilla/5.0', 'x-client-ip': '6.6.6.6' },
+      ),
+    );
     expect(status).toBe(201);
     expect(body).toEqual({ ok: true, id: 'lead-42' });
     expect(headers.get('cache-control')).toBe('no-store');
-    expect(store.insertLead).toHaveBeenCalledTimes(1);
-    expect(sendLeadToTelegram).not.toHaveBeenCalled();
-    await scheduled[0]?.();
-    expect(sendLeadToTelegram).toHaveBeenCalledWith(expect.objectContaining({ id: 'lead-42', email: 'ivan@mail.ru' }));
+    const forwarded = sent();
+    expect(forwarded.url).toBe(`${BACKEND}/api/v1/public/leads`);
+    expect(forwarded.body).toEqual({ ...valid, referer: 'https://gadyuka.ru/' });
+    expect(forwarded.headers.get('x-internal-key')).toBe(KEY);
+    expect(forwarded.headers.get('x-client-ip')).toBe('203.0.113.7');
+    // The visitor's browser in its own header: the request's user-agent is this server's fetch ("node").
+    expect(forwarded.headers.get('x-client-user-agent')).toBe('Mozilla/5.0');
+    expect(forwarded.headers.has('user-agent')).toBe(false);
   });
 
-  it('422: localized field errors (ru and en)', async () => {
+  it('forwards the values as received (the backend checks their types) and no fields of a non-object', async () => {
+    await call(request({ type: 'TAILORING', name: 42, consent: 'yes', hp: null }));
+    expect(sent().body).toEqual({ type: 'TAILORING', name: 42, consent: 'yes', hp: null });
+    fetchMock.mockClear();
+    await call(request('["not", "an", "object"]'));
+    expect(sent().body).toEqual({});
+  });
+
+  it('422: the backend field errors in the visitor language (ru and en)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      backendAnswer(
+        {
+          statusCode: 400,
+          error: 'validation',
+          fields: {
+            email: { key: 'forms.errors.invalidEmail' },
+            consent: { key: 'forms.errors.consentRequired' },
+          },
+        },
+        400,
+      ),
+    );
     const ruResult = await call(request({ ...valid, email: 'bad', consent: false }));
     expect(ruResult.status).toBe(422);
     expect(ruResult.body).toEqual({
@@ -114,6 +124,19 @@ describe('POST /api/leads', () => {
       },
     });
 
+    fetchMock.mockResolvedValueOnce(
+      backendAnswer(
+        {
+          statusCode: 400,
+          error: 'validation',
+          fields: {
+            name: { key: 'forms.errors.tooShort', values: { min: 2 } },
+            contact: { key: 'forms.errors.contactRequired' },
+          },
+        },
+        400,
+      ),
+    );
     const enResult = await call(request({ ...valid, type: 'TAILORING', email: '', name: 'I', locale: 'en' }));
     expect(enResult.status).toBe(422);
     expect(enResult.body).toMatchObject({
@@ -123,90 +146,73 @@ describe('POST /api/leads', () => {
         contact: en.forms.errors.contactRequired,
       },
     });
-    expect(store.insertLead).not.toHaveBeenCalled();
   });
 
   it('429: rate limited with Retry-After', async () => {
-    store.countRecentLeads.mockResolvedValueOnce(5);
+    fetchMock.mockResolvedValueOnce(
+      backendAnswer(
+        {
+          statusCode: 429,
+          error: 'throttled',
+          key: 'forms.errors.rateLimited',
+          details: { retryAfterSeconds: 600 },
+        },
+        429,
+      ),
+    );
     const { status, body, headers } = await call(request(valid));
     expect(status).toBe(429);
-    expect(body).toMatchObject({ ok: false, error: 'rate_limited', retryAfter: 600 });
+    expect(body).toEqual({ ok: false, error: 'rate_limited', message: ru.forms.errors.rateLimited, retryAfter: 600 });
     expect(headers.get('retry-after')).toBe('600');
-    expect(store.insertLead).not.toHaveBeenCalled();
   });
 
-  it('past the site-wide ceiling: saves the lead with the owner-facing status, no Telegram', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    store.countAllRecentLeads.mockResolvedValueOnce(60);
-    const { status } = await call(request(valid));
-    expect(status).toBe(201);
-    expect(notifyCeilingError).toHaveBeenCalledWith(expect.objectContaining({ max: 60 }));
-    expect(scheduled).toHaveLength(0);
-  });
-
-  it('hashes the client IP for the rate limit (never stores the raw IP)', async () => {
-    await call(request(valid));
-    const [ipHash] = store.countRecentLeads.mock.calls[0] ?? [];
-    expect(ipHash).toMatch(/^[0-9a-f]{64}$/);
-    expect(JSON.stringify(store.insertLead.mock.calls)).not.toContain('203.0.113.7');
-  });
-
-  it('201 without saving for honeypot hits', async () => {
-    const { status, body } = await call(request({ ...valid, hp: 'http://spam' }));
-    expect(status).toBe(201);
-    expect(body.ok).toBe(true);
-    expect(store.insertLead).not.toHaveBeenCalled();
-    expect(scheduled).toHaveLength(0);
-  });
-
-  it('415 for bodies that are neither JSON nor a form post', async () => {
+  it('415 for bodies that are neither JSON nor a form post (no backend call)', async () => {
     const { status, body } = await call(request('name=x', { 'content-type': 'text/plain' }));
     expect(status).toBe(415);
     expect(body).toMatchObject({ ok: false, error: 'unsupported_media_type' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('400 for malformed JSON', async () => {
     const { status, body } = await call(request('{not json'));
     expect(status).toBe(400);
     expect(body).toMatchObject({ ok: false, error: 'bad_request' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('413 for oversized bodies', async () => {
     const { status, body } = await call(request({ ...valid, message: 'я'.repeat(20_000) }));
     expect(status).toBe(413);
     expect(body).toMatchObject({ ok: false, error: 'payload_too_large' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('500 in production without IP_HASH_SALT — never stores a reversible IP hash', async () => {
+  it('500 when the backend is down or fails — with a localized message, never a crash', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('IP_HASH_SALT', '');
-    try {
-      const { status, body } = await call(request(valid));
-      expect(status).toBe(500);
-      expect(body).toMatchObject({ ok: false, error: 'server_error' });
-      expect(store.insertLead).not.toHaveBeenCalled();
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
-
-  it('500 when the DB is down — with a localized message, never a crash', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    store.insertLead.mockRejectedValueOnce(new Error('ECONNREFUSED'));
-    const { status, body } = await call(request({ ...valid, locale: 'en' }));
-    expect(status).toBe(500);
-    expect(body).toEqual({ ok: false, error: 'server_error', message: en.forms.errors.server });
+    fetchMock.mockRejectedValueOnce(new TypeError('fetch failed'));
+    expect(await call(request({ ...valid, locale: 'en' }))).toMatchObject({
+      status: 500,
+      body: { ok: false, error: 'server_error', message: en.forms.errors.server },
+    });
+    fetchMock.mockResolvedValueOnce(
+      backendAnswer({ statusCode: 500, error: 'internal', key: 'admin.errors.actionFailed' }, 500),
+    );
+    expect(await call(request(valid))).toMatchObject({
+      status: 500,
+      body: { ok: false, error: 'server_error', message: ru.forms.errors.server },
+    });
   });
 });
 
 describe('POST /api/leads — plain HTML form (no JS)', () => {
   function formRequest(fields: Record<string, string>, headers: Record<string, string> = {}): NextRequest {
-    return new NextRequest('http://localhost:3000/api/leads', {
+    const req = new NextRequest('http://localhost:3000/api/leads', {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-real-ip': '203.0.113.7', ...headers },
       body: new URLSearchParams(fields).toString(),
     });
+    requestHeaders = req.headers;
+    return req;
   }
 
   const fields = {
@@ -224,28 +230,35 @@ describe('POST /api/leads — plain HTML form (no JS)', () => {
     expect(response.status).toBe(303);
     expect(response.headers.get('location')).toBe('/#lead-sent');
     expect(response.headers.get('location')).not.toContain('ivan');
-    expect(store.insertLead).toHaveBeenCalledWith(expect.objectContaining({ email: 'ivan@mail.ru', name: 'Иван' }));
-    await scheduled[0]?.();
-    expect(sendLeadToTelegram).toHaveBeenCalledTimes(1);
+    expect(sent().body).toEqual({ ...fields, consent: true });
   });
 
-  it('303 to the localized landing; invalid forms are not stored', async () => {
+  it('303 to the localized landing when the backend refuses the form', async () => {
+    fetchMock.mockResolvedValueOnce(
+      backendAnswer(
+        { statusCode: 400, error: 'validation', fields: { consent: { key: 'forms.errors.consentRequired' } } },
+        400,
+      ),
+    );
     const response = await POST(formRequest({ ...fields, locale: 'en', consent: '' }));
     expect(response.status).toBe(303);
     expect(response.headers.get('location')).toBe('/en#lead-invalid');
-    expect(store.insertLead).not.toHaveBeenCalled();
+    expect(sent().body).toMatchObject({ consent: false, locale: 'en' });
   });
 
-  it('303 to the failure notice when rate limited', async () => {
-    store.countRecentLeads.mockResolvedValueOnce(5);
-    const response = await POST(formRequest(fields));
-    expect(response.headers.get('location')).toBe('/#lead-failed');
-    expect(store.insertLead).not.toHaveBeenCalled();
+  it('303 to the failure notice when rate limited or the backend is down', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchMock.mockResolvedValueOnce(
+      backendAnswer({ statusCode: 429, error: 'throttled', key: 'forms.errors.rateLimited' }, 429),
+    );
+    expect((await POST(formRequest(fields))).headers.get('location')).toBe('/#lead-failed');
+    fetchMock.mockRejectedValueOnce(new TypeError('fetch failed'));
+    expect((await POST(formRequest(fields))).headers.get('location')).toBe('/#lead-failed');
   });
 
   it('refuses cross-site form posts', async () => {
     const response = await POST(formRequest(fields, { 'sec-fetch-site': 'cross-site' }));
     expect(response.status).toBe(403);
-    expect(store.insertLead).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

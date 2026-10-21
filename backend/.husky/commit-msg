@@ -1,0 +1,12 @@
+# Conventional Commits (backend/.commitlintrc.json) for every commit of the repository.
+# $1 is the message file, relative to the repository root (where git runs hooks).
+commitlint=backend/node_modules/.bin/commitlint
+if [ ! -x "$commitlint" ]; then
+  echo "husky commit-msg: $commitlint not found — run \`npm ci\` in backend/" >&2
+  exit 1
+fi
+case "$1" in
+  /*) message_file=$1 ;;
+  *) message_file=$(pwd)/$1 ;;
+esac
+"$commitlint" --cwd backend --edit "$message_file"

@@ -1,79 +1,60 @@
 import 'server-only';
-import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { cache } from 'react';
 
-import { getClientIp } from '@/lib/rate-limit';
+import { getAdminSession } from '@/lib/api/admin';
+import { ApiRequestError } from '@/lib/api/api-result';
+import { ADMIN_LOGIN_PATH } from '@/lib/api/session-cookies';
+import type { AuthMeResponse } from '@shared/contracts/auth';
 
-import { type AdminLockReason, resolveAdminGate } from './admin-gate';
-import { ADMIN_COOKIE_NAME, ADMIN_COOKIE_PATH, ADMIN_LOGIN_PATH } from './auth-constants';
 import { getAdminTranslations } from './i18n-server';
-import { LoginThrottle } from './login-throttle';
-import {
-  ADMIN_SESSION_TTL_SECONDS,
-  deriveSessionKey,
-  safeEqual,
-  signAdminSession,
-  verifyAdminSession,
-} from './session-token';
 
 /**
- * Admin access control — the ONE place that decides whether a request may use the admin.
+ * Admin access control of the frontend. Every admin route needs a signed-in ADMIN (owner's
+ * decision: no open admin). The session lives in the backend; this server keeps the access /
+ * refresh tokens in httpOnly cookies (src/lib/api/session-cookies.ts):
  *
- * The mode comes from resolveAdminGate() (src/lib/admin/admin-gate.ts), read per request:
- * - ADMIN_PASSWORD set    → a valid signed session cookie is required (mode "password").
- * - ADMIN_PASSWORD empty  → dev/test: open to everyone (mode "open", yellow banner);
- *                           production: LOCKED (fail closed) unless ADMIN_ALLOW_OPEN=1.
+ * - src/proxy.ts (optimistic, before anything renders): reads only the `exp` claim of the access
+ *   cookie; expired → refreshes ONCE (POST /auth/refresh, single flight) and sets the new cookies;
+ *   no usable session → 307 to /admin/login?next=… for page GETs (actions / API get their own 401).
+ * - the checks below (the security boundary, per request): GET /auth/me with the access cookie —
+ *   the backend verifies signature, expiry, the session (logout / reuse revokes at once) and the
+ *   role. One call per request (React cache in getAdminSession).
+ * - and the backend itself checks the token and the ADMIN role on every /admin/* call.
  *
- * Optimistic layer: src/proxy.ts → adminProxyGate() redirects page GETs without a valid
- * session to the login page (real 307, nothing renders). It is NOT the security boundary.
- *
- * Enforcement points (never rely on the layout alone — pages render in parallel with
- * layouts and Server Actions / Route Handlers are reachable by direct POST):
- *   requireAdminPage()    — admin layout + every admin data query (src/lib/admin/queries.ts)
- *   requireAdminAction()  — every Server Action (via adminAction() in action-helpers.ts)
+ * Enforcement points (never rely on the layout alone — pages render in parallel with layouts and
+ * Server Actions / Route Handlers are reachable by direct POST):
+ *   requireAdminPage()    — admin layout + every admin data query
+ *   Server Actions        — the backend checks the session on every call they make (adminRequest
+ *                           sends the access cookie; a 401 becomes «Сессия истекла…», src/lib/api/admin-action.ts)
  *   requireAdminRoute()   — every admin Route Handler (src/app/admin/api/**)
  */
 
-export { ADMIN_COOKIE_NAME, ADMIN_COOKIE_PATH, ADMIN_LOGIN_PATH };
+export { ADMIN_LOGIN_PATH };
 
-export type AdminAccess =
-  | { allowed: true; mode: 'open' | 'password' }
-  /** `locked`: the admin cannot be used at all until the server is configured (no login possible). */
-  | { allowed: false; locked: AdminLockReason | null };
-export type GrantedAdminAccess = Extract<AdminAccess, { allowed: true }>;
+export type AdminSession = AuthMeResponse;
 
-/** Per-request (React cache) access check. Always reads cookies, so callers are request-time. */
-export const getAdminAccess = cache(async (): Promise<AdminAccess> => {
-  const cookieStore = await cookies();
-  const gate = resolveAdminGate();
-  if (gate.kind === 'open') return { allowed: true, mode: 'open' };
-  if (gate.kind === 'locked') return { allowed: false, locked: gate.reason };
-  const token = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
-  if (!token) return { allowed: false, locked: null };
-  const valid = await verifyAdminSession(token, await deriveSessionKey(gate.password, gate.sessionSecret));
-  return valid ? { allowed: true, mode: 'password' } : { allowed: false, locked: null };
-});
+/** Pages / layouts / data queries: redirects to the login page when there is no admin session. */
+export async function requireAdminPage(): Promise<AdminSession> {
+  const session = await getAdminSession();
+  if (!session) redirect(ADMIN_LOGIN_PATH);
+  return session;
+}
 
-export class AdminAuthError extends Error {
-  constructor() {
-    super('Admin session required');
-    this.name = 'AdminAuthError';
+/**
+ * What the login page knows about the session: signed in (→ straight to the admin), signed out (→ the
+ * form), or unknown — the backend could not check it (down, 5xx, misconfigured): the form still shows,
+ * with a notice, instead of the page failing as a whole.
+ */
+export type LoginSessionState = 'signedIn' | 'signedOut' | 'unavailable';
+
+export async function getLoginSessionState(): Promise<LoginSessionState> {
+  try {
+    return (await getAdminSession()) ? 'signedIn' : 'signedOut';
+  } catch (error: unknown) {
+    if (!(error instanceof ApiRequestError)) throw error;
+    console.error(`[admin] login page: ${error.message}`);
+    return 'unavailable';
   }
-}
-
-/** Pages / layouts / data queries: redirects to the login page when access is denied. */
-export async function requireAdminPage(): Promise<GrantedAdminAccess> {
-  const access = await getAdminAccess();
-  if (!access.allowed) redirect(ADMIN_LOGIN_PATH);
-  return access;
-}
-
-/** Server Actions: throws AdminAuthError (adminAction() turns it into an error result for the form). */
-export async function requireAdminAction(): Promise<GrantedAdminAccess> {
-  const access = await getAdminAccess();
-  if (!access.allowed) throw new AdminAuthError();
-  return access;
 }
 
 /**
@@ -85,8 +66,7 @@ export async function requireAdminRoute(request: Request): Promise<Response | nu
     const t = await getAdminTranslations('admin.auth');
     return Response.json({ error: t('crossSite') }, { status: 403 });
   }
-  const access = await getAdminAccess();
-  if (!access.allowed) {
+  if (!(await getAdminSession())) {
     const t = await getAdminTranslations('admin.auth');
     return Response.json({ error: t('sessionRequired') }, { status: 401 });
   }
@@ -106,58 +86,4 @@ export function isSameOriginRequest(request: Request): boolean {
   } catch {
     return false;
   }
-}
-
-// ── login / logout (used by src/lib/admin/actions/auth.ts) ─────────────────────
-
-const loginThrottle = new LoginThrottle({ maxFailures: 10, windowMs: 15 * 60 * 1000 });
-
-/**
- * Throttle key: the same trusted client-IP helper as the lead rate limit (X-Real-IP set by
- * Caddy from the TCP peer, then the LAST X-Forwarded-For hop). Requests without any IP
- * header (only possible without the reverse proxy, i.e. local dev) share one bucket.
- */
-async function clientKey(): Promise<string> {
-  return getClientIp(await headers()) ?? 'unknown';
-}
-
-export type LoginOutcome =
-  | { ok: true }
-  | { ok: false; reason: 'disabled' | 'invalid' | 'throttled'; retryAfterMs?: number }
-  | { ok: false; reason: 'locked'; lockReason: AdminLockReason };
-
-/** Checks the password (constant time, throttled) and sets the session cookie on success. */
-export async function loginWithPassword(input: string): Promise<LoginOutcome> {
-  const gate = resolveAdminGate();
-  if (gate.kind === 'open') return { ok: false, reason: 'disabled' };
-  if (gate.kind === 'locked') return { ok: false, reason: 'locked', lockReason: gate.reason };
-  const { password, sessionSecret } = gate;
-
-  const key = await clientKey();
-  const retryAfterMs = loginThrottle.retryAfterMs(key);
-  if (retryAfterMs > 0) return { ok: false, reason: 'throttled', retryAfterMs };
-
-  if (!safeEqual(input, password)) {
-    loginThrottle.recordFailure(key);
-    // Small fixed delay to slow down guessing even below the throttle limit.
-    await new Promise(resolve => setTimeout(resolve, 400));
-    return { ok: false, reason: 'invalid' };
-  }
-
-  loginThrottle.reset(key);
-  const token = await signAdminSession(await deriveSessionKey(password, sessionSecret));
-  const cookieStore = await cookies();
-  cookieStore.set(ADMIN_COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: ADMIN_COOKIE_PATH,
-    maxAge: ADMIN_SESSION_TTL_SECONDS,
-  });
-  return { ok: true };
-}
-
-export async function clearAdminSession(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete({ name: ADMIN_COOKIE_NAME, path: ADMIN_COOKIE_PATH });
 }

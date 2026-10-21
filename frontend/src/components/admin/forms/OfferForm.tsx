@@ -6,8 +6,9 @@ import { useState, type ReactElement } from 'react';
 
 import { errorFor } from '@/lib/admin/action-result';
 import { saveOffer } from '@/lib/admin/actions/offers';
-import type { AdminMediaRef, OfferFormData } from '@/lib/admin/types';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { LocalizedText } from '@/lib/localized-text';
+import type { MediaRef } from '@shared/contracts/common';
+import type { AdminOfferDetails } from '@shared/contracts/content-entities';
 
 import { EditLocaleProvider, localesWithErrors, translationGaps } from '../i18n/LocaleTabs';
 import { LocalizedField } from '../i18n/LocalizedField';
@@ -22,7 +23,7 @@ import { siteLinksFor } from './site-links';
 
 const LOCALIZED = ['title', 'text', 'badge', 'ctaLabel'] as const;
 
-export function OfferForm({ initial }: { initial: OfferFormData | null }): ReactElement {
+export function OfferForm({ initial }: { initial: AdminOfferDetails | null }): ReactElement {
   return (
     <EditLocaleProvider>
       <OfferFormInner initial={initial} />
@@ -30,7 +31,7 @@ export function OfferForm({ initial }: { initial: OfferFormData | null }): React
   );
 }
 
-function OfferFormInner({ initial }: { initial: OfferFormData | null }): ReactElement {
+function OfferFormInner({ initial }: { initial: AdminOfferDetails | null }): ReactElement {
   const t = useTranslations('admin');
   const router = useRouter();
   const [title, setTitle] = useState<LocalizedText>(initial?.title ?? {});
@@ -39,7 +40,7 @@ function OfferFormInner({ initial }: { initial: OfferFormData | null }): ReactEl
   const [ctaLabel, setCtaLabel] = useState<LocalizedText>(initial?.ctaLabel ?? {});
   const [ctaHref, setCtaHref] = useState(initial?.ctaHref ?? '');
   const [validUntil, setValidUntil] = useState(initial?.validUntil ?? '');
-  const [image, setImage] = useState<AdminMediaRef | null>(initial?.image ?? null);
+  const [image, setImage] = useState<MediaRef | null>(initial?.image ?? null);
   const [published, setPublished] = useState(initial?.published ?? false);
   const { pending, fieldErrors, run } = useActionSubmit();
 

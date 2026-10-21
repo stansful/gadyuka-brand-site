@@ -4,7 +4,7 @@ import { MediaLibrary } from '@/components/admin/media/MediaLibrary';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
 import { MAX_IMAGE_DIMENSION } from '@/lib/admin/media-constants';
-import { getMediaLibrary } from '@/lib/admin/queries';
+import { getMediaLibrary } from '@/lib/admin/queries/media';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

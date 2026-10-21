@@ -18,8 +18,8 @@ import { toast } from 'sonner';
 
 import { localeNames } from '@/i18n/locales';
 import { deleteItem, reorderItems, setPublished } from '@/lib/admin/actions/entities';
-import type { OrderableEntity, PublishableEntity } from '@/lib/admin/schemas';
 import type { EntityRow } from '@/lib/admin/types';
+import type { OrderableEntityKind, PublishableEntityKind } from '@shared/contracts/entities';
 
 import { MediaThumb } from '../media/MediaThumb';
 import { Badge, EmptyState } from '../ui/layout';
@@ -45,12 +45,12 @@ function applyAction(rows: EntityRow[], action: OptimisticAction): EntityRow[] {
   }
 }
 
-function isOrderable(entity: PublishableEntity): entity is OrderableEntity {
+function isOrderable(entity: PublishableEntityKind): entity is OrderableEntityKind {
   return entity !== 'news';
 }
 
 export type EntityListProps = {
-  entity: PublishableEntity;
+  entity: PublishableEntityKind;
   rows: EntityRow[];
   /** Drag & drop ordering (ignored for news, which are ordered by date). */
   sortable?: boolean;

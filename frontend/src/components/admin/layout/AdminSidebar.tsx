@@ -122,12 +122,12 @@ function NavList({
   );
 }
 
-function FooterLinks({ canLogout }: { canLogout: boolean }): ReactElement {
+function FooterLinks(): ReactElement {
   const t = useTranslations('admin.nav');
   return (
     <div className="flex flex-col gap-1 border-t border-line pt-3">
       <a
-        href="/frontend/public"
+        href="/"
         target="_blank"
         rel="noreferrer"
         className="flex h-9 items-center gap-3 rounded-md px-3 text-sm text-fg/70 hover:bg-raised-hi hover:text-fg"
@@ -135,23 +135,21 @@ function FooterLinks({ canLogout }: { canLogout: boolean }): ReactElement {
         <ExternalLink className="size-4 text-muted" aria-hidden />
         {t('openSite')}
       </a>
-      {canLogout ? (
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-sm text-fg/70 hover:bg-raised-hi hover:text-fg"
-          >
-            <LogOut className="size-4 text-muted" aria-hidden />
-            {t('logout')}
-          </button>
-        </form>
-      ) : null}
+      <form action={logoutAction}>
+        <button
+          type="submit"
+          className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-sm text-fg/70 hover:bg-raised-hi hover:text-fg"
+        >
+          <LogOut className="size-4 text-muted" aria-hidden />
+          {t('logout')}
+        </button>
+      </form>
     </div>
   );
 }
 
 /** Sidebar navigation: fixed column on desktop, top bar + drawer below 1024 px. */
-export function AdminSidebar({ newLeads, canLogout }: { newLeads: number; canLogout: boolean }): ReactElement {
+export function AdminSidebar({ newLeads }: { newLeads: number }): ReactElement {
   const t = useTranslations('admin.nav');
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -166,7 +164,7 @@ export function AdminSidebar({ newLeads, canLogout }: { newLeads: number; canLog
         <nav aria-label={t('sections')} className="min-h-0 flex-1 overflow-y-auto">
           <NavList pathname={pathname} newLeads={newLeads} />
         </nav>
-        <FooterLinks canLogout={canLogout} />
+        <FooterLinks />
       </aside>
 
       {/* Tablet / mobile */}
@@ -218,7 +216,7 @@ export function AdminSidebar({ newLeads, canLogout }: { newLeads: number; canLog
             <nav aria-label={t('sections')} className="min-h-0 flex-1 overflow-y-auto">
               <NavList pathname={pathname} newLeads={newLeads} onNavigate={() => setOpen(false)} />
             </nav>
-            <FooterLinks canLogout={canLogout} />
+            <FooterLinks />
           </div>
         </div>
       ) : null}

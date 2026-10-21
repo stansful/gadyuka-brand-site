@@ -9,8 +9,8 @@ import { toast } from 'sonner';
 import { defaultLocale, localeNames, locales, mapLocales } from '@/i18n/locales';
 import { resetSiteText, saveSiteTexts } from '@/lib/admin/actions/content';
 import { formatDateTimeRu } from '@/lib/admin/labels';
-import type { SiteTextEntry, SiteTextGroup, SiteTextsPageData } from '@/lib/admin/types';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { SiteTextEntry, SiteTextGroup, SiteTextsPageData } from '@/lib/admin/site-texts';
+import type { LocalizedText } from '@/lib/localized-text';
 
 import { EditLocaleProvider, translationGaps, useEditLocale } from '../i18n/LocaleTabs';
 import { LocalizedField } from '../i18n/LocalizedField';
@@ -61,7 +61,7 @@ function SiteTextsFormInner({ data }: { data: SiteTextsPageData }): ReactElement
   const imageEntries = data.groups.flatMap(group => group.images);
   const [texts, setTexts] = useState<TextDrafts>({});
   const [images, setImages] = useState<ImageDrafts>({});
-  // Keys of the last save in payload order: zod reports shape errors by index (content-errors.ts).
+  // Keys of the last save in payload order: the backend reports shape errors by index (content-errors.ts).
   const [sentKeys, setSentKeys] = useState<{ texts: string[]; images: string[] }>({ texts: [], images: [] });
   const [resetting, startReset] = useTransition();
   const [resettingKey, setResettingKey] = useState<string | null>(null);

@@ -2,7 +2,7 @@ import type { SiteMessages } from '@/i18n/messages';
 
 /**
  * Copy of the error boundary (src/app/[locale]/error.tsx). The client-side error page can
- * neither read the database nor ask next-intl, and bundling messages/*.json into it would ship
+ * neither read the database nor ask next-intl, and bundling shared/messages/*.json into it would ship
  * every site message to the browser — so the server layout resolves this copy from the
  * DB-backed messages (getSiteMessages: admin edits included) and hands it down through
  * <ErrorCopyProvider> (./ErrorCopyProvider.tsx): a few hundred bytes per page.

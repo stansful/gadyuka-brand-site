@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { PartnerForm } from '@/components/admin/forms/PartnerForm';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { getPartnerForm } from '@/lib/admin/queries';
+import { getPartnerForm } from '@/lib/admin/queries/content';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

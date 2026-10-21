@@ -6,8 +6,9 @@ import { useState, type ReactElement } from 'react';
 
 import { errorFor } from '@/lib/admin/action-result';
 import { saveMenuItem } from '@/lib/admin/actions/menu';
-import type { MenuHrefOption, MenuItemFormData } from '@/lib/admin/types';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { MenuHrefOption } from '@/lib/admin/content-entities';
+import type { LocalizedText } from '@/lib/localized-text';
+import type { AdminMenuItemDetails } from '@shared/contracts/content-entities';
 
 import { EditLocaleProvider, localesWithErrors, translationGaps } from '../i18n/LocaleTabs';
 import { LocalizedField } from '../i18n/LocalizedField';
@@ -22,7 +23,7 @@ import { siteLinksFor } from './site-links';
 const LOCALIZED = ['label'] as const;
 
 type MenuItemFormProps = {
-  initial: MenuItemFormData | null;
+  initial: AdminMenuItemDetails | null;
   /** Landing anchors and collection pages to pick the link from. */
   hrefOptions: MenuHrefOption[];
 };

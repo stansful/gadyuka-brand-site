@@ -1,0 +1,7 @@
+// The client is generated into backend/generated/prisma (gitignored): npm run prisma:prepare.
+// Imported as ~prisma-generated/prisma/client.
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}

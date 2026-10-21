@@ -6,8 +6,8 @@ import { EntityList } from '@/components/admin/lists/EntityList';
 import { buttonClasses } from '@/components/admin/ui/Button';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { listReviewsAdmin } from '@/lib/admin/queries';
-import { REVIEW_RATING_LIMIT } from '@/lib/admin/schemas';
+import { REVIEW_RATING_LIMIT } from '@/lib/admin/limits';
+import { listReviewsAdmin } from '@/lib/admin/queries/catalog';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

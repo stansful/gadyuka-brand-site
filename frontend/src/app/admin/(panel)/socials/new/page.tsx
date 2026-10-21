@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { SocialLinkForm } from '@/components/admin/forms/SocialLinkForm';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { getSocialDefaultLabels } from '@/lib/admin/queries';
+import { getSocialDefaultLabels } from '@/lib/admin/queries/content';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

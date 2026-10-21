@@ -4,8 +4,8 @@ import { notFound } from 'next/navigation';
 import { MenuItemForm } from '@/components/admin/forms/MenuItemForm';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { getMenuHrefOptions, getMenuItemForm } from '@/lib/admin/queries';
-import { readText } from '@/lib/i18n-text';
+import { getMenuHrefOptions, getMenuItemForm } from '@/lib/admin/queries/content';
+import { readText } from '@/lib/localized-text';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

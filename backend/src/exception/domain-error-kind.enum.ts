@@ -1,0 +1,12 @@
+/** What went wrong, independent of the transport; ApiExceptionFilter maps it to an HTTP status. */
+export enum DomainErrorKind {
+  BAD_REQUEST = 'BAD_REQUEST',
+  UNAUTHORIZED = 'UNAUTHORIZED',
+  FORBIDDEN = 'FORBIDDEN',
+  NOT_FOUND = 'NOT_FOUND',
+  CONFLICT = 'CONFLICT',
+  PAYLOAD_TOO_LARGE = 'PAYLOAD_TOO_LARGE',
+  UNSUPPORTED_MEDIA_TYPE = 'UNSUPPORTED_MEDIA_TYPE',
+  TOO_MANY_REQUESTS = 'TOO_MANY_REQUESTS',
+  UNAVAILABLE = 'UNAVAILABLE',
+}

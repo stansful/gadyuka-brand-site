@@ -1,7 +1,7 @@
 import { Send, TriangleAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
-import type { LeadStatus, LeadType } from '@/generated/prisma/enums';
+import type { LeadStatus, LeadType } from '@shared/contracts/leads';
 
 import type { ReactElement } from 'react';
 

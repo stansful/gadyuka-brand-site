@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { SocialLinkForm } from '@/components/admin/forms/SocialLinkForm';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { getSocialDefaultLabels, getSocialLinkForm } from '@/lib/admin/queries';
+import { getSocialDefaultLabels, getSocialLinkForm } from '@/lib/admin/queries/content';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

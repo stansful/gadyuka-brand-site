@@ -36,6 +36,19 @@ export function revalidateContent(): void {
 }
 
 /**
+ * For an admin **Server Action** whose write may or may not have landed: the backend got the
+ * request but its answer was lost (timeout, reset connection, a proxy's 502 page). The site's copy
+ * turns stale: the next visitor still gets it once while a fresh one is read in the background
+ * (`revalidateTag(…, 'max')`), the visitors after that see the write if it landed.
+ * Not updateTag: that also makes the action re-render the admin page it was called from, against
+ * the backend that has just failed to answer — another wait of the request timeout, then the admin
+ * error page in place of the form (and the unsaved input with it).
+ */
+export function markContentStale(): void {
+  revalidateTag(CACHE_TAGS.content, 'max');
+}
+
+/**
  * Same as revalidateContent, for **Route Handlers** (e.g. a media upload endpoint),
  * where updateTag is not allowed. `{ expire: 0 }` = no stale content is served.
  */

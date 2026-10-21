@@ -1,0 +1,411 @@
+{
+  "$comment": [
+    "Metadata of the editable site texts (shared/messages/<locale>.json) that the JSON cannot say itself:",
+    "sections = the admin sections (top-level namespaces) in display order; texts = per-key overrides:",
+    "kind (richtext: paragraphs separated by an empty line; template: filled in by a public CLIENT component",
+    "without an ICU runtime — only plain {placeholders} and the default tags; link: a site link) and required",
+    "(never saved empty in the default locale: headings, buttons, links, the only accessible name of a control,",
+    "the lead form states and errors, the owner notifications); a key without an entry is optional and its kind",
+    "is detected (icu when a default has ICU syntax, else text); images = the landing images (content_images",
+    "rows, not messages) and the section they are edited with. Read by the backend (core/site-texts,",
+    "admin validation and the seed) and by the frontend (landing image slots; tests of what the site renders)."
+  ],
+  "sections": [
+    "header",
+    "hero",
+    "catalog",
+    "about",
+    "tailoring",
+    "offers",
+    "news",
+    "gallery",
+    "reviews",
+    "partners",
+    "contacts",
+    "footer",
+    "brand",
+    "common",
+    "forms",
+    "social",
+    "notFound",
+    "error",
+    "telegram"
+  ],
+  "texts": {
+    "header.cta": {
+      "required": true
+    },
+    "hero.title": {
+      "required": true
+    },
+    "hero.heading": {
+      "required": true
+    },
+    "catalog.title": {
+      "required": true
+    },
+    "catalog.text": {
+      "kind": "richtext"
+    },
+    "catalog.collectionTitle": {
+      "required": true
+    },
+    "catalog.openCollection": {
+      "required": true
+    },
+    "catalog.orderCta": {
+      "required": true
+    },
+    "catalog.breadcrumbHome": {
+      "required": true
+    },
+    "catalog.breadcrumbCatalog": {
+      "required": true
+    },
+    "about.title": {
+      "required": true
+    },
+    "about.text": {
+      "kind": "richtext"
+    },
+    "about.cta": {
+      "required": true
+    },
+    "about.partnersCta": {
+      "required": true
+    },
+    "tailoring.title": {
+      "required": true
+    },
+    "tailoring.text": {
+      "kind": "richtext"
+    },
+    "tailoring.cta": {
+      "required": true
+    },
+    "tailoring.steps.0.text": {
+      "kind": "richtext"
+    },
+    "tailoring.steps.1.text": {
+      "kind": "richtext"
+    },
+    "tailoring.steps.2.text": {
+      "kind": "richtext"
+    },
+    "offers.title": {
+      "required": true
+    },
+    "offers.text": {
+      "kind": "richtext"
+    },
+    "news.title": {
+      "required": true
+    },
+    "news.text": {
+      "kind": "richtext"
+    },
+    "news.readMore": {
+      "required": true
+    },
+    "gallery.title": {
+      "required": true
+    },
+    "gallery.text": {
+      "kind": "richtext"
+    },
+    "gallery.counter": {
+      "kind": "template",
+      "note": "filled in by GalleryScene (fill)"
+    },
+    "reviews.title": {
+      "required": true
+    },
+    "reviews.text": {
+      "kind": "richtext"
+    },
+    "partners.title": {
+      "required": true
+    },
+    "partners.text": {
+      "kind": "richtext"
+    },
+    "partners.cta": {
+      "required": true
+    },
+    "contacts.title": {
+      "required": true
+    },
+    "contacts.text": {
+      "kind": "richtext"
+    },
+    "contacts.form.title": {
+      "required": true
+    },
+    "contacts.form.subjectLine": {
+      "kind": "template",
+      "note": "filled in by LeadForm (splitTemplate on {subject})"
+    },
+    "contacts.form.topicLabel": {
+      "required": true
+    },
+    "contacts.form.topics.contact": {
+      "required": true
+    },
+    "contacts.form.topics.tailoring": {
+      "required": true
+    },
+    "contacts.form.topics.partnership": {
+      "required": true
+    },
+    "contacts.form.emailLabel": {
+      "required": true
+    },
+    "contacts.form.nameLabel": {
+      "required": true
+    },
+    "contacts.form.phoneLabel": {
+      "required": true
+    },
+    "contacts.form.commentLabel": {
+      "required": true
+    },
+    "contacts.form.consent": {
+      "required": true
+    },
+    "contacts.form.submit": {
+      "required": true
+    },
+    "contacts.form.success": {
+      "required": true
+    },
+    "footer.top": {
+      "required": true
+    },
+    "brand.name": {
+      "required": true
+    },
+    "brand.pageTitle": {
+      "required": true
+    },
+    "common.skipToContent": {
+      "required": true
+    },
+    "common.mainNavigation": {
+      "required": true
+    },
+    "common.languageSwitcher": {
+      "required": true
+    },
+    "common.switchLanguageTo": {
+      "kind": "template",
+      "required": true,
+      "note": "filled in by SiteHeader → LanguageSwitcher (splitLanguageTemplate)"
+    },
+    "common.openMenu": {
+      "required": true
+    },
+    "common.closeMenu": {
+      "required": true
+    },
+    "common.homeLink": {
+      "required": true
+    },
+    "common.backHome": {
+      "required": true
+    },
+    "common.breadcrumbs": {
+      "required": true
+    },
+    "common.mobileMenu": {
+      "required": true
+    },
+    "common.footerNavigation": {
+      "required": true
+    },
+    "common.imageViewer": {
+      "required": true
+    },
+    "common.previousImage": {
+      "required": true
+    },
+    "common.nextImage": {
+      "required": true
+    },
+    "common.closeViewer": {
+      "required": true
+    },
+    "forms.sending": {
+      "required": true
+    },
+    "forms.errors.required": {
+      "required": true
+    },
+    "forms.errors.invalidEmail": {
+      "required": true
+    },
+    "forms.errors.invalidPhone": {
+      "required": true
+    },
+    "forms.errors.contactRequired": {
+      "required": true
+    },
+    "forms.errors.tooShort": {
+      "kind": "template",
+      "required": true,
+      "note": "filled in by LeadForm (fill) and POST /public/leads"
+    },
+    "forms.errors.tooLong": {
+      "kind": "template",
+      "required": true,
+      "note": "filled in by LeadForm (fill) and POST /public/leads"
+    },
+    "forms.errors.rateLimited": {
+      "required": true
+    },
+    "forms.errors.server": {
+      "required": true
+    },
+    "forms.errors.network": {
+      "required": true
+    },
+    "forms.errors.invalidForm": {
+      "required": true
+    },
+    "forms.errors.consentRequired": {
+      "required": true
+    },
+    "forms.errors.invalid": {
+      "required": true
+    },
+    "forms.errors.invalidType": {
+      "required": true
+    },
+    "forms.errors.badRequest": {
+      "required": true
+    },
+    "forms.errors.payloadTooLarge": {
+      "required": true
+    },
+    "forms.errors.unsupportedMediaType": {
+      "required": true
+    },
+    "forms.sendAnother": {
+      "required": true
+    },
+    "forms.noscriptInvalid": {
+      "required": true
+    },
+    "social.TELEGRAM": {
+      "required": true
+    },
+    "social.VK": {
+      "required": true
+    },
+    "social.INSTAGRAM": {
+      "required": true
+    },
+    "social.WHATSAPP": {
+      "required": true
+    },
+    "social.YOUTUBE": {
+      "required": true
+    },
+    "social.TIKTOK": {
+      "required": true
+    },
+    "social.PINTEREST": {
+      "required": true
+    },
+    "social.WEBSITE": {
+      "required": true
+    },
+    "social.OTHER": {
+      "required": true
+    },
+    "notFound.title": {
+      "required": true
+    },
+    "error.title": {
+      "required": true
+    },
+    "error.retry": {
+      "required": true
+    },
+    "telegram.newLead": {
+      "required": true
+    },
+    "telegram.leadTypes.TAILORING": {
+      "required": true
+    },
+    "telegram.leadTypes.PARTNERSHIP": {
+      "required": true
+    },
+    "telegram.leadTypes.CONTACT": {
+      "required": true
+    },
+    "telegram.name": {
+      "required": true
+    },
+    "telegram.phone": {
+      "required": true
+    },
+    "telegram.email": {
+      "required": true
+    },
+    "telegram.locale": {
+      "required": true
+    },
+    "telegram.message": {
+      "required": true
+    },
+    "telegram.time": {
+      "required": true
+    },
+    "telegram.openAdmin": {
+      "required": true
+    },
+    "telegram.errors.dryRun": {
+      "required": true
+    },
+    "telegram.errors.notifyCeiling": {
+      "required": true
+    },
+    "telegram.errors.notConfigured": {
+      "required": true
+    },
+    "telegram.errors.badToken": {
+      "required": true
+    },
+    "telegram.errors.timeout": {
+      "required": true
+    },
+    "telegram.errors.network": {
+      "required": true
+    },
+    "telegram.errors.api": {
+      "required": true
+    },
+    "telegram.errors.internal": {
+      "required": true
+    },
+    "telegram.errors.unknown": {
+      "required": true
+    },
+    "telegram.errors.invalidId": {
+      "required": true
+    },
+    "telegram.errors.loadFailed": {
+      "required": true
+    },
+    "telegram.errors.notFound": {
+      "required": true
+    },
+    "telegram.errors.sendFailed": {
+      "required": true
+    }
+  },
+  "images": {
+    "about.image": "about",
+    "tailoring.image": "tailoring"
+  }
+}

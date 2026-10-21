@@ -1,0 +1,48 @@
+# Build context of both production images = the repository root (frontend/Dockerfile, backend/Dockerfile):
+# both need shared/. Only what a build reads should be sent to Docker — never secrets or local output.
+
+# VCS, editors, agents, OS
+.git
+.gitignore
+.idea
+.vscode
+.claude
+**/.DS_Store
+
+# Secrets: the environment comes from docker compose at run time, never from an image
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dependencies and build output (rebuilt inside the images)
+**/node_modules
+**/.next
+**/dist
+**/.build
+**/generated
+**/coverage
+**/.nyc_output
+**/*.tsbuildinfo
+**/*.log
+**/logs
+
+# Precompressed siblings of frontend/public (written again by `npm run build`)
+frontend/public/**/*.br
+frontend/public/**/*.gz
+frontend/public/**/*.zst
+
+# Runtime data, backups, deployment files (not part of an image)
+backups
+docker-volumes
+deploy
+docker-compose*.yml
+.env.example
+README.md
+
+# Not needed by any build
+frontend/concepts
+frontend/docs
+frontend/assets
+backend/docs
+backend/_templates
+backend/.husky

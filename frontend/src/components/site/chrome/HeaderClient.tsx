@@ -38,7 +38,7 @@ type HeaderClientProps = {
   cta: string;
   /** Section id → highlighted menu anchor while that section is in the middle of the viewport. */
   activeMap: Readonly<Record<string, string | null>>;
-  /** Accessible names (messages/*.json, resolved on the server). */
+  /** Accessible names (shared/messages/*.json, resolved on the server). */
   labels: HeaderLabels;
   languages: LanguageSwitcherProps;
 };

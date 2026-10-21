@@ -7,8 +7,9 @@ import { useState, type ReactElement } from 'react';
 import { errorFor } from '@/lib/admin/action-result';
 import { saveSettings } from '@/lib/admin/actions/settings';
 import { formatStars } from '@/lib/admin/labels';
-import type { AdminMediaRef, SettingsFormData } from '@/lib/admin/types';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { LocalizedText } from '@/lib/localized-text';
+import type { AdminSiteSettingsResponse } from '@shared/contracts/catalog';
+import type { MediaRef } from '@shared/contracts/common';
 
 import { EditLocaleProvider, localesWithErrors, translationGaps } from '../i18n/LocaleTabs';
 import { LocalizedField } from '../i18n/LocalizedField';
@@ -25,7 +26,7 @@ const LOCALIZED = ['address', 'seoTitle', 'seoDescription'] as const;
 /** Choices of the review star scale (SiteSettings.reviewRatingMax, CHECK 1..10). */
 const RATING_SCALE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
 
-export function SettingsForm({ initial }: { initial: SettingsFormData }): ReactElement {
+export function SettingsForm({ initial }: { initial: AdminSiteSettingsResponse }): ReactElement {
   return (
     <EditLocaleProvider>
       <SettingsFormInner initial={initial} />
@@ -33,7 +34,7 @@ export function SettingsForm({ initial }: { initial: SettingsFormData }): ReactE
   );
 }
 
-function SettingsFormInner({ initial }: { initial: SettingsFormData }): ReactElement {
+function SettingsFormInner({ initial }: { initial: AdminSiteSettingsResponse }): ReactElement {
   const t = useTranslations('admin.settings.form');
   const [phone, setPhone] = useState(initial.phone);
   const [email, setEmail] = useState(initial.email);
@@ -41,7 +42,7 @@ function SettingsFormInner({ initial }: { initial: SettingsFormData }): ReactEle
   const [reviewRatingMax, setReviewRatingMax] = useState(initial.reviewRatingMax);
   const [seoTitle, setSeoTitle] = useState<LocalizedText>(initial.seoTitle);
   const [seoDescription, setSeoDescription] = useState<LocalizedText>(initial.seoDescription);
-  const [ogImage, setOgImage] = useState<AdminMediaRef | null>(initial.ogImage);
+  const [ogImage, setOgImage] = useState<MediaRef | null>(initial.ogImage);
   const { pending, fieldErrors, run } = useActionSubmit();
 
   const submit = (): void => {

@@ -3,7 +3,7 @@ import type { Locale } from '@/i18n/locales';
 import type { createTranslator, MessageKeys, Messages, NamespaceKeys, NestedKeyOf } from 'next-intl';
 
 /**
- * Admin UI strings: messages/admin/ru.json, the "admin" namespace of next-intl (loaded for
+ * Admin UI strings: shared/messages/admin/ru.json, the "admin" namespace of next-intl (loaded for
  * every locale by src/i18n/request.ts; never seeded into the DB, not editable in the admin).
  * Isomorphic: types and tiny helpers only — the server-side loaders are in ./i18n-server.ts.
  *
@@ -13,11 +13,11 @@ import type { createTranslator, MessageKeys, Messages, NamespaceKeys, NestedKeyO
  * - Client Components: useTranslations('admin.<area>') under the admin layout's
  *   NextIntlClientProvider (it ships ONLY the admin namespace to the browser);
  * - Server Actions, Route Handlers, data functions: getAdminTranslations() (./i18n-server.ts);
- * - zod schemas: issue messages are admin.validation keys (errorKey), translated by parseInput
- *   (./validation.ts) where issues become field errors.
+ * - message keys the backend answers with (validation / errors): translateAdminMessage
+ *   (src/lib/api/admin-messages.ts).
  */
 
-/** The admin UI language (Russian only: there is no messages/admin/en.json). */
+/** The admin UI language (Russian only: there is no shared/messages/admin/en.json). */
 export const ADMIN_LOCALE = 'ru' satisfies Locale;
 
 /** "admin" and every namespace below it ("admin.collections", "admin.siteTexts.form" …). */
@@ -30,15 +30,3 @@ type AdminTree = Messages['admin'];
 
 /** Any admin message key relative to "admin" ("collections.title"). */
 export type AdminMessageKey = MessageKeys<AdminTree, NestedKeyOf<AdminTree>>;
-
-/** A key of admin.validation: the message of a zod issue in the admin schemas. */
-export type AdminValidationKey = MessageKeys<AdminTree['validation'], NestedKeyOf<AdminTree['validation']>>;
-
-/**
- * Typed zod issue message: `.min(1, errorKey('slugRequired'))`. The schemas stay module
- * constants (their z.input types drive the client forms); parseInput translates the key —
- * with the issue's `minimum` / `maximum` / custom `params` as ICU arguments ({min}, {max} …).
- */
-export function errorKey(key: AdminValidationKey): AdminValidationKey {
-  return key;
-}

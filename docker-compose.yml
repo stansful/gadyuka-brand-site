@@ -1,0 +1,308 @@
+# ГАДЮКА — production stack (one VPS). Start it with one of the scripts (they also install Docker,
+# create .env and the data folders): `sudo ./deploy/up-caddy.sh` or `sudo ./deploy/up-nginx.sh`.
+# Details: README.md.
+#
+#   Internet → proxy :80/:443 ──► frontend:3000   Next.js standalone (pages, admin, /api/leads)
+#              (docker-compose.caddy.yml  │   └─► backend:4000 (x-internal-key)
+#               or docker-compose.nginx.yml)
+#              /_next/static, /brand ◄── shared static folder (published by frontend at start)
+#              /media/*  ──────────────► backend:4000   NestJS API (only /media/* is public)
+#   backend → postgres:5432, minio:9000, api.telegram.org
+#
+# This file holds everything but the proxy; the proxy comes from an override file — the scripts write
+# COMPOSE_FILE=docker-compose.yml:docker-compose.<caddy|nginx>.yml into .env, so plain `docker compose …`
+# in this folder addresses the whole stack.
+#
+# - Networks: `edge` (proxy, frontend, backend; outbound internet for Telegram) and `data` (internal: no
+#   internet; backend, postgres, minio and the one-off jobs). No port is published except the proxy's
+#   80/443: Postgres, MinIO, the backend and Next.js are reachable only inside these networks.
+# - Start order on every `up`: postgres → migrate (prisma migrate deploy + the backend's DML-only
+#   database role) → minio → minio-init (bucket + the backend's MinIO user) → seed (idempotent: new
+#   default texts, the admin from ADMIN_LOGIN / ADMIN_PASSWORD; admin edits are kept) → backend →
+#   frontend → proxy. The one-off services run again on every `docker compose up`.
+# - Data: host folders under ${VOLUMES_DIR} (default ~/docker-volumes/gadyuka — `~` is the home of the
+#   user running compose; the scripts write an absolute path into .env): postgres, minio, backend/logs,
+#   frontend/cache, frontend/static, caddy/{data,config} or nginx/certs + certbot/www.
+# - Variables: .env next to this file (template: .env.example). Each service gets only the variables it
+#   needs — never `env_file: .env` (it would hand the database / MinIO root passwords to everything).
+#
+# MinIO image: the official minio/minio image is no longer published; pgsty/minio is the
+# community-maintained build of the same server (pinned release, includes `mc`).
+
+name: gadyuka
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
+x-minio-image: &minio-image pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+
+# Node services: no Linux capabilities, no privilege escalation (they run as the `node` user).
+x-node-hardening: &node-hardening
+  init: true
+  security_opt:
+    - 'no-new-privileges:true'
+  cap_drop:
+    - ALL
+
+x-backend-build: &backend-build
+  context: .
+  dockerfile: backend/Dockerfile
+  target: runtime
+
+# Settings of the backend and the seed (backend/src/config validates them at startup).
+x-backend-env: &backend-env
+  NODE_ENV: prod
+  APP_HOST: 0.0.0.0
+  APP_PORT: '4000'
+  LOG_DIR: /var/log/gadyuka
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: '5432'
+  POSTGRES_NAME: ${POSTGRES_NAME:-gadyuka}
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_BUCKET: ${S3_BUCKET:-gadyuka-media}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID in .env}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY in .env}
+  S3_FORCE_PATH_STYLE: '1'
+  INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in .env}
+  AUTH_ACCESS_SECRET: ${AUTH_ACCESS_SECRET:?Set AUTH_ACCESS_SECRET in .env}
+  AUTH_ACCESS_TTL: ${AUTH_ACCESS_TTL:-900}
+  AUTH_REFRESH_TTL: ${AUTH_REFRESH_TTL:-2592000}
+  TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+  TELEGRAM_OWNER_ID: ${TELEGRAM_OWNER_ID:-}
+  TELEGRAM_DRY_RUN: ${TELEGRAM_DRY_RUN:-0}
+  IP_HASH_SALT: ${IP_HASH_SALT:?Set IP_HASH_SALT in .env}
+  SITE_URL: ${SITE_URL:?Set SITE_URL in .env}
+
+services:
+  postgres:
+    image: postgres:18.1-alpine3.23
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gadyuka}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS:?Set POSTGRES_PASS in .env}
+      POSTGRES_DB: ${POSTGRES_NAME:-gadyuka}
+    volumes:
+      # Postgres 18 images keep the cluster in /var/lib/postgresql/18/docker: mount the parent.
+      - ${VOLUMES_DIR:-~/docker-volumes/gadyuka}/postgres:/var/lib/postgresql
+    shm_size: 128mb
+    security_opt:
+      - 'no-new-privileges:true'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks: [data]
+    logging: *logging
+
+  minio:
+    image: *minio-image
+    restart: unless-stopped
+    command: ['server', '/data']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
+      # No web console in production (use `mc` inside the container, README.md).
+      MINIO_BROWSER: 'off'
+    volumes:
+      - ${VOLUMES_DIR:-~/docker-volumes/gadyuka}/minio:/data
+    security_opt:
+      - 'no-new-privileges:true'
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks: [data]
+    logging: *logging
+
+  # One-off on every `up`: the media bucket (private: the backend serves it under /media/*) and the
+  # backend's own MinIO user (S3_ACCESS_KEY_ID ≠ MINIO_ROOT_USER) with rights on that bucket only.
+  # A changed S3_SECRET_ACCESS_KEY is applied on the next `up`.
+  minio-init:
+    image: *minio-image
+    restart: 'no'
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
+      S3_BUCKET: ${S3_BUCKET:-gadyuka-media}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID in .env}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY in .env}
+    entrypoint: ['/bin/sh', '-ec']
+    command:
+      - |
+        if [ "$${S3_ACCESS_KEY_ID}" = "$${MINIO_ROOT_USER}" ]; then
+          echo "[minio-init] S3_ACCESS_KEY_ID must differ from MINIO_ROOT_USER" >&2; exit 1
+        fi
+        # Retried for a minute: `docker compose restart` starts this job together with MinIO (no healthy wait).
+        tries=0
+        until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1; do
+          tries=$$((tries + 1))
+          if [ "$${tries}" -ge 30 ]; then
+            mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" >/dev/null; exit 1
+          fi
+          sleep 2
+        done
+        mc mb --ignore-existing "local/$${S3_BUCKET}"
+        cat > /tmp/backend-policy.json <<POLICY
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            { "Effect": "Allow", "Action": ["s3:GetBucketLocation", "s3:ListBucket"], "Resource": ["arn:aws:s3:::$${S3_BUCKET}"] },
+            { "Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"], "Resource": ["arn:aws:s3:::$${S3_BUCKET}/*"] }
+          ]
+        }
+        POLICY
+        mc admin policy create local gadyuka-media-rw /tmp/backend-policy.json >/dev/null
+        mc admin user add local "$${S3_ACCESS_KEY_ID}" "$${S3_SECRET_ACCESS_KEY}" >/dev/null
+        # Attach unless attached already (policyName is a comma-separated list; the image has no grep).
+        case "$$(mc admin user info local "$${S3_ACCESS_KEY_ID}" --json)" in
+          *'"policyName":"gadyuka-media-rw"'* | *'"policyName":"gadyuka-media-rw,'* | *',gadyuka-media-rw"'* | *',gadyuka-media-rw,'*) ;;
+          *) mc admin policy attach local gadyuka-media-rw --user "$${S3_ACCESS_KEY_ID}" >/dev/null ;;
+        esac
+        echo "[minio-init] bucket $${S3_BUCKET} and user $${S3_ACCESS_KEY_ID} (policy gadyuka-media-rw) are ready"
+    security_opt:
+      - 'no-new-privileges:true'
+    networks: [data]
+    logging: *logging
+
+  # One-off on every `up`: `prisma migrate deploy` as the database owner (POSTGRES_USER), then the
+  # backend's DML-only role APP_DB_USER (backend/docker/app-db-role.mjs: create / password / grants).
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: migrate
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_NAME: ${POSTGRES_NAME:-gadyuka}
+      POSTGRES_USER: ${POSTGRES_USER:-gadyuka}
+      POSTGRES_PASS: ${POSTGRES_PASS:?Set POSTGRES_PASS in .env}
+      APP_DB_USER: ${APP_DB_USER:-gadyuka_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
+    <<: *node-hardening
+    networks: [data]
+    logging: *logging
+
+  # One-off on every `up` (idempotent, backend/README.md → Seed): the admin account (ADMIN_LOGIN /
+  # ADMIN_PASSWORD — a changed password ends the admin's sessions), new default texts of
+  # shared/messages (texts edited in the admin are kept), the seed images (backend/assets → MinIO) and,
+  # on the first run only, the demo content. Runs as the owner; reset everything seeded:
+  #   docker compose run --rm -e SEED_OVERWRITE=1 seed
+  seed:
+    build: *backend-build
+    restart: 'no'
+    command: ['node', 'dist/backend/src/cli/seed.js']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *backend-env
+      POSTGRES_USER: ${POSTGRES_USER:-gadyuka}
+      POSTGRES_PASS: ${POSTGRES_PASS:?Set POSTGRES_PASS in .env}
+      ADMIN_LOGIN: ${ADMIN_LOGIN:?Set ADMIN_LOGIN in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      SEED_OVERWRITE: ${SEED_OVERWRITE:-0}
+    volumes:
+      - ${VOLUMES_DIR:-~/docker-volumes/gadyuka}/backend/logs:/var/log/gadyuka
+    <<: *node-hardening
+    networks: [data]
+    logging: *logging
+
+  backend:
+    build: *backend-build
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      seed:
+        condition: service_completed_successfully
+    environment:
+      <<: *backend-env
+      # Least privilege: rows only (no DDL); migrations and the seed run as the owner.
+      POSTGRES_USER: ${APP_DB_USER:-gadyuka_app}
+      POSTGRES_PASS: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
+    volumes:
+      - ${VOLUMES_DIR:-~/docker-volumes/gadyuka}/backend/logs:/var/log/gadyuka
+    expose:
+      - '4000'
+    healthcheck:
+      # 200 only when the database and MinIO answer (GET /api/v1/public/health needs the internal key).
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4000/api/v1/public/health',{headers:{'x-internal-key':process.env.INTERNAL_API_KEY},signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    <<: *node-hardening
+    networks: [data, edge]
+    logging: *logging
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        # Prerendered into pages (canonical, sitemap, robots, Open Graph): rebuild after a change.
+        SITE_URL: ${SITE_URL:?Set SITE_URL in .env}
+        GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
+        YANDEX_VERIFICATION: ${YANDEX_VERIFICATION:-}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      BACKEND_URL: http://backend:4000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in .env}
+      SITE_URL: ${SITE_URL:?Set SITE_URL in .env}
+      GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
+      YANDEX_VERIFICATION: ${YANDEX_VERIFICATION:-}
+      # Static files of the build → the proxy (frontend/docker/publish-static.mjs).
+      STATIC_PUBLISH_DIR: /srv/static
+      STATIC_RETAIN_DAYS: '7'
+    volumes:
+      # Image optimizer + fetch cache (survives image updates).
+      - ${VOLUMES_DIR:-~/docker-volumes/gadyuka}/frontend/cache:/app/frontend/.next/cache
+      # Read by the proxy (read-only there).
+      - ${VOLUMES_DIR:-~/docker-volumes/gadyuka}/frontend/static:/srv/static
+    expose:
+      - '3000'
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://127.0.0.1:3000/robots.txt']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    <<: *node-hardening
+    networks: [edge]
+    logging: *logging
+
+networks:
+  # The proxy, the site and the backend. A regular bridge: the backend reaches api.telegram.org.
+  edge:
+  # Databases and storage: no route to the internet, nothing published.
+  data:
+    internal: true

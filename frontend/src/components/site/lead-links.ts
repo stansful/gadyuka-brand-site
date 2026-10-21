@@ -1,8 +1,8 @@
-import type { LeadType } from '@/generated/prisma/enums';
 import { isLocale, type Locale } from '@/i18n/locales';
 import { LEAD_FORM_ANCHOR } from '@/lib/content/anchors';
 import { type LeadIntent, leadIntentHref } from '@/lib/lead-intent';
 import { localizedPath } from '@/lib/seo/site-url';
+import type { LeadType } from '@shared/contracts/leads';
 
 /**
  * Links that open the lead form («Письмо в редакцию») with a preselected topic — isomorphic,

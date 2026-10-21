@@ -5,12 +5,12 @@ import type { FieldErrors } from '@/lib/admin/action-result';
  * Field errors of the «Тексты сайта» save (saveSiteTexts) keyed by what the editor renders:
  * "<message key>.<locale>" for a text, "<image key>" for a landing image.
  *
- * The action reports its own checks that way already; zod shape errors come as
- * "entries.<index>.values.<locale>.value" / "images.<index>.mediaId" — indexes of the SENT
- * payload (only the changed texts and images), so `entryKeys` / `imageKeys` are the keys of
- * that save in payload order — and are re-keyed here. The locale segment is matched against
- * the configured locales (not a character class), so region codes like "pt-br" or "zh-Hans"
- * work too; an unknown one falls back to the text itself.
+ * The backend reports its checks of the texts that way already; a request it refuses by shape comes
+ * with the paths of the request — "entries.<index>.values.<locale>.value" / "images.<index>.mediaId" —
+ * indexes of the SENT payload (only the changed texts and images), so `entryKeys` / `imageKeys` are the
+ * keys of that save in payload order — and are re-keyed here. The locale segment is matched against
+ * the configured locales (not a character class), so region codes like "pt-br" or "zh-Hans" work too;
+ * an unknown one falls back to the text itself.
  */
 export function errorsByEntryKey(
   fieldErrors: FieldErrors,

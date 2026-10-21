@@ -1,77 +1,50 @@
 import { requireAdminRoute } from '@/lib/admin/auth';
-import { getAdminTranslations } from '@/lib/admin/i18n-server';
-import { ACCEPTED_FORMATS_LABEL, MAX_UPLOAD_BYTES, MAX_UPLOAD_MEGABYTES } from '@/lib/admin/media-constants';
-import { createMediaFromUpload, listMedia } from '@/lib/admin/media-service';
-import { idSchema } from '@/lib/admin/schemas';
-import { BodyTooLargeError, readFormData } from '@/lib/http/read-body';
-import { MediaValidationError } from '@/lib/media';
+import { mediaJson, mediaReadFailure, mediaUploadFailure } from '@/lib/admin/media-responses';
+import { translateAdminMessage } from '@/lib/api/admin-messages';
+import { listMediaPage, MAX_UPLOAD_BODY_BYTES, UPLOAD_TOO_LARGE, uploadMediaStream } from '@/lib/api/media';
 
 /**
- * Admin media API (Route Handler: uploads exceed the 1 MB Server Action body limit).
+ * Admin media API (Route Handler: uploads exceed the 1 MB Server Action body limit). The backend
+ * does the work (/api/v1/admin/media); this checks the session and keeps the answers the media
+ * dialogs read (src/components/admin/media/media-api.ts):
  *
  *   GET  /admin/api/media?cursor=<id>&q=<text>  → { items: AdminMedia[], nextCursor }
  *   POST /admin/api/media  (multipart, field "file", one image per request)
- *        → 201 { media: AdminMedia } | 4xx { error: "<message from admin.media.errors>" }
+ *        → 201 { media: AdminMedia } | 4xx/500 { error: "<message from admin.media.errors>" }
+ *
+ * The upload body is streamed to the backend as it arrives (never buffered: request.formData()
+ * would read bodies of any size), cut off at the size limit.
  */
-
-/** Multipart overhead allowance on top of the file limit (hard cap, enforced while streaming). */
-const MAX_BODY_BYTES = MAX_UPLOAD_BYTES + 512 * 1024;
-
-/** ICU arguments of the admin.media.errors messages. */
-const ERROR_VALUES = { size: MAX_UPLOAD_MEGABYTES, formats: ACCEPTED_FORMATS_LABEL } as const;
-
-const noStore = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET(request: Request): Promise<Response> {
   const denied = await requireAdminRoute(request);
   if (denied) return denied;
-
   const url = new URL(request.url);
-  const cursorParam = url.searchParams.get('cursor');
-  const cursor = cursorParam ? idSchema.safeParse(cursorParam) : null;
-  if (cursor && !cursor.success) {
-    const t = await getAdminTranslations('admin.media.errors');
-    return Response.json({ error: t('badCursor') }, { status: 400, headers: noStore });
-  }
-  const query = url.searchParams.get('q') ?? undefined;
-
-  const page = await listMedia({ cursor: cursor?.data ?? null, query });
-  return Response.json(page, { headers: noStore });
+  const result = await listMediaPage({ cursor: url.searchParams.get('cursor'), q: url.searchParams.get('q') });
+  if (!result.ok) return mediaReadFailure('listMedia', result.failure);
+  return mediaJson({ items: result.data.items, nextCursor: result.data.nextCursor });
 }
 
 export async function POST(request: Request): Promise<Response> {
   const denied = await requireAdminRoute(request);
   if (denied) return denied;
+  const contentType = request.headers.get('content-type') ?? '';
+  const contentLength = declaredLength(request);
+  if (contentLength !== null && contentLength > MAX_UPLOAD_BODY_BYTES) return mediaUploadFailure(UPLOAD_TOO_LARGE);
+  if (!request.body || !/^multipart\/form-data\s*;/i.test(contentType)) return notMultipart(contentType);
+  const result = await uploadMediaStream({ body: request.body, contentType, contentLength, signal: request.signal });
+  if (!result.ok) return mediaUploadFailure(result.failure);
+  return mediaJson({ media: result.data }, 201);
+}
 
-  const t = await getAdminTranslations('admin.media.errors');
-  // Never request.formData(): it buffers bodies of any size (chunked uploads have no
-  // Content-Length). readFormData counts bytes while streaming and stops at the limit.
-  let form: FormData;
-  try {
-    form = await readFormData(request, MAX_BODY_BYTES);
-  } catch (error: unknown) {
-    if (error instanceof BodyTooLargeError) {
-      return Response.json({ error: t('tooLarge', ERROR_VALUES) }, { status: 413, headers: noStore });
-    }
-    return Response.json({ error: t('unreadable') }, { status: 400, headers: noStore });
-  }
-  const file = form.get('file');
-  if (!(file instanceof File)) {
-    return Response.json({ error: t('noFile') }, { status: 400, headers: noStore });
-  }
-  if (file.size > MAX_UPLOAD_BYTES) {
-    return Response.json({ error: t('tooLarge', ERROR_VALUES) }, { status: 413, headers: noStore });
-  }
+/** A form without a file part (urlencoded) → «Файл не передан»; anything else → «Не удалось прочитать файл…». */
+async function notMultipart(contentType: string): Promise<Response> {
+  const isUrlEncoded = /^application\/x-www-form-urlencoded\b/i.test(contentType);
+  const key = isUrlEncoded ? 'admin.media.errors.noFile' : 'admin.media.errors.unreadable';
+  return mediaJson({ error: await translateAdminMessage({ key }) }, 400);
+}
 
-  try {
-    const data = new Uint8Array(await file.arrayBuffer());
-    const media = await createMediaFromUpload({ data, originalName: file.name });
-    return Response.json({ media }, { status: 201, headers: noStore });
-  } catch (error: unknown) {
-    if (error instanceof MediaValidationError) {
-      return Response.json({ error: t(error.code, ERROR_VALUES) }, { status: 422, headers: noStore });
-    }
-    console.error('[admin] media upload failed:', error);
-    return Response.json({ error: t('saveFailed') }, { status: 500, headers: noStore });
-  }
+function declaredLength(request: Request): number | null {
+  const value = Number(request.headers.get('content-length') ?? '');
+  return request.headers.has('content-length') && Number.isFinite(value) ? value : null;
 }

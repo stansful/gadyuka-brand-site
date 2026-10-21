@@ -1,129 +1,116 @@
 import 'server-only';
-import { type LeadFieldErrors, type LeadSubmission, validateLeadInput } from '@/lib/leads';
-import { checkRateLimit, LEAD_NOTIFY_CEILING, type RecentLeadCounter } from '@/lib/rate-limit';
-import type { TelegramLead } from '@/lib/telegram';
-
-import type { LeadMeta } from './store';
+import { describeFailure, type ApiFailure } from '@/lib/api/api-result';
+import type { VisitorInfo } from '@/lib/api/client';
+import { submitLead } from '@/lib/api/leads';
+import {
+  LEAD_ERROR_FIELDS,
+  LEAD_SIMPLE_ERROR_CODES,
+  type LeadFieldError,
+  type LeadFieldErrors,
+  type LeadSimpleErrorCode,
+} from '@/lib/leads';
+import type { MessageRef } from '@shared/contracts/errors';
+import type { LeadSubmitPayload, LeadSubmitRequest } from '@shared/contracts/leads';
 
 /**
- * The lead submission flow without HTTP details (testable with fakes):
- *   validate → (honeypot: pretend success) → [locked per ipHash: rate limit → save] → schedule Telegram.
- * The lead is always saved BEFORE Telegram is contacted, and Telegram runs after the
- * response (`schedule`), so a Telegram outage never loses a lead or fails the request.
- * Site-wide flood guard: past LEAD_NOTIFY_CEILING leads are still saved, but marked
- * «не отправлено» instead of being pushed to Telegram (the owner can resend from the admin).
+ * The lead submission of POST /api/leads without HTTP details: the visitor's form → the backend
+ * (POST /api/v1/public/leads — validation, honeypot, rate limits, storage, the Telegram notification;
+ * shared/contracts/leads.ts) → an outcome the route answers with.
+ *
+ * Only the form's own fields are forwarded, with their values exactly as received (the backend checks
+ * their types too); the visitor's IP and user agent travel as headers (getVisitor), the page's Referer
+ * in the body (Lead.meta). A honeypot hit comes back as an ordinary 201 with a decoy id.
  */
 
-/** DB operations available inside the per-ipHash critical section. */
-export type LeadStore = {
-  countRecent: RecentLeadCounter;
-  oldestInWindow: (ipHash: string, since: Date) => Promise<Date | null>;
-  /** All leads (any IP) created at or after `since`. */
-  countAllRecent: (since: Date) => Promise<number>;
-  insert: (
-    lead: LeadSubmission,
-    ipHash: string,
-    meta: LeadMeta,
-    options: { telegramError: string | null },
-  ) => Promise<TelegramLead>;
-};
-
-export type SubmitLeadDeps = {
-  /**
-   * Runs `work` atomically for one ipHash: production = DB transaction + advisory lock
-   * (store.ts → withLeadLock), so parallel requests cannot all pass the limit.
-   */
-  withLock: <T>(ipHash: string, work: (store: LeadStore) => Promise<T>) => Promise<T>;
-  /** Called with the saved lead; must not throw (sendLeadToTelegram never does). */
-  notify: (lead: TelegramLead) => Promise<unknown>;
-  /**
-   * Lead.telegramError of a lead saved past the site-wide ceiling — the owner-facing message
-   * telegram.errors.notifyCeiling (production: notifyCeilingError in src/lib/telegram.ts).
-   */
-  ceilingError: (ceiling: typeof LEAD_NOTIFY_CEILING) => Promise<string>;
-  /** Runs `task` after the response is sent (next/server `after` in the route). */
-  schedule: (task: () => Promise<void>) => void;
-  now?: () => Date;
-};
-
 export type SubmitLeadContext = {
-  ipHash: string;
-  userAgent: string | null;
+  visitor: VisitorInfo;
+  /** Referer header of the visitor's request (null when absent) */
   referer: string | null;
 };
 
 export type SubmitLeadOutcome =
-  | { status: 'created'; id: string; notified: boolean }
-  | { status: 'ignored' }
+  | { status: 'created'; id: string }
   | { status: 'invalid'; errors: LeadFieldErrors }
   | { status: 'rate_limited'; retryAfterSeconds: number }
-  | { status: 'failed'; error: unknown };
+  | { status: 'failed'; reason: string };
 
-type LockedOutcome =
-  | { kind: 'limited'; retryAfterSeconds: number }
-  | { kind: 'saved'; lead: TelegramLead; notify: boolean };
+/** The form fields forwarded to the backend (LeadSubmitRequest without the server-side referer). */
+const FORM_FIELDS = [
+  'type',
+  'name',
+  'email',
+  'phone',
+  'message',
+  'locale',
+  'consent',
+  'hp',
+] as const satisfies ReadonlyArray<keyof LeadSubmitRequest>;
 
-function clip(value: string | null, max: number): string | null {
-  return value === null ? null : value.slice(0, max);
+/** Namespace of the backend's lead form errors: site messages forms.errors.<code>. */
+const FORM_ERRORS_NAMESPACE = 'forms.errors';
+const FORM_ERROR_PREFIX = `${FORM_ERRORS_NAMESPACE}.`;
+
+/** Retry-After when a 429 of the backend does not say (the per-network window, 10 minutes). */
+const DEFAULT_RETRY_AFTER_SECONDS = 600;
+
+function isRecord(value: unknown): value is object {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export async function submitLead(
-  input: unknown,
-  context: SubmitLeadContext,
-  deps: SubmitLeadDeps,
-): Promise<SubmitLeadOutcome> {
-  const validation = validateLeadInput(input);
-  if (!validation.ok) {
-    if (validation.reason === 'honeypot') return { status: 'ignored' };
-    return { status: 'invalid', errors: validation.errors };
-  }
-
-  const now = deps.now?.() ?? new Date();
-  const meta: LeadMeta = {
-    consentAt: now.toISOString(),
-    userAgent: clip(context.userAgent, 300),
-    referer: clip(context.referer, 500),
-    source: 'site',
-  };
-
-  let outcome: LockedOutcome;
-  try {
-    outcome = await deps.withLock(context.ipHash, async (store): Promise<LockedOutcome> => {
-      const limit = await checkRateLimit(context.ipHash, {
-        count: store.countRecent,
-        oldestInWindow: store.oldestInWindow,
-        now,
-      });
-      if (limit.limited) return { kind: 'limited', retryAfterSeconds: limit.retryAfterSeconds };
-
-      const siteWide = await store.countAllRecent(new Date(now.getTime() - LEAD_NOTIFY_CEILING.windowMs));
-      const notify = siteWide < LEAD_NOTIFY_CEILING.max;
-      const lead = await store.insert(validation.data, context.ipHash, meta, {
-        telegramError: notify ? null : await deps.ceilingError(LEAD_NOTIFY_CEILING),
-      });
-      return { kind: 'saved', lead, notify };
-    });
-  } catch (error: unknown) {
-    return { status: 'failed', error };
-  }
-
-  if (outcome.kind === 'limited') return { status: 'rate_limited', retryAfterSeconds: outcome.retryAfterSeconds };
-
-  const saved = outcome.lead;
-  if (!outcome.notify) {
-    console.warn(
-      `[leads] more than ${LEAD_NOTIFY_CEILING.max} leads in ${LEAD_NOTIFY_CEILING.windowMs / 60_000} min — lead ${saved.id} saved without a Telegram notification`,
-    );
-    return { status: 'created', id: saved.id, notified: false };
-  }
-
-  deps.schedule(async () => {
-    try {
-      await deps.notify(saved);
-    } catch (error: unknown) {
-      // notify() records failures itself; this is only a last-resort guard.
-      console.error(`[leads] Telegram notification for lead ${saved.id} crashed:`, error);
+/** The form's fields of a raw payload (anything else is left out; a non-object → no fields). */
+export function leadPayloadOf(raw: unknown, referer: string | null): LeadSubmitPayload {
+  const payload: Record<string, unknown> = {};
+  if (isRecord(raw)) {
+    for (const field of FORM_FIELDS) {
+      const value: unknown = Reflect.get(raw, field);
+      if (value !== undefined) payload[field] = value;
     }
-  });
-  return { status: 'created', id: saved.id, notified: true };
+  }
+  if (referer !== null) payload.referer = referer;
+  return payload;
+}
+
+export async function submitLeadForVisitor(raw: unknown, context: SubmitLeadContext): Promise<SubmitLeadOutcome> {
+  const result = await submitLead(leadPayloadOf(raw, context.referer), context.visitor);
+  if (result.ok) return { status: 'created', id: result.data.id };
+  return outcomeOf(result.failure);
+}
+
+function outcomeOf(failure: ApiFailure): SubmitLeadOutcome {
+  if (failure.kind === 'validation') {
+    const errors = fieldErrorsOf(failure.fields);
+    if (Object.keys(errors).length > 0) return { status: 'invalid', errors };
+  }
+  if (failure.kind === 'domain' && failure.status === 429) {
+    return { status: 'rate_limited', retryAfterSeconds: retryAfterOf(failure.details?.retryAfterSeconds) };
+  }
+  return { status: 'failed', reason: describeFailure(failure) };
+}
+
+/** The backend's field errors → the form's error codes (fields / keys the form does not know are left out). */
+function fieldErrorsOf(fields: Readonly<Record<string, MessageRef>>): LeadFieldErrors {
+  const errors: LeadFieldErrors = {};
+  for (const field of LEAD_ERROR_FIELDS) {
+    const ref = fields[field];
+    const error = ref ? fieldErrorOf(ref) : null;
+    if (error) errors[field] = error;
+  }
+  return errors;
+}
+
+function isSimpleCode(code: string): code is LeadSimpleErrorCode {
+  return (LEAD_SIMPLE_ERROR_CODES as ReadonlyArray<string>).includes(code);
+}
+
+function fieldErrorOf({ key, values }: MessageRef): LeadFieldError | null {
+  const code = key.startsWith(FORM_ERROR_PREFIX) ? key.slice(FORM_ERROR_PREFIX.length) : '';
+  if (code === 'tooShort') return typeof values?.min === 'number' ? { code, min: values.min } : null;
+  if (code === 'tooLong') return typeof values?.max === 'number' ? { code, max: values.max } : null;
+  return isSimpleCode(code) ? { code } : null;
+}
+
+function retryAfterOf(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.ceil(value)
+    : DEFAULT_RETRY_AFTER_SECONDS;
 }

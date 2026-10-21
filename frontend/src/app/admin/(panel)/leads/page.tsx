@@ -6,10 +6,10 @@ import { LeadStatusBadge, LeadTypeBadge, TelegramBadge } from '@/components/admi
 import { LeadFilters } from '@/components/admin/leads/LeadFilters';
 import { buttonClasses } from '@/components/admin/ui/Button';
 import { EmptyState, PageHeader } from '@/components/admin/ui/layout';
-import type { LeadStatus, LeadType } from '@/generated/prisma/enums';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
 import { formatDateTimeRu, LEAD_STATUSES, LEAD_TYPES } from '@/lib/admin/labels';
-import { listLeadsAdmin } from '@/lib/admin/queries';
+import { listLeadsAdmin } from '@/lib/admin/queries/leads';
+import type { LeadStatus, LeadType } from '@shared/contracts/leads';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

@@ -5,7 +5,7 @@ import { ImagePlus, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState, type ReactElement, type ReactNode } from 'react';
 
-import type { AdminMediaRef } from '@/lib/admin/types';
+import type { AdminMediaRef } from './media-types';
 
 import { Button } from '../ui/Button';
 import { MediaLibraryDialog } from './MediaLibraryDialog';

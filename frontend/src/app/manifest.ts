@@ -1,3 +1,5 @@
+import { connection } from 'next/server';
+
 import { defaultLocale } from '@/i18n/locales';
 import { getSiteTexts } from '@/i18n/site-messages';
 import { getSiteSettings } from '@/lib/content';
@@ -10,9 +12,11 @@ import type { MetadataRoute } from 'next';
  * One manifest for the whole site, in the default language. Its texts are the site's own,
  * editable in the admin: the app name is the SEO title of «Настройки» (else the brand name),
  * the short name the brand name (message brand.name), the description the SEO description.
- * Cached like the rest of the content (both reads are "use cache" + cacheTag("content")).
+ * Cached like the rest of the content (both reads are "use cache" + cacheTag("content")), read on request.
  */
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  // Public data is read at request time only (src/lib/api/public.ts): never during `next build`.
+  await connection();
   const [texts, settings] = await Promise.all([getSiteTexts(defaultLocale), getSiteSettings(defaultLocale)]);
   const brand = texts['brand.name'];
   return {

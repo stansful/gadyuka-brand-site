@@ -1,15 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { brandAssetUrl, mediaPublicUrl } from './media-url';
-
-describe('mediaPublicUrl (re-exported from src/lib/storage/keys)', () => {
-  it('prefixes /media and encodes segments', () => {
-    expect(mediaPublicUrl('admin/u1/3f2b8c1e-9a4d-4e7f-8b2a-1c3d5e7f9a0b/image.webp')).toBe(
-      '/media/admin/u1/3f2b8c1e-9a4d-4e7f-8b2a-1c3d5e7f9a0b/image.webp',
-    );
-    expect(mediaPublicUrl('/seed/a b.webp')).toBe('/media/seed/a%20b.webp');
-  });
-});
+import { brandAssetUrl } from './media-url';
 
 describe('brandAssetUrl', () => {
   it('builds brand asset urls', () => {

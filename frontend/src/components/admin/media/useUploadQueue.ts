@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import type { AdminMedia } from '@/lib/admin/types';
+import type { AdminMedia } from './media-types';
 
 import { mediaProblemText, precheckFile, uploadMediaFile } from './media-api';
 

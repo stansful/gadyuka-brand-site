@@ -9,7 +9,7 @@
   "arrowParens": "avoid",
   "endOfLine": "lf",
   "printWidth": 120,
-  "ignorePatterns": ["package-lock.json", "src/generated/**", "concepts/**", "assets/**"],
+  "ignorePatterns": ["package-lock.json", "concepts/**", "assets/**"],
   "overrides": [
     {
       "files": ["**/*.json"],
@@ -21,13 +21,13 @@
   "sortPackageJson": true,
   "sortImports": {
     "newlinesBetween": true,
-    "internalPattern": ["@/"],
+    "internalPattern": ["@/", "@shared/"],
     "ignoreCase": true,
     "customGroups": [
       {
         "groupName": "ts-path-alias",
         "selector": "internal",
-        "elementNamePattern": ["@/**"]
+        "elementNamePattern": ["@/**", "@shared/**"]
       }
     ],
     "order": "asc",

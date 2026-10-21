@@ -1,0 +1,25 @@
+model Review {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  author    String
+  /// LocalizedText (e.g. «покупатель»)
+  role      Json     @default("{}")
+  /// LocalizedText
+  text      Json
+  avatarId  String?  @map("avatar_id") @db.Uuid
+  avatar    Media?   @relation("ReviewAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
+  /// 1..SiteSettings.reviewRatingMax (CHECK 1..10 in the migration; the upper bound is validated
+  /// against the current scale in the app)
+  rating    Int?
+  /// Future: the site user who wrote the review (null = added in the admin)
+  userId    String?  @map("user_id") @db.Uuid
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  order     Int      @default(0)
+  published Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([published, order])
+  @@index([avatarId])
+  @@index([userId])
+  @@map("reviews")
+}

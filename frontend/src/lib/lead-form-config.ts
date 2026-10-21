@@ -1,6 +1,6 @@
-import type { LeadType } from '@/generated/prisma/enums';
 import type { Locale } from '@/i18n/locales';
 import type { TextKey } from '@/lib/content/registry';
+import type { LeadType } from '@shared/contracts/leads';
 
 export {
   LEAD_INTENT_EVENT,
@@ -16,15 +16,12 @@ export {
 } from './lead-intent';
 
 /**
- * The lead form's configuration, error codes and API contract types — ISOMORPHIC and zod-free.
- *
- * Kept apart from src/lib/leads.ts (the zod schemas, ~30 KB gzipped on the client): the form
- * (src/components/site/LeadForm.tsx) renders from this module and loads the validator only when
- * the visitor reaches or touches the form. leads.ts re-exports everything here, so server code
- * and the API keep importing "@/lib/leads".
+ * The lead form's configuration, error codes and API contract types — ISOMORPHIC and
+ * dependency-free (types and constants only; the checks themselves are src/lib/leads.ts, which
+ * re-exports everything here, so server code and the API keep importing "@/lib/leads").
  */
 
-/** Field limits (shared by the schema, the form `maxLength` attributes and error messages). */
+/** Field limits (shared by the validator, the form `maxLength` attributes and error messages). */
 export const LEAD_LIMITS = {
   nameMin: 2,
   nameMax: 80,
@@ -38,7 +35,7 @@ export const LEAD_HONEYPOT_FIELD = 'hp';
 
 // ─── Error codes ────────────────────────────────────────────────────────────
 
-/** Error codes = keys of `forms.errors.*` in messages/*.json. */
+/** Error codes = keys of `forms.errors.*` in shared/messages/*.json. */
 export type LeadErrorCode =
   | 'required'
   | 'invalidEmail'

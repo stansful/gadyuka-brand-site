@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { isSameOriginRequest } from './auth';
+import { ApiRequestError } from '@/lib/api/api-result';
+import type { AuthMeResponse } from '@shared/contracts/auth';
+
+const getAdminSession = vi.fn<() => Promise<AuthMeResponse | null>>();
+vi.mock('@/lib/api/admin', () => ({ getAdminSession }));
+
+const { getLoginSessionState, isSameOriginRequest } = await import('./auth');
 
 const post = (headers: Record<string, string>): Request =>
   new Request('http://localhost:3000/admin/api/media', { method: 'POST', headers });
@@ -28,5 +34,29 @@ describe('isSameOriginRequest (CSRF guard for admin route handlers)', () => {
 
   it('allows non-browser clients without Origin (they carry no ambient cookies cross-site)', () => {
     expect(isSameOriginRequest(post({ host: 'localhost:3000' }))).toBe(true);
+  });
+});
+
+describe('getLoginSessionState (the login page never fails as a whole)', () => {
+  it('tells signed in from signed out', async () => {
+    getAdminSession.mockResolvedValueOnce({ id: 'u1', login: 'owner', name: 'Owner', role: 'ADMIN', sessionId: 's1' });
+    expect(await getLoginSessionState()).toBe('signedIn');
+    getAdminSession.mockResolvedValueOnce(null);
+    expect(await getLoginSessionState()).toBe('signedOut');
+  });
+
+  it('is «unavailable» (the form with a notice) when the backend cannot check the session', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    getAdminSession.mockRejectedValueOnce(
+      new ApiRequestError('/api/v1/auth/me', { kind: 'unavailable', status: null, reason: 'network' }),
+    );
+    expect(await getLoginSessionState()).toBe('unavailable');
+    expect(error).toHaveBeenCalledOnce();
+    error.mockRestore();
+  });
+
+  it('lets any other error through (a bug is not an outage)', async () => {
+    getAdminSession.mockRejectedValueOnce(new TypeError('boom'));
+    await expect(getLoginSessionState()).rejects.toThrow('boom');
   });
 });

@@ -83,9 +83,9 @@
 
 Перечёркнутое на скриншотах (стоковые фото, шаблонные блоки Tilda «Меню интернет-магазина», кредиты Unsplash) — не используем.
 
-## Ассеты (`assets`)
+## Ассеты (`assets/` — векторы и вырезки; фото и брендбук — `../backend/assets/`, их загружает сид бэкенда)
 
-### `assets/vector` — SVG (potrace, `fill="currentColor"` → цвет задаётся CSS `color`)
+### `assets/vector/` — SVG (potrace, `fill="currentColor"` → цвет задаётся CSS `color`)
 
 - `logo-black-ink.svg` — логотип: змея + «Г» (контур/линии; при `color` = цвет линий). Основной знак.
 - `logo-red-tongue-ink.svg` + `logo-red-tongue-red.svg` — тот же логотип + отдельный слой красного языка (одинаковый viewBox 1360×2440 → наложить друг на друга один в один). Пары `head-closeup-*` (2772×1560) и `head-side-red-*` (1540×1160) — тоже совпадают по viewBox.
@@ -96,15 +96,15 @@
 - `tongue-red.svg` — раздвоенный язык (фирменный знак-бирка).
 - `wordmark-ink.svg` — вордмарк «ГАДЮКА» (Bicubik, точная копия).
 
-### `assets/cutout` — прозрачные PNG (те же элементы, растр 4×)
+### `assets/cutout/` — прозрачные PNG (те же элементы, растр 4×)
 
 `logo-black.png`, `logo-red-tongue.png`, `logo-white.png` (белые линии, прозрачный фон), `head-front.png`, `head-closeup.png`, `head-side-red.png`, `head-side-top.png`, `tongue.png`, `wordmark.png` (белый).
 
-### `assets/photos`
+### `../backend/assets/photos/`
 
 - `hoodie-white-logo.jpg`, `hoodie-white-head.jpg`, `hoodie-white-scales.jpg` (960×720, белое худи на синем фоне с надписью ГАДЮКА / МЕНЯ ЗАПОМНЯТ внизу) — товары коллекции.
 - `hoodie-black-back.jpg` (2452×1594, тёмное худи со спины, большая голова змеи; по краям белые поля — кадрировать `object-fit: cover`).
 - `packaging.jpg` (коробки «Меня запомнят. Краснодар», номера 01/03/04), `hangtag.jpg` (бирка), `label-logo.jpg`, `label-tongue.jpg` (тканевые нашивки).
 - `lekala-rack.jpg` — стойка с лекалами (для «Индивидуального пошива»).
 
-### `assets/brandbook` — все 16 слайдов брендбука (JPEG), `01-wordmark-on-black.jpg` = «изображение №1».
+### `../backend/assets/brandbook/` — все 16 слайдов брендбука (JPEG), `01-wordmark-on-black.jpg` = «изображение №1».

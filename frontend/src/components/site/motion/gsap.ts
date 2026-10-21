@@ -1,4 +1,4 @@
-import { gsap } from '@/components/site/motion/gsap';
+import { gsap } from 'gsap';
 
 import type { ScrollTrigger } from 'gsap/ScrollTrigger';
 import type { SplitText } from 'gsap/SplitText';

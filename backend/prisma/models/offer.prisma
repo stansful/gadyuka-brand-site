@@ -1,0 +1,23 @@
+model Offer {
+  id         String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  /// LocalizedText
+  title      Json
+  /// LocalizedText
+  text       Json      @default("{}")
+  /// LocalizedText (e.g. «−15%»); empty object = no badge
+  badge      Json      @default("{}")
+  /// LocalizedText; empty object = no button
+  ctaLabel   Json      @default("{}") @map("cta_label")
+  ctaHref    String?   @map("cta_href")
+  validUntil DateTime? @map("valid_until")
+  imageId    String?   @map("image_id") @db.Uuid
+  image      Media?    @relation("OfferImage", fields: [imageId], references: [id], onDelete: SetNull)
+  order      Int       @default(0)
+  published  Boolean   @default(false)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@index([published, order])
+  @@index([imageId])
+  @@map("offers")
+}

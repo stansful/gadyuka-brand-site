@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { MenuItemForm } from '@/components/admin/forms/MenuItemForm';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { getMenuHrefOptions } from '@/lib/admin/queries';
+import { getMenuHrefOptions } from '@/lib/admin/queries/content';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

@@ -1,0 +1,21 @@
+/// Accounts. The seed creates / updates the ADMIN from ADMIN_LOGIN / ADMIN_PASSWORD; USER rows are
+/// reserved for future site users (uploads, reviews).
+model User {
+  id           String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  role         UserRole
+  /// Sign-in name, lowercase (CHECK in the migration). Required for ADMIN; null = cannot sign in
+  login        String?  @unique
+  /// scrypt "<salt hex>:<key hex>" (src/module/hash). Required for ADMIN; null = cannot sign in
+  passwordHash String?  @map("password_hash")
+  /// Display name
+  name         String
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  sessions Session[]
+  media    Media[]
+  reviews  Review[]
+
+  @@index([role])
+  @@map("users")
+}

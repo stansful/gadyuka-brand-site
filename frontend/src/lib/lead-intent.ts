@@ -1,11 +1,11 @@
-import type { LeadType } from '@/generated/prisma/enums';
+import type { LeadType } from '@shared/contracts/leads';
 
 /**
  * Lead types and lead intents (CTA → form) — ISOMORPHIC and dependency-free.
  *
  * Kept apart from src/lib/leads.ts on purpose: the layout-level SmoothScroll (every public page)
- * and the form read intents, and leads.ts builds zod schemas at module load (~30 KB gzipped),
- * which must not ship to pages without the form. leads.ts re-exports everything here.
+ * reads intents, and the lead validator in leads.ts is only needed where the form is.
+ * leads.ts re-exports everything here.
  */
 
 export const LEAD_TYPES = ['TAILORING', 'PARTNERSHIP', 'CONTACT'] as const satisfies ReadonlyArray<LeadType>;

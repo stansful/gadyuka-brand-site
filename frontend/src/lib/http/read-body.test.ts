@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { BodyTooLargeError, readBodyBytes, readFormData } from './read-body';
+import { BodyTooLargeError, readBodyBytes } from './read-body';
 
 /** A request whose body is streamed without Content-Length (like a chunked upload). */
 function streamingRequest(chunks: Uint8Array[], contentType = 'application/octet-stream'): Request {
@@ -38,17 +38,5 @@ describe('readBodyBytes', () => {
       headers: { 'content-length': '10' },
     });
     await expect(readBodyBytes(request, 5)).rejects.toBeInstanceOf(BodyTooLargeError);
-  });
-});
-
-describe('readFormData', () => {
-  it('parses multipart bodies read with a hard limit', async () => {
-    const form = new FormData();
-    form.set('file', new File([new Uint8Array([1, 2, 3])], 'a.png', { type: 'image/png' }));
-    const source = new Request('http://localhost/upload', { method: 'POST', body: form });
-    const parsed = await readFormData(source, 10_000);
-    const file = parsed.get('file');
-    expect(file).toBeInstanceOf(File);
-    expect(file instanceof File ? file.size : 0).toBe(3);
   });
 });

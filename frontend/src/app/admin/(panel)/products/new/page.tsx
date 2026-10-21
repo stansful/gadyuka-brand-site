@@ -5,7 +5,7 @@ import { ProductForm } from '@/components/admin/forms/ProductForm';
 import { buttonClasses } from '@/components/admin/ui/Button';
 import { EmptyState, PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { getCollectionOptions } from '@/lib/admin/queries';
+import { getCollectionOptions } from '@/lib/admin/queries/catalog';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

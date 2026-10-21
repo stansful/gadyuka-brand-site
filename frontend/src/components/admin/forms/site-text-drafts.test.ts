@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Locale } from '@/i18n/locales';
-import type { AdminMediaRef } from '@/lib/admin/types';
+import type { MediaRef } from '@shared/contracts/common';
 
 import {
   editImage,
@@ -150,9 +150,9 @@ describe('texts: «Вернуть по умолчанию»', () => {
 });
 
 describe('landing images', () => {
-  const m1: AdminMediaRef = { id: 'm1', url: '/media/1.webp', width: 10, height: 10, alt: {} };
-  const m2: AdminMediaRef = { id: 'm2', url: '/media/2.webp', width: 10, height: 10, alt: {} };
-  const m3: AdminMediaRef = { id: 'm3', url: '/media/3.webp', width: 10, height: 10, alt: {} };
+  const m1: MediaRef = { id: 'm1', url: '/media/1.webp', width: 10, height: 10, alt: {} };
+  const m2: MediaRef = { id: 'm2', url: '/media/2.webp', width: 10, height: 10, alt: {} };
+  const m3: MediaRef = { id: 'm3', url: '/media/3.webp', width: 10, height: 10, alt: {} };
   const about = { key: 'about.image', media: m1 };
   const tailoring = { key: 'tailoring.image', media: null };
 

@@ -1,0 +1,20 @@
+/// Exactly one row with id = 1 (CHECK in the migration).
+model SiteSettings {
+  id              Int      @id @default(1)
+  phone           String   @default("")
+  email           String   @default("")
+  /// LocalizedText
+  address         Json     @default("{}")
+  /// Max stars of a review rating (CHECK 1..10 in the migration)
+  reviewRatingMax Int      @default(5) @map("review_rating_max")
+  /// LocalizedText
+  seoTitle        Json     @default("{}") @map("seo_title")
+  /// LocalizedText
+  seoDescription  Json     @default("{}") @map("seo_description")
+  ogImageId       String?  @map("og_image_id") @db.Uuid
+  ogImage         Media?   @relation("SettingsOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}

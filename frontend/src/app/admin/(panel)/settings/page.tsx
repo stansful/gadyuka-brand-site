@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { SettingsForm } from '@/components/admin/forms/SettingsForm';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { getSettingsForm } from '@/lib/admin/queries';
+import { getSettingsForm } from '@/lib/admin/queries/catalog';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

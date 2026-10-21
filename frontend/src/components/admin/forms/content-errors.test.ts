@@ -6,7 +6,7 @@ const keys = ['hero.title', 'forms.errors.tooShort'];
 const imageKeys = ['about.image'];
 
 describe('errorsByEntryKey', () => {
-  it('re-keys zod errors from entry / image indexes to message and image keys (+ locale)', () => {
+  it('re-keys the shape errors of the backend from entry / image indexes to message and image keys (+ locale)', () => {
     expect(
       errorsByEntryKey(
         {

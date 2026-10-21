@@ -6,7 +6,7 @@ import { locales, mapLocales, type Locale } from '@/i18n/locales';
 import type { BrandCopy } from './brand';
 
 /**
- * The brand as the site messages spell it (brand.* — DB rows over messages/*.json, cached with
+ * The brand as the site messages spell it (brand.* — DB rows over shared/messages/*.json, cached with
  * the rest of the content): the page locale's name, city and title template plus the name in
  * every locale (structured data names the organization the same way on every page).
  */

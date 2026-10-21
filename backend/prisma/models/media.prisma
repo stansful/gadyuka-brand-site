@@ -1,0 +1,43 @@
+/// Uploaded images. Files live in S3 (MinIO): key = "<admin|user>/<ownerId>/<uuid>/image.webp",
+/// url = the public link the site uses ("/media/<key>"). Optional references to a media row use
+/// onDelete: SetNull; required ones (gallery, product images) use Restrict, so a file in use cannot
+/// be deleted by accident.
+model Media {
+  id           String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  /// First segment of the S3 key: admin | user
+  ownerType    UserRole @map("owner_type")
+  ownerId      String   @map("owner_id") @db.Uuid
+  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  /// Per-upload folder in S3 (never reused, so objects are immutable)
+  uuid         String   @unique @default(dbgenerated("uuidv7()")) @db.Uuid
+  bucket       String
+  /// S3 object key: "<admin|user>/<ownerId>/<uuid>/image.webp" (CHECK in the migration)
+  key          String
+  /// Public link of the file, used as-is by the site and the admin ("/media/<key>")
+  url          String
+  mime         String
+  width        Int
+  height       Int
+  /// Bytes
+  size         Int
+  /// LocalizedText
+  alt          Json     @default("{}")
+  originalName String?  @map("original_name")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  contentImages    ContentImage[] @relation("ContentImageMedia")
+  collectionCovers Collection[]   @relation("CollectionCover")
+  productImages    ProductImage[]
+  reviewAvatars    Review[]       @relation("ReviewAvatar")
+  newsImages       NewsItem[]     @relation("NewsImage")
+  galleryItems     GalleryItem[]
+  offerImages      Offer[]        @relation("OfferImage")
+  partnerLogos     Partner[]      @relation("PartnerLogo")
+  ogImageSettings  SiteSettings[] @relation("SettingsOgImage")
+
+  @@unique([bucket, key])
+  @@index([ownerId, createdAt])
+  @@index([createdAt])
+  @@map("media")
+}

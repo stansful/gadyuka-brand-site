@@ -1,26 +1,16 @@
 import { requireAdminRoute } from '@/lib/admin/auth';
-import { getAdminTranslations } from '@/lib/admin/i18n-server';
-import { getAdminMedia, getMediaUsages } from '@/lib/admin/media-service';
-import { idSchema } from '@/lib/admin/schemas';
+import { mediaJson, mediaReadFailure } from '@/lib/admin/media-responses';
+import { translateMediaUsages } from '@/lib/admin/media-usages';
+import { getMediaDetails } from '@/lib/api/media';
 
 /**
- * GET /admin/api/media/<id> → { media: AdminMedia, usages: MediaUsage[] }
- * (details panel of the media library: where the file is used).
+ * GET /admin/api/media/<id> → { media: AdminMedia, usages: MediaUsageView[] }
+ * (details panel of the media library: where the file is used, with links).
  */
 export async function GET(request: Request, { params }: RouteContext<'/admin/api/media/[id]'>): Promise<Response> {
   const denied = await requireAdminRoute(request);
   if (denied) return denied;
-
-  const id = idSchema.safeParse((await params).id);
-  if (!id.success) {
-    const t = await getAdminTranslations('admin.errors');
-    return Response.json({ error: t('invalidId') }, { status: 400 });
-  }
-
-  const [media, usages] = await Promise.all([getAdminMedia(id.data), getMediaUsages(id.data)]);
-  if (!media) {
-    const t = await getAdminTranslations('admin.media.errors');
-    return Response.json({ error: t('notFound') }, { status: 404 });
-  }
-  return Response.json({ media, usages }, { headers: { 'Cache-Control': 'no-store' } });
+  const result = await getMediaDetails((await params).id);
+  if (!result.ok) return mediaReadFailure('getMediaDetails', result.failure);
+  return mediaJson({ media: result.data.media, usages: await translateMediaUsages(result.data.usages) });
 }

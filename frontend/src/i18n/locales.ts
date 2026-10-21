@@ -3,12 +3,13 @@
  * LocalizedText is JSON) touches these places; TypeScript flags every one of them that is
  * missing (they are Record<Locale, …>):
  *   1. `locales` below + its entries in `localeNames` and `localeTags`;
- *   2. messages/<code>.json (same keys as ru.json) + its import in DEFAULT_MESSAGES
- *      (src/i18n/messages.ts), and messages/content/<code>.json (seed copy of the demo entities,
- *      prisma/seed-data/copy.ts); then `npm run db:seed` writes the new locale's Message rows;
+ *   2. shared/messages/<code>.json (same keys as ru.json) + its import in DEFAULT_MESSAGES
+ *      (src/i18n/messages.ts), and shared/messages/content/<code>.json (seed copy of the demo entities);
+ *      then the backend: its locale list (backend/src/core/locales) and `npm run db:seed` there, which
+ *      writes the new locale's Message rows;
  *      (the brand's name, city and title template are messages too: brand.*);
  *   3. translations of all content in the admin (language tabs appear automatically).
- * The admin UI stays Russian: messages/admin/<code>.json is optional (src/i18n/request.ts).
+ * The admin UI stays Russian: shared/messages/admin/<code>.json is optional (src/i18n/request.ts).
  * Region-tagged codes ("pt-br") are supported by the admin error mapping
  * (src/components/admin/forms/content-errors.ts).
  */

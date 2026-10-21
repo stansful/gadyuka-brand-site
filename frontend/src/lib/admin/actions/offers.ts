@@ -1,53 +1,28 @@
 'use server';
 
-import { revalidateContent } from '@/lib/content/cache';
-import { db } from '@/lib/db';
+import { adminApiAction } from '@/lib/api/admin-action';
+import { translateAdminMessage } from '@/lib/api/admin-messages';
+import { saveContentEntity } from '@/lib/api/content-entities';
+import type { AdminOfferInput } from '@shared/contracts/content-entities';
 
-import { adminAction, errorFailure, missingMediaFailure } from '../action-helpers';
-import { actionFail, actionOk, type ActionResult } from '../action-result';
-import { getAdminTranslations } from '../i18n-server';
-import { endOfDayFromInput, idSchema, offerInputSchema, type OfferInput } from '../schemas';
-import { parseInput } from '../validation';
+import { actionOk, type ActionResult } from '../action-result';
 
-/** Create (id = null) or update a special offer. */
-export async function saveOffer(id: string | null, input: OfferInput): Promise<ActionResult<{ id: string }>> {
-  return adminAction('saveOffer', async () => {
-    const parsedId = id === null ? null : idSchema.safeParse(id);
-    if (parsedId && !parsedId.success) return errorFailure('invalidId');
-    const parsed = await parseInput(offerInputSchema, input);
-    if (!parsed.success) return actionFail(parsed.message, parsed.fieldErrors);
-    const data = parsed.data;
-    const currentId = parsedId?.data ?? null;
-
-    const missingMedia = await missingMediaFailure([data.imageId], ['imageId']);
-    if (missingMedia) return missingMedia;
-    const t = await getAdminTranslations('admin.offers');
-    const hasLabel = Object.keys(data.ctaLabel).length > 0;
-    if (hasLabel && !data.ctaHref) {
-      return actionFail(t('ctaHrefRequired'), { ctaHref: t('ctaHrefRequiredField') });
-    }
-
-    const fields = {
-      title: data.title,
-      text: data.text,
-      badge: data.badge,
-      ctaLabel: data.ctaLabel,
-      ctaHref: data.ctaHref && data.ctaHref.length > 0 ? data.ctaHref : null,
-      validUntil: data.validUntil ? endOfDayFromInput(data.validUntil) : null,
-      imageId: data.imageId,
-      published: data.published,
-    };
-
-    let savedId: string;
-    if (currentId) {
-      savedId = (await db.offer.update({ where: { id: currentId }, data: fields, select: { id: true } })).id;
-    } else {
-      const last = await db.offer.aggregate({ _max: { order: true } });
-      savedId = (
-        await db.offer.create({ data: { ...fields, order: (last._max.order ?? -1) + 1 }, select: { id: true } })
-      ).id;
-    }
-    revalidateContent();
-    return actionOk({ id: savedId }, t(currentId ? 'saved' : 'created'));
+/**
+ * Create (id = null: appended to the end of the list) or update a special offer. The backend checks
+ * the button link rules (a label needs a link — shown on the link field) and stores the last day
+ * until 23:59:59.999 Moscow time.
+ */
+export async function saveOffer(id: string | null, input: AdminOfferInput): Promise<ActionResult<{ id: string }>> {
+  return adminApiAction('saveOffer', () => saveContentEntity('/api/v1/admin/offers', id, input), {
+    revalidatesContent: true,
+    fieldErrors: {
+      'admin.errors.missingMedia': { field: 'imageId' },
+      'admin.offers.ctaHrefRequired': { field: 'ctaHref', key: 'admin.offers.ctaHrefRequiredField' },
+    },
+    onSuccess: async data =>
+      actionOk(
+        { id: data.id },
+        await translateAdminMessage({ key: id === null ? 'admin.offers.created' : 'admin.offers.saved' }),
+      ),
   });
 }

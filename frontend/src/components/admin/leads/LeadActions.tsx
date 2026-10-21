@@ -4,9 +4,9 @@ import { RefreshCw, Send } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState, type ReactElement } from 'react';
 
-import type { LeadStatus } from '@/generated/prisma/enums';
 import { resendLead, setLeadStatus } from '@/lib/admin/actions/leads';
 import { LEAD_STATUSES } from '@/lib/admin/labels';
+import type { LeadStatus } from '@shared/contracts/leads';
 
 import { Button } from '../ui/Button';
 import { Field } from '../ui/Field';

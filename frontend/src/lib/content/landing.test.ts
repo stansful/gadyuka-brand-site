@@ -1,97 +1,203 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_MESSAGES, resolveMessages, resolveMessageValues, type MessageRow } from '@/i18n/messages';
+import { DEFAULT_MESSAGES } from '@/i18n/messages';
+import type { ApiFailure, ApiResult } from '@/lib/api/api-result';
+import type { ImageRef } from '@shared/contracts/common';
+import type { LandingResponse, PublicCollection, PublicSettings } from '@shared/contracts/content';
 
-vi.mock('@/lib/db', () => ({ db: {} }));
+// ── mocks: no Next.js request scope, no backend ──────────────────────────────
+const cache = vi.hoisted(() => ({ life: [] as unknown[], tags: [] as unknown[] }));
+vi.mock('next/cache', () => ({
+  cacheLife: (profile: unknown) => cache.life.push(profile),
+  cacheTag: (tag: unknown) => cache.tags.push(tag),
+}));
+vi.mock('next/server', () => ({ connection: async (): Promise<void> => undefined }));
+const apiRequest = vi.hoisted(() => vi.fn<(path: string, options?: unknown) => Promise<ApiResult<unknown>>>());
+vi.mock('@/lib/api/client', () => ({ apiRequest }));
+const publicRead = vi.hoisted(() => vi.fn<(path: string) => Promise<unknown>>());
+vi.mock('@/lib/api/public', () => ({ publicRead }));
 
-const { offerExpiryCacheLife, ratingOnScale, toMenuItems, toSocialLinks } = await import('./landing');
+const { getCollectionBySlug, getLanding, getSiteSettings } = await import('./landing');
+const { toLandingContent } = await import('./mappers');
+const { offerExpiryCacheLife } = await import('./offer-cache-life');
 
 const now = new Date('2026-10-16T20:00:00.000Z');
-const at = (minutes: number): Date => new Date(now.getTime() + minutes * 60_000);
+const at = (minutes: number): string => new Date(now.getTime() + minutes * 60_000).toISOString();
+
+const image = (id: string): ImageRef => ({
+  id,
+  src: `/media/admin/u/${id}/image.webp`,
+  width: 4,
+  height: 3,
+  mime: 'image/webp',
+  alt: '',
+  altDefault: 'Фото',
+});
+
+const settings: PublicSettings = {
+  phone: '+7 900',
+  email: 'hello@example.com',
+  address: 'Москва',
+  reviewRatingMax: 5,
+  seoTitle: 'ГАДЮКА',
+  seoDescription: '',
+  ogImage: null,
+};
+
+const collection: PublicCollection = {
+  id: 'c1',
+  slug: 'noir',
+  title: 'Нуар',
+  description: '',
+  cover: image('m0'),
+  products: [
+    {
+      id: 'p1',
+      slug: 'coat',
+      title: 'Пальто',
+      description: '',
+      details: ['шерсть'],
+      price: null,
+      images: [image('m1')],
+    },
+  ],
+};
+
+const landing = (changes: Partial<LandingResponse> = {}): LandingResponse => ({
+  locale: 'en',
+  texts: { 'hero.title': 'GADYUKA (edited)' },
+  images: { 'about.image': image('m2'), 'removed.image': image('m3') },
+  menu: [{ id: 'm1', label: 'About', href: '#about', showInHeader: true, showInFooter: false }],
+  socials: [{ id: 's1', type: 'TELEGRAM', url: 'https://t.me/gadyuka', label: null }],
+  collections: [collection],
+  reviews: [{ id: 'r1', author: 'Аня', role: '', text: 'Great', avatar: null, rating: 5 }],
+  news: [],
+  gallery: [{ id: 'g1', caption: '', image: image('m4') }],
+  offers: [],
+  partners: [],
+  settings,
+  offersExpireAt: null,
+  ...changes,
+});
+
+const ok = <T>(data: T): ApiResult<T> => ({ ok: true, status: 200, data });
+
+beforeEach(() => {
+  cache.life = [];
+  cache.tags = [];
+  apiRequest.mockReset();
+  publicRead.mockReset();
+  vi.useFakeTimers({ now, toFake: ['Date'] });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('offerExpiryCacheLife', () => {
-  it('keeps the regular profile without offers expiring within the hour', () => {
-    expect(offerExpiryCacheLife([], now)).toBeNull();
-    expect(offerExpiryCacheLife([{ validUntil: null }, { validUntil: at(90) }], now)).toBeNull();
+  it('keeps the regular profile without an offer ending within the hour', () => {
+    expect(offerExpiryCacheLife(null, now)).toBeNull();
+    expect(offerExpiryCacheLife(at(90), now)).toBeNull();
   });
 
-  it('revalidates right after the earliest upcoming expiry', () => {
-    expect(offerExpiryCacheLife([{ validUntil: at(30) }, { validUntil: at(10) }, { validUntil: null }], now)).toEqual({
-      stale: 300,
-      revalidate: 10 * 60 + 1,
-      expire: 86_400,
+  it('revalidates right after the earliest end', () => {
+    expect(offerExpiryCacheLife(at(10), now)).toEqual({ stale: 300, revalidate: 10 * 60 + 1, expire: 86_400 });
+  });
+
+  it('never revalidates more often than once a minute (an end already passed included)', () => {
+    expect(offerExpiryCacheLife(new Date(now.getTime() + 5_000).toISOString(), now)?.revalidate).toBe(60);
+    expect(offerExpiryCacheLife(at(-1), now)?.revalidate).toBe(60);
+  });
+});
+
+describe('toLandingContent: the backend answer → the components’ view', () => {
+  it('fills every message key: the backend value, else the bundled default of the locale', () => {
+    const content = toLandingContent(landing(), now);
+    expect(content.texts['hero.title']).toBe('GADYUKA (edited)');
+    expect(content.texts['notFound.title']).toBe(DEFAULT_MESSAGES.en.notFound.title);
+    expect(Object.keys(content.texts)).not.toContain('removed.key');
+  });
+
+  it('has every landing image slot of the registry, null when the backend has none', () => {
+    const content = toLandingContent(landing(), now);
+    expect(content.images).toEqual({ 'about.image': image('m2'), 'tailoring.image': null });
+  });
+
+  it('keeps the lists, the catalog and the settings as answered, and dates the footer', () => {
+    const response = landing();
+    const content = toLandingContent(response, now);
+    expect(content).toMatchObject({
+      locale: 'en',
+      menu: response.menu,
+      socials: response.socials,
+      collections: [collection],
+      reviews: response.reviews,
+      gallery: response.gallery,
+      settings,
+      year: 2026,
     });
-  });
-
-  it('never revalidates more often than once a minute', () => {
-    expect(offerExpiryCacheLife([{ validUntil: new Date(now.getTime() + 5_000) }], now)?.revalidate).toBe(60);
+    expect(content.collections[0]?.products[0]?.details).not.toBe(collection.products[0]?.details);
   });
 });
 
-describe('site messages: DB rows over the JSON defaults', () => {
-  const row = (key: string, locale: string, value: string): MessageRow => ({ key, locale, value });
-
-  it('shows the default of the locale for a key without a DB row (not seeded yet)', () => {
-    expect(resolveMessageValues('ru', [])['common.chapterNo']).toBe(DEFAULT_MESSAGES.ru.common.chapterNo);
-    expect(resolveMessageValues('en', [])['common.chapterNo']).toBe(DEFAULT_MESSAGES.en.common.chapterNo);
+describe('getLanding (GET /public/landing/:locale, cached)', () => {
+  it('reads the landing of the locale and caches it with the content tag for hours', async () => {
+    apiRequest.mockResolvedValue(ok(landing()));
+    const content = await getLanding('en');
+    expect(apiRequest).toHaveBeenCalledWith('/api/v1/public/landing/en', { query: undefined });
+    expect(content.texts['hero.title']).toBe('GADYUKA (edited)');
+    expect(cache).toEqual({ tags: ['content'], life: ['hours'] });
   });
 
-  it('lets a DB row override the default — only for its own locale', () => {
-    const rows = [row('common.chapterNo', 'ru', 'Часть {number}'), row('common.chapterNo', 'en', 'Part {number}')];
-    expect(resolveMessageValues('ru', rows)['common.chapterNo']).toBe('Часть {number}');
-    expect(resolveMessageValues('en', rows)['common.chapterNo']).toBe('Part {number}');
-    expect(resolveMessageValues('en', [row('common.chapterNo', 'ru', 'Часть {number}')])['common.chapterNo']).toBe(
-      DEFAULT_MESSAGES.en.common.chapterNo,
-    );
+  it('shortens the cache life before the earliest offer end', async () => {
+    apiRequest.mockResolvedValue(ok(landing({ offersExpireAt: at(10) })));
+    await getLanding('ru');
+    expect(cache.life).toEqual([{ stale: 300, revalidate: 601, expire: 86_400 }]);
   });
 
-  it('keeps a key emptied in the default locale empty, and shows it for an emptied translation', () => {
-    expect(resolveMessageValues('ru', [row('offers.fine', 'ru', '')])['offers.fine']).toBe('');
-    const rows = [row('footer.trademark', 'ru', 'Знак'), row('footer.trademark', 'en', '  ')];
-    expect(resolveMessageValues('en', rows)['footer.trademark']).toBe('Знак');
-    expect(resolveMessageValues('en', [row('footer.trademark', 'en', '')])['footer.trademark']).toBe(
-      DEFAULT_MESSAGES.ru.footer.trademark,
-    );
-    const both = [row('footer.trademark', 'ru', ''), row('footer.trademark', 'en', '')];
-    expect(resolveMessageValues('en', both)['footer.trademark']).toBe('');
-  });
-
-  it('ignores orphan rows (keys no longer in messages/*.json, branch paths)', () => {
-    const rows = [row('hero.city', 'ru', 'Москва'), row('forms.errors', 'ru', 'x'), row('hero', 'ru', 'x')];
-    const values = resolveMessageValues('ru', rows);
-    expect(Object.keys(values)).not.toContain('hero.city');
-    expect(resolveMessages('ru', rows)).toEqual(DEFAULT_MESSAGES.ru);
-  });
-
-  it('builds the nested tree next-intl reads, without touching the defaults', () => {
-    const tree = resolveMessages('en', [row('about.advantages.0.title', 'en', 'Own designs')]);
-    expect(tree.about.advantages['0'].title).toBe('Own designs');
-    expect(tree.forms.errors.tooShort).toBe(DEFAULT_MESSAGES.en.forms.errors.tooShort);
-    expect(DEFAULT_MESSAGES.en.about.advantages['0'].title).not.toBe('Own designs');
+  it('throws when the backend cannot answer (nothing is cached)', async () => {
+    apiRequest.mockResolvedValue({ ok: false, failure: { kind: 'unavailable', status: null, reason: 'network' } });
+    await expect(getLanding('ru')).rejects.toThrow('/api/v1/public/landing/ru');
+    expect(cache.life).toEqual([]);
   });
 });
 
-describe('menu, social links, ratings', () => {
-  const item = { id: 'm1', href: '#about', showInHeader: true, showInFooter: false };
-
-  it('localizes menu labels (ru fallback) and skips items without any label', () => {
-    expect(toMenuItems([{ ...item, label: { ru: 'О нас', en: 'About' } }], 'en')).toEqual([
-      { ...item, label: 'About' },
-    ]);
-    expect(toMenuItems([{ ...item, label: { ru: 'О нас' } }], 'en')).toEqual([{ ...item, label: 'О нас' }]);
-    expect(toMenuItems([{ ...item, label: {} }], 'ru')).toEqual([]);
+describe('getCollectionBySlug (GET /public/collections/:slug?locale=, cached)', () => {
+  it('reads the collection of the slug in the locale', async () => {
+    apiRequest.mockResolvedValue(ok({ locale: 'en', collection }));
+    expect(await getCollectionBySlug('en', 'noir')).toEqual(collection);
+    expect(apiRequest).toHaveBeenCalledWith('/api/v1/public/collections/noir', { query: { locale: 'en' } });
   });
 
-  it('leaves an empty social label null (the site then shows social.<type>)', () => {
-    const link = { id: 's1', type: 'TELEGRAM' as const, url: 'https://t.me/gadyuka' };
-    expect(toSocialLinks([{ ...link, label: {} }], 'ru')).toEqual([{ ...link, label: null }]);
-    expect(toSocialLinks([{ ...link, label: { ru: 'Канал' } }], 'en')).toEqual([{ ...link, label: 'Канал' }]);
+  it('is null for a missing or hidden collection (404) and for a slug that cannot exist (400)', async () => {
+    const notFound: ApiFailure = {
+      kind: 'domain',
+      status: 404,
+      error: 'notFound',
+      message: { key: 'admin.errors.notFound' },
+    };
+    apiRequest.mockResolvedValueOnce({ ok: false, failure: notFound });
+    expect(await getCollectionBySlug('ru', 'gone')).toBeNull();
+    const invalid: ApiFailure = {
+      kind: 'validation',
+      status: 400,
+      fields: { slug: { key: 'admin.validation.invalid' } },
+    };
+    apiRequest.mockResolvedValueOnce({ ok: false, failure: invalid });
+    expect(await getCollectionBySlug('ru', 'a/b?c')).toBeNull();
+    expect(apiRequest).toHaveBeenLastCalledWith('/api/v1/public/collections/a%2Fb%3Fc', { query: { locale: 'ru' } });
   });
 
-  it('keeps ratings on the current star scale', () => {
-    expect(ratingOnScale(null, 5)).toBeNull();
-    expect(ratingOnScale(4, 5)).toBe(4);
-    expect(ratingOnScale(8, 5)).toBe(5);
-    expect(ratingOnScale(8, 10)).toBe(8);
+  it('throws when the backend cannot answer', async () => {
+    apiRequest.mockResolvedValue({ ok: false, failure: { kind: 'unavailable', status: 502, reason: 'badResponse' } });
+    await expect(getCollectionBySlug('ru', 'noir')).rejects.toThrow('unavailable');
+  });
+});
+
+describe('getSiteSettings (GET /public/settings/:locale)', () => {
+  it('reads the settings of the locale through the cached public read', async () => {
+    publicRead.mockResolvedValue({ locale: 'en', settings });
+    expect(await getSiteSettings('en')).toEqual(settings);
+    expect(publicRead).toHaveBeenCalledWith('/api/v1/public/settings/en');
   });
 });

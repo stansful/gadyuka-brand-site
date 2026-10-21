@@ -7,8 +7,9 @@ import { useState, type ReactElement } from 'react';
 
 import { errorFor } from '@/lib/admin/action-result';
 import { saveReview } from '@/lib/admin/actions/reviews';
-import type { AdminMediaRef, ReviewFormData } from '@/lib/admin/types';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { LocalizedText } from '@/lib/localized-text';
+import type { AdminReviewDetailsResponse } from '@shared/contracts/catalog';
+import type { MediaRef } from '@shared/contracts/common';
 
 import { EditLocaleProvider, localesWithErrors, translationGaps } from '../i18n/LocaleTabs';
 import { LocalizedField } from '../i18n/LocalizedField';
@@ -25,7 +26,7 @@ import { StarRatingField } from './StarRatingField';
 const LOCALIZED = ['role', 'text'] as const;
 
 type ReviewFormProps = {
-  initial: ReviewFormData | null;
+  initial: AdminReviewDetailsResponse | null;
   /** Current star scale (SiteSettings.reviewRatingMax). */
   ratingMax: number;
 };
@@ -44,7 +45,7 @@ function ReviewFormInner({ initial, ratingMax }: ReviewFormProps): ReactElement 
   const [author, setAuthor] = useState(initial?.author ?? '');
   const [role, setRole] = useState<LocalizedText>(initial?.role ?? {});
   const [text, setText] = useState<LocalizedText>(initial?.text ?? {});
-  const [avatar, setAvatar] = useState<AdminMediaRef | null>(initial?.avatar ?? null);
+  const [avatar, setAvatar] = useState<MediaRef | null>(initial?.avatar ?? null);
   const [rating, setRating] = useState<number | null>(initial?.rating ?? null);
   const [published, setPublished] = useState(initial?.published ?? false);
   const { pending, fieldErrors, run } = useActionSubmit();

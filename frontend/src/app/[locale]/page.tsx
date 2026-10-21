@@ -28,7 +28,7 @@ import type { Metadata } from 'next';
  * The landing — design «Нуар-комикс» (concepts/01-noir-comic): a comic issue. The cover, then
  * the chapters in CHAPTER_ORDER (Каталог → О нас → [red «ГАДЮКА» band] → Индивидуальный пошив
  * → Специальные предложения → Новости → Галерея → Отзывы → Партнёры → Контакты). Everything
- * visible comes from getLanding() (the DB-backed site messages, ContentImage images, the menu,
+ * visible comes from getLanding() (the backend's site messages, ContentImage images, the menu,
  * the social links and the entities); sections are server components, animations live in
  * small client scenes.
  */
@@ -49,6 +49,13 @@ const CHAPTERS: Readonly<Record<ChapterId, ChapterComponent>> = {
 
 /** The red band runs between «О нас» and «Индивидуальный пошив». */
 const RED_BAND_AFTER: ChapterId = 'about';
+
+/**
+ * Rendered on request from request-time cached data (messages and content come from the backend,
+ * src/lib/api/public.ts) and reached by full navigations (plain <a> links): no instant-navigation
+ * validation for this page, like its root layout.
+ */
+export const instant = false;
 
 // SEO: title/description/OG from SiteSettings, canonical + hreflang (ru, en, x-default).
 export async function generateMetadata({ params }: PageProps<'/[locale]'>): Promise<Metadata> {

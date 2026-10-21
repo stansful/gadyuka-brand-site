@@ -8,7 +8,8 @@ import { useEffect, useState, type ReactElement } from 'react';
 
 import { localeNames, locales } from '@/i18n/locales';
 import { fileSizeParts } from '@/lib/admin/labels';
-import type { AdminMedia, MediaPage } from '@/lib/admin/types';
+
+import type { AdminMedia, MediaPage } from './media-types';
 
 import { Button } from '../ui/Button';
 import { TextInput } from '../ui/inputs';

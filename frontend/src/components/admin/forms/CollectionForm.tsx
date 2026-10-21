@@ -7,8 +7,9 @@ import { useState, type ReactElement } from 'react';
 import { errorFor } from '@/lib/admin/action-result';
 import { saveCollection } from '@/lib/admin/actions/collections';
 import { slugify } from '@/lib/admin/slug';
-import type { AdminMediaRef, CollectionFormData } from '@/lib/admin/types';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { LocalizedText } from '@/lib/localized-text';
+import type { AdminCollectionDetailsResponse } from '@shared/contracts/catalog';
+import type { MediaRef } from '@shared/contracts/common';
 
 import { EditLocaleProvider, localesWithErrors, translationGaps } from '../i18n/LocaleTabs';
 import { LocalizedField } from '../i18n/LocalizedField';
@@ -22,7 +23,7 @@ import { SlugField } from './SlugField';
 
 const LOCALIZED = ['title', 'description'] as const;
 
-export function CollectionForm({ initial }: { initial: CollectionFormData | null }): ReactElement {
+export function CollectionForm({ initial }: { initial: AdminCollectionDetailsResponse | null }): ReactElement {
   return (
     <EditLocaleProvider>
       <CollectionFormInner initial={initial} />
@@ -30,14 +31,14 @@ export function CollectionForm({ initial }: { initial: CollectionFormData | null
   );
 }
 
-function CollectionFormInner({ initial }: { initial: CollectionFormData | null }): ReactElement {
+function CollectionFormInner({ initial }: { initial: AdminCollectionDetailsResponse | null }): ReactElement {
   const t = useTranslations('admin');
   const router = useRouter();
   const [title, setTitle] = useState<LocalizedText>(initial?.title ?? {});
   const [slug, setSlug] = useState(initial?.slug ?? '');
   const [slugTouched, setSlugTouched] = useState(initial !== null);
   const [description, setDescription] = useState<LocalizedText>(initial?.description ?? {});
-  const [cover, setCover] = useState<AdminMediaRef | null>(initial?.cover ?? null);
+  const [cover, setCover] = useState<MediaRef | null>(initial?.cover ?? null);
   const [published, setPublished] = useState(initial?.published ?? false);
   const { pending, fieldErrors, run } = useActionSubmit();
 

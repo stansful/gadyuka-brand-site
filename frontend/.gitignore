@@ -1,13 +1,11 @@
 .env
-.env.example
+.env.*
 !.env.example
 node_modules/
 .next/
 .DS_Store
 .idea/
 concepts/
-# Production backups (pg_dump with all lead PII + uploads archives) — never commit them.
-backups/
 
 # --- merged from create-next-app ---
 # dependencies
@@ -27,6 +25,10 @@ backups/
 
 # production
 /build
+# precompressed siblings of public/* written by `npm run build` (scripts/precompress.mjs)
+/public/**/*.br
+/public/**/*.gz
+/public/**/*.zst
 
 # misc
 *.pem
@@ -44,5 +46,3 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma generated client
-/src/generated/

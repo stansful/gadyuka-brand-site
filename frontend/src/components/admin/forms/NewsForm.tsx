@@ -7,8 +7,9 @@ import { useState, type ReactElement } from 'react';
 import { errorFor } from '@/lib/admin/action-result';
 import { saveNews } from '@/lib/admin/actions/news';
 import { slugify } from '@/lib/admin/slug';
-import type { AdminMediaRef, NewsFormData } from '@/lib/admin/types';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { LocalizedText } from '@/lib/localized-text';
+import type { MediaRef } from '@shared/contracts/common';
+import type { AdminNewsDetails } from '@shared/contracts/content-entities';
 
 import { EditLocaleProvider, localesWithErrors, translationGaps } from '../i18n/LocaleTabs';
 import { LocalizedField } from '../i18n/LocalizedField';
@@ -24,7 +25,7 @@ import { SlugField } from './SlugField';
 
 const LOCALIZED = ['title', 'excerpt', 'body'] as const;
 
-export function NewsForm({ initial, today }: { initial: NewsFormData | null; today: string }): ReactElement {
+export function NewsForm({ initial, today }: { initial: AdminNewsDetails | null; today: string }): ReactElement {
   return (
     <EditLocaleProvider>
       <NewsFormInner initial={initial} today={today} />
@@ -32,7 +33,7 @@ export function NewsForm({ initial, today }: { initial: NewsFormData | null; tod
   );
 }
 
-function NewsFormInner({ initial, today }: { initial: NewsFormData | null; today: string }): ReactElement {
+function NewsFormInner({ initial, today }: { initial: AdminNewsDetails | null; today: string }): ReactElement {
   const t = useTranslations('admin');
   const router = useRouter();
   const [title, setTitle] = useState<LocalizedText>(initial?.title ?? {});
@@ -41,7 +42,7 @@ function NewsFormInner({ initial, today }: { initial: NewsFormData | null; today
   const [date, setDate] = useState(initial?.date ?? today);
   const [excerpt, setExcerpt] = useState<LocalizedText>(initial?.excerpt ?? {});
   const [body, setBody] = useState<LocalizedText>(initial?.body ?? {});
-  const [image, setImage] = useState<AdminMediaRef | null>(initial?.image ?? null);
+  const [image, setImage] = useState<MediaRef | null>(initial?.image ?? null);
   const [published, setPublished] = useState(initial?.published ?? false);
   const { pending, fieldErrors, run } = useActionSubmit();
 

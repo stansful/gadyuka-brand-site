@@ -1,0 +1,2 @@
+# WWW_REDIRECT=0 (default): www.<DOMAIN> is not served. Set WWW_REDIRECT=1 in .env (after adding a DNS
+# record for www) to use www-1.caddy instead, then `docker compose up -d caddy`.

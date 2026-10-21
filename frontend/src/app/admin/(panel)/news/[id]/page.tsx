@@ -3,9 +3,9 @@ import { notFound } from 'next/navigation';
 
 import { NewsForm } from '@/components/admin/forms/NewsForm';
 import { PageHeader } from '@/components/admin/ui/layout';
+import { todayInMoscow } from '@/lib/admin/content-entities';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { getNewsForm } from '@/lib/admin/queries';
-import { toDateInputValue } from '@/lib/admin/schemas';
+import { getNewsForm } from '@/lib/admin/queries/content';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
@@ -18,7 +18,7 @@ export default async function EditPage({ params }: PageProps<'/admin/news/[id]'>
   const { id } = await params;
   const [news, t] = await Promise.all([getNewsForm(id), getTranslations('admin.news')]);
   if (!news) notFound();
-  const today = toDateInputValue(new Date());
+  const today = todayInMoscow();
   return (
     <>
       <PageHeader title={news.title.ru || news.slug} backHref="/admin/news" backLabel={t('back')} />

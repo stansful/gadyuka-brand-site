@@ -7,10 +7,10 @@ import { useState, type ReactElement } from 'react';
 import { defaultLocale } from '@/i18n/locales';
 import { errorFor } from '@/lib/admin/action-result';
 import { saveSocialLink } from '@/lib/admin/actions/socials';
-import { SOCIAL_URL_PLACEHOLDERS } from '@/lib/admin/labels';
-import type { SocialLinkFormData } from '@/lib/admin/types';
-import { isSocialType, SOCIAL_TYPES, type SocialType } from '@/lib/content/social';
-import type { LocalizedText } from '@/lib/i18n-text';
+import { SOCIAL_URL_PLACEHOLDERS } from '@/lib/admin/content-entities';
+import { isSocialType, SOCIAL_TYPES } from '@/lib/content/social';
+import type { LocalizedText } from '@/lib/localized-text';
+import type { AdminSocialLinkDetails, SocialType } from '@shared/contracts/content-entities';
 
 import { EditLocaleProvider, localesWithErrors, useEditLocale } from '../i18n/LocaleTabs';
 import { LocalizedField } from '../i18n/LocalizedField';
@@ -25,7 +25,7 @@ import { siteLinksFor } from './site-links';
 const LOCALIZED = ['label'] as const;
 
 type SocialLinkFormProps = {
-  initial: SocialLinkFormData | null;
+  initial: AdminSocialLinkDetails | null;
   /** What the site shows without an own label: the «Тексты сайта» value of `social.<TYPE>`. */
   defaultLabels: Record<SocialType, LocalizedText>;
 };

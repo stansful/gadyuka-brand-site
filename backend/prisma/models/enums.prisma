@@ -1,0 +1,50 @@
+/// Account role. Also the first segment of a media object key ("admin/…", "user/…").
+enum UserRole {
+  ADMIN
+  USER
+
+  @@map("user_role")
+}
+
+/// Why a session was ended before its refresh token expired.
+enum SessionRevokeReason {
+  /// POST /auth/logout
+  LOGOUT
+  /// A refresh token that had already been exchanged was presented again (stolen token)
+  TOKEN_REUSE
+  /// The seed changed the user's password
+  PASSWORD_CHANGE
+
+  @@map("session_revoke_reason")
+}
+
+enum SocialType {
+  TELEGRAM
+  VK
+  INSTAGRAM
+  WHATSAPP
+  YOUTUBE
+  TIKTOK
+  PINTEREST
+  WEBSITE
+  OTHER
+
+  @@map("social_type")
+}
+
+enum LeadType {
+  TAILORING
+  PARTNERSHIP
+  CONTACT
+
+  @@map("lead_type")
+}
+
+enum LeadStatus {
+  NEW
+  IN_PROGRESS
+  DONE
+  SPAM
+
+  @@map("lead_status")
+}

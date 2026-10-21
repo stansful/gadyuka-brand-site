@@ -11,7 +11,8 @@
 // grid as compact relative path data in the logo's user space (same viewBox as the logo files).
 // A file of its own, not inline: the cover asks for it like for the logo (HeroSection, an
 // external <use> by content-hashed URL), so its ~2 KB stay out of the page's HTML and RSC payload.
-// Needs the potrace CLI (brew install potrace / apt install potrace) and sharp (a dependency).
+// Needs the potrace CLI (brew install potrace / apt install potrace) and sharp (installed with next,
+// its optional dependency for image optimization).
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

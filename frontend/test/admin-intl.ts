@@ -2,12 +2,11 @@ import { createTranslator, type Messages } from 'next-intl';
 
 import { DEFAULT_MESSAGES } from '@/i18n/messages';
 import type { AdminNamespace, AdminTranslator } from '@/lib/admin/i18n';
-
-import adminRu from '../messages/admin/ru.json';
+import adminRu from '@shared/messages/admin/ru.json';
 
 /**
  * Admin translations in Vitest (no Next.js request scope): the same messages next-intl serves
- * (site defaults + messages/admin/ru.json). Mock the server entry with
+ * (site defaults + shared/messages/admin/ru.json). Mock the server entry with
  *   vi.mock('next-intl/server', async () => (await import('<…>/test/admin-intl')).nextIntlServerMock);
  */
 const MESSAGES: Messages = { ...DEFAULT_MESSAGES.ru, ...adminRu };

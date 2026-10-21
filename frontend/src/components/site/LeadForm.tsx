@@ -6,7 +6,6 @@ import {
   type ReactElement,
   type ReactNode,
   Fragment,
-  useCallback,
   useEffect,
   useId,
   useRef,
@@ -15,7 +14,6 @@ import {
 } from 'react';
 import { flushSync } from 'react-dom';
 
-import type { LeadType } from '@/generated/prisma/enums';
 import type { Locale } from '@/i18n/locales';
 import {
   DEFAULT_LEAD_TYPE,
@@ -37,7 +35,8 @@ import {
   needsEmailOrPhone,
   parseLeadIntent,
 } from '@/lib/lead-form-config';
-import type * as Leads from '@/lib/leads';
+import { parseLeadApiResponse, validateLeadInput } from '@/lib/leads';
+import type { LeadType } from '@shared/contracts/leads';
 
 import { fill, splitTemplate, type FormMessages } from './labels';
 import { motionEnabled } from './motion/env';
@@ -48,11 +47,8 @@ import { gsap } from './motion/gsap';
  * server-rendered inside the section).
  *
  * - «Тема» selects the lead type (TAILORING / PARTNERSHIP / CONTACT); the visible inputs and
- *   which of them are required follow LEAD_FORM_FIELDS — the same zod rules the API applies.
- *   The zod validator (src/lib/leads.ts) is not part of the page's first JS: it is imported
- *   when the form comes within a viewport of the screen or is touched (focus, pointer, key),
- *   whichever is first, and a submit waits for it. Until then no error can be shown anyway
- *   (errors appear after a field was left or after submit), so nothing renders differently.
+ *   which of them are required follow LEAD_FORM_FIELDS — the same rules the API applies
+ *   (validateLeadInput, src/lib/leads.ts: a few dependency-free checks shipped with the form).
  * - CTA buttons elsewhere preselect the topic and show / prefill a subject ("Заказ: …"):
  *   in-page links dispatch a LeadIntent event (SmoothScroll), links from other pages carry
  *   ?topic=…&subject=… (read once after hydration, then removed from the address bar).
@@ -122,27 +118,6 @@ function clearIntentFromUrl(): void {
   window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
-/** The zod validator (src/lib/leads.ts): loaded when the form is approached or touched. */
-type LeadValidator = Pick<typeof Leads, 'validateLeadInput' | 'leadApiResponseSchema'>;
-
-let validatorPromise: Promise<LeadValidator> | null = null;
-
-/**
- * The validator is fetched ahead only after the page has not been scrolled for this long (ms):
- * the visitor stopped to read near the form, not a pause between two swipes (its chunk takes
- * ~100 ms to run on a slow phone — a swipe started meanwhile would stall).
- */
-const VALIDATOR_QUIET_MS = 1000;
-
-/** One shared import for every form on the page; a failed load (offline) can be retried. */
-function loadValidator(): Promise<LeadValidator> {
-  validatorPromise ??= import('@/lib/leads').catch((error: unknown) => {
-    validatorPromise = null;
-    throw error;
-  });
-  return validatorPromise;
-}
-
 export type LeadFormProps = {
   locale: Locale;
   /** The form's own copy, messages contacts.form.* (src/components/site/lead-form-copy.ts). */
@@ -173,9 +148,6 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
     () => true,
     () => false,
   );
-  const [validator, setValidator] = useState<LeadValidator | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const awaitingValidatorRef = useRef(false);
   const againRef = useRef<HTMLButtonElement>(null);
   const okRef = useRef<HTMLParagraphElement>(null);
   /** The text last prefilled into the message (replaced by the next CTA unless edited). */
@@ -183,68 +155,6 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
 
   const fields = leadFieldsFor(type);
   const showContactGroup = needsEmailOrPhone(type);
-
-  const ensureValidator = useCallback(
-    (): Promise<LeadValidator> =>
-      loadValidator().then(loaded => {
-        setValidator(previous => previous ?? loaded);
-        return loaded;
-      }),
-    [],
-  );
-  const preloadValidator = (): void => {
-    if (!validator) void ensureValidator().catch(() => undefined);
-  };
-
-  // Load the validator once the form is within about a viewport of the screen — and the page
-  // has not been scrolled for a moment (then in an idle period): it comes into range in the
-  // middle of a swipe, and parsing + running its chunk is one long task that would stall it.
-  // Focus / input load it at once anyway (preloadValidator).
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root || typeof IntersectionObserver === 'undefined') return;
-    let quietTimer = 0;
-    let idle = 0;
-    let armed = false;
-    const cancelIdle = (): void => {
-      if (idle && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idle);
-      idle = 0;
-    };
-    const load = (): void => {
-      idle = 0;
-      window.removeEventListener('scroll', arm);
-      void ensureValidator().catch(() => undefined);
-    };
-    // Every scroll starts the quiet period again — and drops an idle callback already queued
-    // after the last one: it would otherwise run in an idle gap of the new swipe (or at its
-    // timeout, in the middle of it).
-    function arm(): void {
-      window.clearTimeout(quietTimer);
-      cancelIdle();
-      quietTimer = window.setTimeout(() => {
-        if (typeof window.requestIdleCallback === 'function')
-          idle = window.requestIdleCallback(load, { timeout: 2000 });
-        else load();
-      }, VALIDATOR_QUIET_MS);
-    }
-    const observer = new IntersectionObserver(
-      entries => {
-        if (!entries.some(entry => entry.isIntersecting)) return;
-        observer.disconnect();
-        armed = true;
-        window.addEventListener('scroll', arm, { passive: true });
-        arm();
-      },
-      { rootMargin: '100% 0px' },
-    );
-    observer.observe(root);
-    return () => {
-      observer.disconnect();
-      window.clearTimeout(quietTimer);
-      cancelIdle();
-      if (armed) window.removeEventListener('scroll', arm);
-    };
-  }, [ensureValidator]);
 
   // CTA → form: preselect the topic, show the subject and prefill it into an untouched message.
   useEffect(() => {
@@ -327,13 +237,10 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
   const isShown = (field: LeadErrorField): boolean =>
     submitted || (field === 'contact' ? touched.email === true && touched.phone === true : touched[field] === true);
 
-  // Client-side errors are derived from the current values (no extra state). Before the
-  // validator has loaded nothing was left or submitted yet, so there is nothing to show.
-  const validation = validator
-    ? validator.validateLeadInput({ ...buildBody(values, type), [LEAD_HONEYPOT_FIELD]: '' })
-    : null;
+  // Client-side errors are derived from the current values (no extra state).
+  const validation = validateLeadInput({ ...buildBody(values, type), [LEAD_HONEYPOT_FIELD]: '' });
   const clientErrors: ErrorMessages = {};
-  if (validation && !validation.ok && validation.reason === 'invalid') {
+  if (!validation.ok && validation.reason === 'invalid') {
     for (const [field, error] of Object.entries(validation.errors) as Array<
       [LeadErrorField, LeadFieldError | undefined]
     >) {
@@ -405,26 +312,12 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    if (status === 'pending' || awaitingValidatorRef.current) return;
+    if (status === 'pending') return;
     setUsedWithJs(true);
 
-    let loaded: LeadValidator;
-    try {
-      // Normally loaded long before (the form was approached / focused); a second submit
-      // while it is still on its way is ignored.
-      awaitingValidatorRef.current = true;
-      loaded = validator ?? (await ensureValidator());
-    } catch {
-      setStatus('error');
-      setStatusMessage(labels.errors.network);
-      return;
-    } finally {
-      awaitingValidatorRef.current = false;
-    }
-    const check = loaded.validateLeadInput({ ...buildBody(values, type), [LEAD_HONEYPOT_FIELD]: '' });
-    if (!check.ok && check.reason === 'invalid') {
+    if (!validation.ok && validation.reason === 'invalid') {
       const messages: ErrorMessages = {};
-      for (const [field, error] of Object.entries(check.errors) as Array<
+      for (const [field, error] of Object.entries(validation.errors) as Array<
         [LeadErrorField, LeadFieldError | undefined]
       >) {
         if (error) messages[field] = translateError(error);
@@ -451,13 +344,12 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(buildBody(values, type)),
       });
-      const parsed = loaded.leadApiResponseSchema.safeParse(await response.json().catch(() => null));
-      if (!parsed.success) {
+      const result = parseLeadApiResponse(await response.json().catch(() => null));
+      if (!result) {
         setStatus('error');
         setStatusMessage(labels.errors.server);
         return;
       }
-      const result = parsed.data;
       if (result.ok) {
         // The form (and the focused submit button) is replaced by the success message:
         // render it, then put focus on «send another» so keyboard users keep their place.
@@ -521,14 +413,7 @@ export function LeadForm({ locale, copy, labels }: LeadFormProps): ReactElement 
     ) : null;
 
   return (
-    <div
-      ref={rootRef}
-      className={`lead-form${status !== 'idle' ? ` is-${status}` : ''}`}
-      data-lead-type={type}
-      onFocusCapture={preloadValidator}
-      onPointerDownCapture={preloadValidator}
-      onKeyDownCapture={preloadValidator}
-    >
+    <div className={`lead-form${status !== 'idle' ? ` is-${status}` : ''}`} data-lead-type={type}>
       {subject && status !== 'success' ? (
         <p className="letter__re">
           {subjectLine.before ? <span data-edit="contacts.form.subjectLine">{subjectLine.before}</span> : null}

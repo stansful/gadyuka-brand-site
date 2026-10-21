@@ -1,0 +1,40 @@
+model Product {
+  id           String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  /// URL slug (CHECK in the migration)
+  slug         String     @unique
+  collectionId String     @map("collection_id") @db.Uuid
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  /// LocalizedText
+  title        Json
+  /// LocalizedText
+  description  Json       @default("{}")
+  /// LocalizedText (fabric, fit, print … — free text, one item per line)
+  details      Json       @default("{}")
+  /// Whole rubles; null = price on request (CHECK ≥ 0 in the migration)
+  price        Int?
+  order        Int        @default(0)
+  published    Boolean    @default(false)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  images ProductImage[]
+
+  @@index([collectionId, published, order])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mediaId   String   @map("media_id") @db.Uuid
+  media     Media    @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([productId, mediaId])
+  @@index([productId, order])
+  @@index([mediaId])
+  @@map("product_images")
+}

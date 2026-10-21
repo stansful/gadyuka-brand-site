@@ -1,0 +1,15 @@
+# ГАДЮКА — bootstrap config (no TLS certificate yet): only what certbot's webroot challenge and the
+# healthcheck need. nginx-start.sh switches to site.conf.template as soon as the certificate exists.
+
+server {
+    listen 80 default_server;
+    server_name _;
+
+    include /etc/gadyuka-nginx/snippets/acme.conf;
+
+    location / {
+        add_header Retry-After 60 always;
+        default_type text/plain;
+        return 503 "The TLS certificate for ${DOMAIN} is being issued. Try again in a minute.\n";
+    }
+}

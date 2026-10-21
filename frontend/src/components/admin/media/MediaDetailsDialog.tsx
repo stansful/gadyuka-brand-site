@@ -9,8 +9,9 @@ import { toast } from 'sonner';
 
 import { deleteMedia, updateMediaAlt } from '@/lib/admin/actions/media';
 import { fileSizeParts, formatDateTimeRu } from '@/lib/admin/labels';
-import type { AdminMedia, MediaUsage } from '@/lib/admin/types';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { LocalizedText } from '@/lib/localized-text';
+
+import type { AdminMedia, MediaUsageView } from './media-types';
 
 import { EditLocaleProvider, LocaleTabs, localesWithErrors, translationGaps } from '../i18n/LocaleTabs';
 import { LocalizedField } from '../i18n/LocalizedField';
@@ -50,7 +51,7 @@ export function MediaDetailsDialog({
 
 type UsageState =
   | { status: 'loading' }
-  | { status: 'ready'; usages: MediaUsage[] }
+  | { status: 'ready'; usages: MediaUsageView[] }
   | { status: 'error'; message: string };
 
 function DetailsBody({

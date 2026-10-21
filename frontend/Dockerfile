@@ -1,105 +1,77 @@
 # syntax=docker/dockerfile:1.7
 #
-# ГАДЮКА — production image: Next.js 16 standalone + Prisma 7 migrations on start.
-# Build through docker compose (see DEPLOY.md):
-#   - `next build` prerenders / and /en from the database, so the build needs a
-#     migrated DB: compose builds with `network: host` and DATABASE_URL=…@127.0.0.1:5432;
-#   - .env is passed as a BuildKit secret (never stored in an image layer).
+# ГАДЮКА frontend (Next.js 16, output: standalone) — production image. Build context = the REPOSITORY
+# ROOT (the app imports ../shared at build time); the root .dockerignore applies.
 #
-# Targets: tools (migrate / seed one-off tasks) · runner (the app).
+#   docker compose build frontend      (root docker-compose.yml; see the root README.md)
+#
+# `next build` needs neither the backend nor a database (public reads happen per request) and no
+# secrets: nothing secret is passed to the build. Build arguments are public values that end up in
+# prerendered pages: SITE_URL (canonical, sitemap, robots, Open Graph — rebuild after a change) and the
+# search engine verification codes (meta tags).
+#
+# At start the container copies the build's static files (.next/static with their precompressed
+# .br/.zst/.gz siblings, public/) into STATIC_PUBLISH_DIR — a volume the reverse proxy serves
+# /_next/static/* and /brand/* from (docker/publish-static.mjs, frontend/docs/COMPRESSION.md).
 
-ARG NODE_IMAGE=node:24-alpine
+# Exact tags, so a rebuild never picks up another Node. Build stages: Node = backend/.nvmrc — its npm
+# (11.6.2) wrote the lockfiles (the npm 11.19 of later Node 24 images rejects frontend/package-lock.json).
+# Runtime: the newest patch release of the same LTS line (security fixes; N-API addons such as sharp
+# are ABI-stable within a major). Bump them together with .nvmrc.
+ARG NODE_BUILD_IMAGE=node:24.11.1-alpine3.23
+ARG NODE_IMAGE=node:24.22.0-alpine3.23
 
-# ── base ──────────────────────────────────────────────────────────────────────
-FROM ${NODE_IMAGE} AS base
-# openssl: Prisma engine platform detection; libc6-compat: glibc shims for native deps.
-RUN apk add --no-cache libc6-compat openssl
-WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1
-
-# ── deps: all dependencies (dev included: prisma CLI, tsx) + generated Prisma client ──
-FROM base AS deps
-COPY package.json package-lock.json prisma.config.ts ./
-COPY prisma/schema.prisma ./prisma/schema.prisma
-# postinstall runs `prisma generate` → src/generated/prisma (sharp installs its linuxmusl build).
+# ── deps: every dependency (dev included: TypeScript, Tailwind for `next build`) ────────────────────
+FROM ${NODE_BUILD_IMAGE} AS deps
+WORKDIR /app/frontend
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+COPY frontend/package.json frontend/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 
-# ── tools: full source, for `docker compose run --rm tools <cmd>` (migrate, seed) ──
-FROM deps AS tools
-COPY . .
-CMD ["npx", "prisma", "migrate", "deploy"]
-
-# ── builder: next build (output: "standalone") ────────────────────────────────
-FROM tools AS builder
-ENV NODE_ENV=production
-# The secret is mounted as .env.production.local on purpose: Next copies `.env` and
-# `.env.production` into .next/standalone, which would bake secrets into the image.
-RUN --mount=type=secret,id=dotenv,target=/app/.env.production.local,required=true \
-    --mount=type=cache,target=/app/.next/cache \
+# ── build: next build + postbuild (strip .env copies, precompress static files) ─────────────────────
+FROM ${NODE_BUILD_IMAGE} AS build
+ARG SITE_URL
+ARG GOOGLE_SITE_VERIFICATION=""
+ARG YANDEX_VERIFICATION=""
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NPM_CONFIG_UPDATE_NOTIFIER=false \
+    NODE_ENV=production
+WORKDIR /app
+COPY shared ./shared
+COPY frontend ./frontend
+COPY --from=deps /app/frontend/node_modules ./frontend/node_modules
+WORKDIR /app/frontend
+# BACKEND_URL points at a closed port: nothing may reach a backend during the build (and none exists).
+RUN test -n "${SITE_URL}" || { echo 'build argument SITE_URL is required (https://<domain>)' >&2; exit 1; }; \
+    SITE_URL="${SITE_URL}" \
+    GOOGLE_SITE_VERIFICATION="${GOOGLE_SITE_VERIFICATION}" \
+    YANDEX_VERIFICATION="${YANDEX_VERIFICATION}" \
+    BACKEND_URL=http://127.0.0.1:1 \
     npm run build \
- && rm -f .next/standalone/.env .next/standalone/.env.* \
- && test -f .next/standalone/server.js
+ && test -f .next/standalone/frontend/server.js \
+ && test -f .next/BUILD_ID
 
-# ── migrator: a self-contained Prisma CLI for `prisma migrate deploy` at start ──
-FROM base AS migrator
-WORKDIR /migrate
-COPY package-lock.json /tmp/package-lock.json
-# Same prisma / dotenv versions as the app (read from the lockfile).
-RUN --mount=type=cache,target=/root/.npm \
-    PRISMA_VERSION="$(node -p "require('/tmp/package-lock.json').packages['node_modules/prisma'].version")" \
- && DOTENV_VERSION="$(node -p "require('/tmp/package-lock.json').packages['node_modules/dotenv'].version")" \
- && npm init -y >/dev/null \
- && npm install --no-audit --no-fund --omit=dev --save-exact "prisma@${PRISMA_VERSION}" "dotenv@${DOTENV_VERSION}" \
- && rm /tmp/package-lock.json
-COPY prisma.config.ts ./
-COPY prisma/schema.prisma ./prisma/schema.prisma
-COPY prisma/migrations ./prisma/migrations
-
-# ── runner: the production image ──────────────────────────────────────────────
-FROM base AS runner
-RUN apk add --no-cache su-exec
+# ── runtime: the standalone server ──────────────────────────────────────────────────────────────────
+FROM ${NODE_IMAGE} AS runtime
+# HOSTNAME=0.0.0.0, never 127.0.0.1: next-intl's locale proxy would loop redirecting "local" requests.
 ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0 \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
-
-COPY --from=migrator /migrate /migrate
-COPY --from=builder --chown=node:node /app/public ./public
-COPY --from=builder --chown=node:node /app/.next/standalone ./
-COPY --from=builder --chown=node:node /app/.next/static ./.next/static
-# No writable data directory: media live in S3 / MinIO (S3_* variables, src/lib/storage).
-
-COPY --chmod=755 <<'EOF' /usr/local/bin/gadyuka-entrypoint.sh
-#!/bin/sh
-# 1) prisma migrate deploy (skip with SKIP_MIGRATIONS=1), retried while the DB starts.
-#    docker-compose.yml sets SKIP_MIGRATIONS=1: the app connects as a DML-only role, so
-#    migrations run in the `tools` service as the superuser (DEPLOY.md, sections 8 and 9).
-# 2) start the server as the unprivileged `node` user
-set -eu
-
-# The admin fails closed in production without ADMIN_PASSWORD (src/lib/admin/admin-gate.ts).
-if [ -z "${ADMIN_PASSWORD:-}" ] && [ "${ADMIN_ALLOW_OPEN:-0}" != "1" ]; then
-  echo "[entrypoint] WARNING: ADMIN_PASSWORD is empty — /admin is LOCKED until it is set in .env (DEPLOY.md, section 7)" >&2
-fi
-
-if [ "${SKIP_MIGRATIONS:-0}" != "1" ]; then
-  attempt=1
-  until (cd /migrate && ./node_modules/.bin/prisma migrate deploy); do
-    if [ "$attempt" -ge 5 ]; then
-      echo "[entrypoint] prisma migrate deploy failed after $attempt attempts" >&2
-      exit 1
-    fi
-    attempt=$((attempt + 1))
-    echo "[entrypoint] retrying migrations in 3s…" >&2
-    sleep 3
-  done
-fi
-
-if [ "$(id -u)" = "0" ]; then
-  exec su-exec node "$@"
-fi
-exec "$@"
-EOF
-
+    STATIC_PUBLISH_DIR=/srv/static
+WORKDIR /app
+# The standalone output mirrors the repository (tracing root = repo root): /app/frontend/server.js.
+# Code and dependencies stay root-owned (read-only for `node`); .next is the server's own (cache, ISR).
+COPY --from=build /app/frontend/.next/standalone ./
+COPY --from=build --chown=node:node /app/frontend/.next/static ./frontend/.next/static
+COPY --from=build /app/frontend/public ./frontend/public
+COPY --chmod=755 frontend/docker/entrypoint.sh /usr/local/bin/gadyuka-frontend
+COPY frontend/docker/publish-static.mjs /usr/local/lib/gadyuka/publish-static.mjs
+RUN chown -R node:node /app/frontend/.next \
+ && mkdir -p /app/frontend/.next/cache /srv/static \
+ && chown node:node /app/frontend/.next/cache /srv/static
+USER node
+WORKDIR /app/frontend
 EXPOSE 3000
-ENTRYPOINT ["/usr/local/bin/gadyuka-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/gadyuka-frontend"]
 CMD ["node", "server.js"]

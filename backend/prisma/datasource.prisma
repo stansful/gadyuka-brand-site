@@ -1,0 +1,4 @@
+// Connection URL: prisma.config.ts (built from the POSTGRES_* variables).
+datasource db {
+  provider = "postgresql"
+}

@@ -1,0 +1,21 @@
+model NewsItem {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  /// URL slug (CHECK in the migration)
+  slug      String   @unique
+  /// LocalizedText
+  title     Json
+  /// LocalizedText
+  excerpt   Json     @default("{}")
+  /// LocalizedText (plain text / simple markdown)
+  body      Json     @default("{}")
+  date      DateTime
+  imageId   String?  @map("image_id") @db.Uuid
+  image     Media?   @relation("NewsImage", fields: [imageId], references: [id], onDelete: SetNull)
+  published Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([published, date(sort: Desc)])
+  @@index([imageId])
+  @@map("news_items")
+}

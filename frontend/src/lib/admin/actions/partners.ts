@@ -1,45 +1,21 @@
 'use server';
 
-import { revalidateContent } from '@/lib/content/cache';
-import { db } from '@/lib/db';
+import { adminApiAction } from '@/lib/api/admin-action';
+import { translateAdminMessage } from '@/lib/api/admin-messages';
+import { saveContentEntity } from '@/lib/api/content-entities';
+import type { AdminPartnerInput } from '@shared/contracts/content-entities';
 
-import { adminAction, errorFailure, missingMediaFailure } from '../action-helpers';
-import { actionFail, actionOk, type ActionResult } from '../action-result';
-import { getAdminTranslations } from '../i18n-server';
-import { idSchema, partnerInputSchema, type PartnerInput } from '../schemas';
-import { parseInput } from '../validation';
+import { actionOk, type ActionResult } from '../action-result';
 
-/** Create (id = null) or update a partner. */
-export async function savePartner(id: string | null, input: PartnerInput): Promise<ActionResult<{ id: string }>> {
-  return adminAction('savePartner', async () => {
-    const parsedId = id === null ? null : idSchema.safeParse(id);
-    if (parsedId && !parsedId.success) return errorFailure('invalidId');
-    const parsed = await parseInput(partnerInputSchema, input);
-    if (!parsed.success) return actionFail(parsed.message, parsed.fieldErrors);
-    const data = parsed.data;
-    const currentId = parsedId?.data ?? null;
-
-    const missingMedia = await missingMediaFailure([data.logoId], ['logoId']);
-    if (missingMedia) return missingMedia;
-    const fields = {
-      name: data.name,
-      url: data.url,
-      logoId: data.logoId,
-      description: data.description,
-      published: data.published,
-    };
-
-    let savedId: string;
-    if (currentId) {
-      savedId = (await db.partner.update({ where: { id: currentId }, data: fields, select: { id: true } })).id;
-    } else {
-      const last = await db.partner.aggregate({ _max: { order: true } });
-      savedId = (
-        await db.partner.create({ data: { ...fields, order: (last._max.order ?? -1) + 1 }, select: { id: true } })
-      ).id;
-    }
-    revalidateContent();
-    const t = await getAdminTranslations('admin.partners');
-    return actionOk({ id: savedId }, t(currentId ? 'saved' : 'created'));
+/** Create (id = null: appended to the end of the list) or update a partner. */
+export async function savePartner(id: string | null, input: AdminPartnerInput): Promise<ActionResult<{ id: string }>> {
+  return adminApiAction('savePartner', () => saveContentEntity('/api/v1/admin/partners', id, input), {
+    revalidatesContent: true,
+    fieldErrors: { 'admin.errors.missingMedia': { field: 'logoId' } },
+    onSuccess: async data =>
+      actionOk(
+        { id: data.id },
+        await translateAdminMessage({ key: id === null ? 'admin.partners.created' : 'admin.partners.saved' }),
+      ),
   });
 }

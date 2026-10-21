@@ -1,100 +1,46 @@
-import { localeNames, type Locale } from '@/i18n/locales';
-import { defaultMessageTranslations, type MessageKey } from '@/i18n/messages';
-import type { ImageKey } from '@/lib/content/registry';
+import { isLocale, localeNames, type Locale } from '@/i18n/locales';
+import type { SiteTextsConflictDetails } from '@shared/contracts/site-texts';
 
 import type { FieldErrors } from './action-result';
 import type { AdminTranslator } from './i18n';
-
-import { planSiteTextWrites, type SiteTextLabels, type SiteTextWrite, type StoredMessage } from './site-texts';
+import type { SiteTextLabels } from './site-texts';
 
 /**
- * Optimistic concurrency of the «Тексты сайта» save (saveSiteTexts) — pure, unit-tested.
+ * The refusal of a «Тексты сайта» save that met a conflict — pure, unit-tested.
  *
- * The editor sends only what the owner changed (plus the languages that have no row yet),
- * each with `base`: the stored text the edit started from. The action reads the rows inside
- * its transaction, under a lock that serializes every «Тексты сайта» write, and plans:
- * - an edit (value ≠ base) whose row now holds a third text — changed in another tab or
- *   session since the editor loaded it — is a conflict: the whole save is refused, so a stale
- *   tab can never put an older text back over a newer one;
- * - an edit whose row still holds `base` (or already holds the value) is written as usual
- *   (planSiteTextWrites: only what changes, editedAt by the default);
- * - an unchanged text (value = base, whitespace aside) is never written over a row: a missing
- *   row gets the default the site shows, an existing one is left as it is.
- * Landing images likewise: a picked image (mediaId ≠ base) conflicts with a third media.
+ * The editor sends only what the owner changed, each with the stored text it started from; the backend
+ * checks under its lock that every edit still starts from what is stored and refuses the WHOLE save
+ * (409, PUT /api/v1/admin/site-texts) when a text or image was changed in another tab or session
+ * meanwhile, so a stale tab never puts an older text back over a newer one. Its `details` name them
+ * (SiteTextsConflictDetails); this module turns them into the message and the field errors.
  */
 
-/** One language of a text in the save: the trimmed value and the stored text it started from. */
-export type SiteTextChange = { key: MessageKey; locale: Locale; value: string; base: string };
-
-/** A landing image in the save: the picked media and the stored one it replaced (null = none). */
-export type SiteImageChange = { key: ImageKey; mediaId: string | null; base: string | null };
-
 /** A text changed elsewhere since the editor loaded it: what the row holds now. */
-export type SiteTextConflict = { key: MessageKey; locale: Locale; current: string };
+export type SiteTextConflict = { key: string; locale: Locale; current: string };
 
-export type SiteTextSavePlan = {
-  conflicts: SiteTextConflict[];
-  writes: SiteTextWrite[];
-  /** What every submitted text holds after the save (the editor shows it). */
-  stored: Partial<Record<MessageKey, Partial<Record<Locale, string>>>>;
-};
+export type SiteTextConflicts = { texts: SiteTextConflict[]; images: string[] };
 
-/** An edit, not a resend of the stored text (the value is trimmed by the schema, the base is not). */
-export function isSiteTextEdit(change: Pick<SiteTextChange, 'value' | 'base'>): boolean {
-  return change.value !== change.base.trim();
-}
+/** `details` of an error body as the API client passes them on (src/lib/api/api-result.ts). */
+type ErrorDetails = SiteTextsConflictDetails | Readonly<Record<string, string | number | boolean>>;
 
-/** The Message writes of `changes` against the rows read inside the save's transaction. */
-export function planSiteTextSave(
-  changes: readonly SiteTextChange[],
-  rows: readonly StoredMessage[],
-  now: Date,
-): SiteTextSavePlan {
-  const byId = new Map(rows.map(row => [`${row.locale}\u0000${row.key}`, row]));
-  const conflicts: SiteTextConflict[] = [];
-  const accepted: Array<{ key: MessageKey; values: Partial<Record<Locale, string>> }> = [];
-  const stored: SiteTextSavePlan['stored'] = {};
-  for (const change of changes) {
-    const { key, locale } = change;
-    const row = byId.get(`${locale}\u0000${key}`);
-    // What the site shows now: the row, or the default while the row is missing.
-    const current = row ? row.value : defaultMessageTranslations(key)[locale];
-    if (!isSiteTextEdit(change)) {
-      if (!row) accepted.push({ key, values: { [locale]: current } });
-      stored[key] = { ...stored[key], [locale]: current };
+/**
+ * The conflicts of a 409's details, in their order: "<message key>.<locale>" → the stored text,
+ * "<image key>" → true (SiteTextsConflictDetails). Anything else is ignored.
+ */
+export function parseSiteTextConflicts(details: ErrorDetails | undefined): SiteTextConflicts {
+  const conflicts: SiteTextConflicts = { texts: [], images: [] };
+  for (const [path, value] of Object.entries(details ?? {})) {
+    if (value === true) {
+      conflicts.images.push(path);
       continue;
     }
-    if (current !== change.base && current !== change.value) {
-      conflicts.push({ key, locale, current });
-      continue;
+    const dot = path.lastIndexOf('.');
+    const locale = path.slice(dot + 1);
+    if (typeof value === 'string' && dot > 0 && isLocale(locale)) {
+      conflicts.texts.push({ key: path.slice(0, dot), locale, current: value });
     }
-    accepted.push({ key, values: { [locale]: change.value } });
-    stored[key] = { ...stored[key], [locale]: change.value };
   }
-  return { conflicts, writes: conflicts.length > 0 ? [] : planSiteTextWrites(accepted, rows, now), stored };
-}
-
-export type SiteImageSavePlan = {
-  conflicts: ImageKey[];
-  writes: Array<{ key: ImageKey; mediaId: string | null }>;
-};
-
-/** The ContentImage writes of `changes` against the rows read inside the save's transaction. */
-export function planSiteImageSave(
-  changes: readonly SiteImageChange[],
-  rows: ReadonlyArray<{ key: string; mediaId: string | null }>,
-): SiteImageSavePlan {
-  const byKey = new Map(rows.map(row => [row.key, row]));
-  const conflicts: ImageKey[] = [];
-  const writes: SiteImageSavePlan['writes'] = [];
-  for (const change of changes) {
-    if (change.mediaId === change.base) continue;
-    const row = byKey.get(change.key);
-    const current = row ? row.mediaId : null;
-    if (current !== change.base && current !== change.mediaId) conflicts.push(change.key);
-    else if (!row || current !== change.mediaId) writes.push({ key: change.key, mediaId: change.mediaId });
-  }
-  return { conflicts, writes: conflicts.length > 0 ? [] : writes };
+  return conflicts;
 }
 
 /** How many conflicting texts the message names (the rest are counted). */
@@ -107,26 +53,25 @@ function preview(text: string): string {
 }
 
 /**
- * The refusal of a save with conflicts: the message names the texts and images changed
- * elsewhere and asks to reload; each of them gets a field error (a text quotes what is
- * stored now, so the owner can compare it with the edit before reloading).
+ * The refusal of a save with conflicts: the message names the texts and images changed elsewhere and
+ * asks to reload; each of them gets a field error (a text quotes what is stored now, so the owner can
+ * compare it with the edit before reloading).
  */
 export function siteTextConflictFailure(
-  texts: readonly SiteTextConflict[],
-  images: readonly ImageKey[],
+  conflicts: SiteTextConflicts,
   labels: SiteTextLabels,
   t: AdminTranslator<'admin.siteTexts.errors'>,
 ): { message: string; fieldErrors: FieldErrors } {
   const fieldErrors: FieldErrors = {};
   const names: string[] = [];
-  for (const conflict of texts) {
+  for (const conflict of conflicts.texts) {
     names.push(t('conflictText', { label: labels.text(conflict.key), language: localeNames[conflict.locale].short }));
     fieldErrors[`${conflict.key}.${conflict.locale}`] =
       conflict.current.trim() === ''
         ? t('conflictFieldEmpty')
         : t('conflictField', { current: preview(conflict.current) });
   }
-  for (const key of images) {
+  for (const key of conflicts.images) {
     names.push(t('conflictImage', { label: labels.image(key) }));
     fieldErrors[key] = t('conflictImageField');
   }

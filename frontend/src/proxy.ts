@@ -3,12 +3,13 @@ import createMiddleware from 'next-intl/middleware';
 import type { NextRequest, NextResponse } from 'next/server';
 
 import { routing } from './i18n/routing';
-import { adminProxyGate } from './lib/admin/proxy-gate';
+import { adminProxy } from './lib/api/admin-proxy';
 
 /**
  * Next 16 proxy (formerly middleware):
- *  - /admin/**  → optimistic password gate (src/lib/admin/proxy-gate.ts); the admin lives
- *                 outside the locale tree (RU only), so next-intl never sees it.
+ *  - /admin/**  → the admin session (src/lib/api/admin-proxy.ts): refreshes an expired access token
+ *                 once, sends page loads without a session to /admin/login. The admin lives outside
+ *                 the locale tree (RU only), so next-intl never sees it.
  *  - everything else → next-intl locale routing: "/" is served as ru (internal rewrite
  *                 to /ru), "/en/..." as en.
  */
@@ -16,14 +17,15 @@ const intlProxy = createMiddleware(routing);
 
 export default async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
-  if (pathname === '/admin' || pathname.startsWith('/admin/')) return adminProxyGate(request);
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) return adminProxy(request);
   return intlProxy(request);
 }
 
 export const config = {
   // Run on everything EXCEPT:
-  //  - /api…, /admin/api… (route handlers: POST /api/leads, the admin media API — they check access themselves)
-  //  - /media…   (uploads + seed media from S3, src/app/media/[...key] route handler)
+  //  - /api…, /admin/api… (route handlers: POST /api/leads, the admin media API — they check access
+  //    themselves; uploads must not be buffered by the proxy, see proxyClientMaxBodySize)
+  //  - /media…   (media files: proxied to the backend, src/app/media/[...key] route handler)
   //  - /brand…   (static brand assets in public/brand)
   //  - /_next…, /_vercel…
   //  - any path containing a dot (files: favicon.ico, robots.txt, sitemap.xml, *.svg …)

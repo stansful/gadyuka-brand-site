@@ -1,0 +1,53 @@
+{
+  "include": ["src", "generated", "../shared/contracts"],
+  "exclude": ["node_modules", "dist", ".build"],
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "Node20",
+
+    "strict": true,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": false,
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
+    "noUnusedLocals": false,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+
+    "pretty": true,
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "forceConsistentCasingInFileNames": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+
+    "skipLibCheck": true,
+
+    "rootDir": "..",
+    "outDir": "./dist",
+
+    "paths": {
+      "~prisma-generated/*": ["./generated/*"],
+      "~config": ["./src/config"],
+      "~config/*": ["./src/config/*"],
+      "~core/*": ["./src/core/*"],
+      "~database": ["./src/database"],
+      "~database/*": ["./src/database/*"],
+      "~decorator": ["./src/decorator"],
+      "~decorator/*": ["./src/decorator/*"],
+      "~exception": ["./src/exception"],
+      "~exception/*": ["./src/exception/*"],
+      "~guard": ["./src/guard"],
+      "~guard/*": ["./src/guard/*"],
+      "~module/*": ["./src/module/*"],
+      "~swagger/*": ["./src/swagger/*"],
+      "~test/*": ["./src/test/*"],
+      "~usecases/*": ["./src/usecases/*"],
+      "~shared/*": ["../shared/*"]
+    }
+  }
+}

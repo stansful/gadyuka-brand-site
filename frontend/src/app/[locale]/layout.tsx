@@ -68,6 +68,15 @@ export const viewport: Viewport = {
   colorScheme: 'dark',
 };
 
+/**
+ * The public site renders on request: its data (messages first — loadSiteMessages below) comes
+ * from the backend through request-time cached reads (src/lib/api/public.ts: connection() + "use
+ * cache" + cacheTag('content')), never at build time — `next build` runs without a backend. So the
+ * document blocks on that data; opt this root out of the static-shell / instant-navigation
+ * validation (the public pages link with plain <a>, there is no client navigation to keep instant).
+ */
+export const instant = false;
+
 export function generateStaticParams(): Array<{ locale: string }> {
   return routing.locales.map(locale => ({ locale }));
 }
@@ -76,8 +85,8 @@ export default async function LocaleLayout({ children, params }: LayoutProps<'/[
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   // The client error boundary (./error.tsx) cannot read messages itself: resolve its copy here.
-  // Fail-soft (bundled defaults when the DB is down): nothing catches an error of this layout,
-  // and a database outage is exactly when the error page has to render.
+  // Fail-soft (bundled defaults when the backend is down): nothing catches an error of this layout,
+  // and a backend outage is exactly when the error page has to render.
   const errorCopy = errorCopyFromMessages(await loadSiteMessages(locale));
 
   return (

@@ -1,0 +1,5 @@
+# Lint (no fixes) of the packages that are installed, before anything leaves the machine.
+npm --prefix backend run --silent lint:check
+if [ -x frontend/node_modules/.bin/oxlint ]; then
+  npm --prefix frontend run --silent lint
+fi

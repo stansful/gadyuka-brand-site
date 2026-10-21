@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 import type { AdminTranslator } from '@/lib/admin/i18n';
 import {
   ACCEPTED_FORMATS_LABEL,
@@ -7,36 +5,88 @@ import {
   MAX_UPLOAD_BYTES,
   MAX_UPLOAD_MEGABYTES,
 } from '@/lib/admin/media-constants';
-import type { AdminMedia, MediaPage, MediaUsage } from '@/lib/admin/types';
-import { parseLocalizedText } from '@/lib/i18n-text';
+import { parseLocalizedText } from '@/lib/localized-text';
+
+import type { AdminMedia, MediaPage, MediaUsageView } from './media-types';
 
 /**
- * Browser client of the admin media API (src/app/admin/api/media). Responses are validated
- * with zod. Failures are MediaProblems: the server's own (already translated) error text, or
- * a key of admin.media.errors for what the browser detects itself — the components turn them
- * into text with mediaProblemText().
+ * Browser client of the admin media API (src/app/admin/api/media). Responses are checked by the
+ * small parsers below (a malformed body is the «unexpected» problem). Failures are
+ * MediaProblems: the server's own (already translated) error text, or a key of
+ * admin.media.errors for what the browser detects itself — the components turn them into text
+ * with mediaProblemText().
  */
 
 const MEDIA_API = '/admin/api/media';
 
-const adminMediaSchema = z.object({
-  id: z.string(),
-  url: z.string(),
-  width: z.number(),
-  height: z.number(),
-  alt: z.unknown().transform(value => parseLocalizedText(value)),
-  mime: z.string(),
-  size: z.number(),
-  originalName: z.string().nullable(),
-  createdAt: z.string(),
-  usageCount: z.number(),
-});
+// ── response parsers (dependency-free: hand-written checks of the route answers) ──
 
-const mediaPageSchema = z.object({ items: z.array(adminMediaSchema), nextCursor: z.string().nullable() });
-const mediaUsageSchema = z.object({ kind: z.string(), title: z.string(), href: z.string() });
-const mediaDetailsSchema = z.object({ media: adminMediaSchema, usages: z.array(mediaUsageSchema) });
-const uploadResponseSchema = z.object({ media: adminMediaSchema });
-const errorResponseSchema = z.object({ error: z.string() });
+type JsonObject = { readonly [key: string]: unknown };
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function asObject(value: unknown): JsonObject | null {
+  return isJsonObject(value) ? value : null;
+}
+
+const isText = (value: unknown): value is string => typeof value === 'string';
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+/** Every item parsed, or null when one of them (or the value itself) is malformed. */
+function parseList<T>(value: unknown, parseItem: (item: unknown) => T | null): T[] | null {
+  if (!Array.isArray(value)) return null;
+  const out: T[] = [];
+  for (const item of value) {
+    const parsed = parseItem(item);
+    if (parsed === null) return null;
+    out.push(parsed);
+  }
+  return out;
+}
+
+function parseAdminMedia(value: unknown): AdminMedia | null {
+  const media = asObject(value);
+  if (!media) return null;
+  const { id, url, width, height, alt, mime, size, originalName, createdAt, usageCount } = media;
+  if (!isText(id) || !isText(url) || !isText(mime) || !isText(createdAt)) return null;
+  if (!isFiniteNumber(width) || !isFiniteNumber(height) || !isFiniteNumber(size) || !isFiniteNumber(usageCount)) {
+    return null;
+  }
+  if (originalName !== null && !isText(originalName)) return null;
+  return { id, url, width, height, alt: parseLocalizedText(alt), mime, size, originalName, createdAt, usageCount };
+}
+
+function parseMediaUsage(value: unknown): MediaUsageView | null {
+  const usage = asObject(value);
+  if (!usage) return null;
+  const { kind, title, href } = usage;
+  return isText(kind) && isText(title) && isText(href) ? { kind, title, href } : null;
+}
+
+function parseMediaPage(value: unknown): MediaPage | null {
+  const page = asObject(value);
+  if (!page) return null;
+  const items = parseList(page.items, parseAdminMedia);
+  const { nextCursor } = page;
+  if (!items || (nextCursor !== null && !isText(nextCursor))) return null;
+  return { items, nextCursor };
+}
+
+function parseMediaDetails(value: unknown): { media: AdminMedia; usages: MediaUsageView[] } | null {
+  const details = asObject(value);
+  if (!details) return null;
+  const media = parseAdminMedia(details.media);
+  const usages = parseList(details.usages, parseMediaUsage);
+  return media && usages ? { media, usages } : null;
+}
+
+/** `{ error: "…" }` — the server's own (translated) error text. */
+function errorText(value: unknown): string | null {
+  const error = asObject(value)?.error;
+  return isText(error) ? error : null;
+}
 
 type MediaErrorsTranslator = AdminTranslator<'admin.media.errors'>;
 
@@ -60,8 +110,8 @@ export class MediaApiError extends Error {
 }
 
 function responseProblem(body: unknown, status: number): MediaProblem {
-  const parsed = errorResponseSchema.safeParse(body);
-  if (parsed.success) return { text: parsed.data.error };
+  const text = errorText(body);
+  if (text !== null) return { text };
   if (status === 401) return { key: 'sessionExpired' };
   if (status === 413) return { key: 'fileTooLarge' };
   return { key: 'server', values: { status } };
@@ -88,19 +138,19 @@ export async function fetchMediaPage(
   if (options.cursor) params.set('cursor', options.cursor);
   if (options.query?.trim()) params.set('q', options.query.trim());
   const body = await getJson(`${MEDIA_API}?${params.toString()}`, signal);
-  const parsed = mediaPageSchema.safeParse(body);
-  if (!parsed.success) throw new MediaApiError({ key: 'unexpected' });
-  return parsed.data;
+  const page = parseMediaPage(body);
+  if (!page) throw new MediaApiError({ key: 'unexpected' });
+  return page;
 }
 
 export async function fetchMediaDetails(
   id: string,
   signal?: AbortSignal,
-): Promise<{ media: AdminMedia; usages: MediaUsage[] }> {
+): Promise<{ media: AdminMedia; usages: MediaUsageView[] }> {
   const body = await getJson(`${MEDIA_API}/${encodeURIComponent(id)}`, signal);
-  const parsed = mediaDetailsSchema.safeParse(body);
-  if (!parsed.success) throw new MediaApiError({ key: 'unexpected' });
-  return parsed.data;
+  const details = parseMediaDetails(body);
+  if (!details) throw new MediaApiError({ key: 'unexpected' });
+  return details;
 }
 
 /** Client-side pre-check (the server re-validates by magic bytes). Null = fine. */
@@ -131,10 +181,8 @@ export function uploadMediaFile(
     request.onload = () => {
       const body: unknown = request.response;
       if (request.status >= 200 && request.status < 300) {
-        const parsed = uploadResponseSchema.safeParse(body);
-        resolve(
-          parsed.success ? { ok: true, media: parsed.data.media } : { ok: false, problem: { key: 'unexpected' } },
-        );
+        const media = parseAdminMedia(asObject(body)?.media);
+        resolve(media ? { ok: true, media } : { ok: false, problem: { key: 'unexpected' } });
         return;
       }
       resolve({ ok: false, problem: responseProblem(body, request.status) });

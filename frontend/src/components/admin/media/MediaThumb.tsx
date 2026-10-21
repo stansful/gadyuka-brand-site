@@ -3,9 +3,9 @@ import { ImageOff } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 
-import type { AdminMediaRef } from '@/lib/admin/types';
-
 import type { ReactElement } from 'react';
+
+import type { AdminMediaRef } from './media-types';
 
 /** Square (or custom aspect) thumbnail of a media file; placeholder when empty. */
 export function MediaThumb({

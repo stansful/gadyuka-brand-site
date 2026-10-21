@@ -4,8 +4,8 @@ import { useTranslations } from 'next-intl';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTransition, type ReactElement } from 'react';
 
-import type { LeadStatus, LeadType } from '@/generated/prisma/enums';
 import { LEAD_STATUSES, LEAD_TYPES } from '@/lib/admin/labels';
+import type { LeadStatus, LeadType } from '@shared/contracts/leads';
 
 import { Select } from '../ui/inputs';
 

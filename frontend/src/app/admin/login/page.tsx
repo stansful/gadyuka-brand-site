@@ -4,21 +4,20 @@ import { redirect } from 'next/navigation';
 import { Suspense, type ReactElement } from 'react';
 
 import { LoginForm } from '@/components/admin/layout/LoginForm';
-import { adminLockValues } from '@/lib/admin/admin-gate';
-import { getAdminAccess } from '@/lib/admin/auth';
+import { getLoginSessionState } from '@/lib/admin/auth';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
+import { safeAdminPath } from '@/lib/api/session-cookies';
 
 import type { Metadata } from 'next';
 
+/**
+ * Reached by redirects (full navigations), never prefetched; renders on request — the session check
+ * and the request-time site messages of next-intl block it: no instant-navigation validation.
+ */
+export const instant = false;
+
 export function generateMetadata(): Promise<Metadata> {
   return adminPageMetadata('auth.title');
-}
-
-/** Post-login target: only /admin paths (never an open redirect). */
-function safeNext(value: string | string[] | undefined): string {
-  const candidate = Array.isArray(value) ? value[0] : value;
-  if (!candidate || !/^\/admin(?:[/?#]|$)/.test(candidate) || candidate.startsWith('/admin/login')) return '/admin';
-  return candidate;
 }
 
 export default async function LoginPage({ searchParams }: PageProps<'/admin/login'>): Promise<ReactElement> {
@@ -52,25 +51,24 @@ export default async function LoginPage({ searchParams }: PageProps<'/admin/logi
 }
 
 async function LoginGate({ searchParams }: Pick<PageProps<'/admin/login'>, 'searchParams'>): Promise<ReactElement> {
-  const [access, params, t] = await Promise.all([getAdminAccess(), searchParams, getTranslations('admin.auth')]);
-  const next = safeNext(params.next);
-  // Open admin, or already signed in → straight to the admin.
-  if (access.allowed) redirect(next);
-  // Locked (production without a usable ADMIN_PASSWORD): explain, never redirect back to /admin.
-  if (access.locked) {
-    return (
-      <div
-        role="alert"
-        className="flex gap-3 rounded-lg border border-yellow-500/30 bg-yellow-400/10 p-4 text-sm text-yellow-100"
-      >
-        <TriangleAlert className="mt-0.5 size-4 shrink-0 text-yellow-300" aria-hidden />
-        <p>{t(`locked.${access.locked}`, adminLockValues(access.locked))}</p>
-      </div>
-    );
-  }
+  const [session, params, t] = await Promise.all([getLoginSessionState(), searchParams, getTranslations('admin.auth')]);
+  // Post-login target: only /admin paths (never an open redirect).
+  const next = safeAdminPath(Array.isArray(params.next) ? params.next[0] : params.next);
+  // Already signed in (or the proxy has just refreshed the session) → straight to the admin.
+  if (session === 'signedIn') redirect(next);
   return (
     <>
-      <p className="-mt-4 mb-6 text-center text-sm text-muted">{t('prompt')}</p>
+      {session === 'unavailable' ? (
+        <div
+          role="alert"
+          className="mb-6 flex gap-3 rounded-lg border border-yellow-500/30 bg-yellow-400/10 p-4 text-sm text-yellow-100"
+        >
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-yellow-300" aria-hidden />
+          <p>{t('unavailable')}</p>
+        </div>
+      ) : (
+        <p className="-mt-4 mb-6 text-center text-sm text-muted">{t('prompt')}</p>
+      )}
       <LoginForm next={next} />
     </>
   );

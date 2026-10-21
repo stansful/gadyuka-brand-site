@@ -8,7 +8,7 @@ import { Card, PageHeader } from '@/components/admin/ui/layout';
 import { isLocale, localeNames } from '@/i18n/locales';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
 import { formatDateTimeRu } from '@/lib/admin/labels';
-import { getLeadDetail } from '@/lib/admin/queries';
+import { getLeadDetail } from '@/lib/admin/queries/leads';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

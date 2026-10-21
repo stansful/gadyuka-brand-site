@@ -16,29 +16,33 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { flattenMessages, isMessageKey, type MessageTree } from '@/i18n/messages';
-import { CONTENT_SECTIONS, IMAGE_KEYS } from '@/lib/content/registry';
+import { IMAGE_KEYS } from '@/lib/content/registry';
+import adminRu from '@shared/messages/admin/ru.json';
 
-import adminRu from '../../../messages/admin/ru.json';
-
+import { SITE_TEXT_SECTIONS } from '../../../test/site-text-metadata';
 /**
- * Regression guard of the admin copy extraction (messages/admin/ru.json, namespace "admin"):
+ * Regression guard of the admin copy extraction (shared/messages/admin/ru.json, namespace "admin"):
  * 1. no Cyrillic in string literals, templates or JSX text of the admin code (comments and
  *    tests do not count; slug.ts holds the transliteration table — data, not copy);
  * 2. every key the admin code reads exists: t('…') / t.rich / t.has … on a translator from
  *    useTranslations / getTranslations / getAdminTranslations (or a parameter typed
- *    AdminTranslator<'admin.…'>), errorKey('…') of the zod schemas and adminPageMetadata('…');
- *    a template key (t(`types.${type}`)) must at least name an existing branch; and every
+ *    AdminTranslator<'admin.…'>), adminPageMetadata('…'),
+ *    translateAdminMessage({ key: 'admin.…' }) of the backend calls (src/lib/api) and any other
+ *    'admin.…' key literal (constants passed on); a template key (t(`types.${type}`)) must at least
+ *    name an existing branch; and every
  *    {argument} / <tag> of the message is passed (TypeScript cannot check it: the JSON values
  *    are typed as plain strings);
  * 3. the messages themselves are valid ICU and the site-text labels match the site's keys.
  */
 
 const ROOT = path.resolve(import.meta.dirname, '../../..');
-const SCANNED_DIRS = ['src/app/admin', 'src/components/admin', 'src/lib/admin'];
-/** Admin-facing copy outside the admin folders (the texts editor metadata, upload errors, zod). */
-const SCANNED_FILES = ['src/lib/content/registry.ts', 'src/lib/media.ts', 'src/lib/i18n-text.ts'];
+const SCANNED_DIRS = ['src/app/admin', 'src/components/admin', 'src/lib/admin', 'src/lib/api'];
+/** Admin-facing copy outside the admin folders (the site sections and landing images the editor names). */
+const SCANNED_FILES = ['src/lib/content/registry.ts'];
 const EXCLUDED = new Set(['src/lib/admin/slug.ts']);
 const CYRILLIC = /[Ѐ-ӿ]/;
+/** A full admin message key written out as a literal ('admin.errors.invalidRequest'). */
+const ADMIN_KEY_LITERAL = /^admin(\.[A-Za-z0-9]+)+$/;
 
 function sourceFiles(relative: string): string[] {
   return readdirSync(path.join(ROOT, relative), { withFileTypes: true }).flatMap(entry => {
@@ -186,6 +190,20 @@ function keyUses(file: string, source: ts.SourceFile): KeyUse[] {
   const use = (node: ts.Node, key: string, kind: KeyUse['kind'], call?: KeyCall): void => {
     uses.push({ file, line: lineOf(source, node), key, kind, call });
   };
+  /** translateAdminMessage({ key: 'admin.x.y', values: { … } }): a full key with its values. */
+  const useMessageRef = (node: ts.CallExpression): void => {
+    const [ref] = node.arguments;
+    if (!ref || !ts.isObjectLiteralExpression(ref)) return;
+    const propertyOf = (name: string): ts.Expression | undefined =>
+      ref.properties.find(
+        (property): property is ts.PropertyAssignment =>
+          ts.isPropertyAssignment(property) && ts.isIdentifier(property.name) && property.name.text === name,
+      )?.initializer;
+    const key = propertyOf('key');
+    if (!key) return;
+    const call: KeyCall = { method: 'plain', values: valueNames(propertyOf('values')) };
+    for (const candidate of keyCandidates(key)) use(node, candidate.key, candidate.kind, call);
+  };
   const useKeys = (node: ts.CallExpression, namespace: string, method: KeyCall['method']): void => {
     const [argument, values] = node.arguments;
     if (!argument) return;
@@ -239,9 +257,8 @@ function keyUses(file: string, source: ts.SourceFile): KeyUse[] {
       if (ts.isIdentifier(callee)) {
         const namespace = lookup(callee.text);
         if (namespace) useKeys(node, namespace, 'plain');
-        // zod issue keys get their values from the issue ({min}, {max}, params) at runtime.
-        if (callee.text === 'errorKey') useKeys(node, 'admin.validation', 'unchecked');
         if (callee.text === 'adminPageMetadata') useKeys(node, 'admin', 'plain');
+        if (callee.text === 'translateAdminMessage') useMessageRef(node);
       } else if (ts.isPropertyAccessExpression(callee) && TRANSLATOR_METHODS.has(callee.name.text)) {
         const namespace = ts.isIdentifier(callee.expression) ? lookup(callee.expression.text) : undefined;
         const method = callee.name.text;
@@ -252,6 +269,11 @@ function keyUses(file: string, source: ts.SourceFile): KeyUse[] {
         const namespace = factoryNamespace(callee);
         if (namespace) useKeys(node, namespace, 'plain');
       }
+    }
+
+    // Any other full key literal (a constant handed to a helper): it must exist as a leaf or branch.
+    if (ts.isStringLiteral(node) && ADMIN_KEY_LITERAL.test(node.text)) {
+      use(node, node.text, LEAVES[node.text] === undefined ? 'branch' : 'leaf');
     }
 
     ts.forEachChild(node, visit);
@@ -309,7 +331,7 @@ function missingKey(use: KeyUse): boolean {
   return use.key !== 'admin' && !BRANCHES.has(use.key);
 }
 
-describe('admin copy lives in messages/admin/ru.json', () => {
+describe('admin copy lives in shared/messages/admin/ru.json', () => {
   it('scans the admin code', () => {
     expect(files.length).toBeGreaterThan(100);
   });
@@ -319,7 +341,7 @@ describe('admin copy lives in messages/admin/ru.json', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('reads only keys that exist in messages/admin/ru.json', () => {
+  it('reads only keys that exist in shared/messages/admin/ru.json', () => {
     const uses = files.flatMap(({ file, source }) => keyUses(file, source));
     // The scan really sees the code's keys (namespaces, plain keys and template branches).
     expect(uses.filter(use => use.kind === 'leaf').length).toBeGreaterThan(400);
@@ -334,7 +356,7 @@ describe('admin copy lives in messages/admin/ru.json', () => {
   });
 });
 
-describe('messages/admin/ru.json', () => {
+describe('shared/messages/admin/ru.json', () => {
   it('holds only the admin namespace, every message valid ICU', () => {
     expect(Object.keys(adminRu)).toEqual(['admin']);
     const invalid = Object.entries(LEAVES).flatMap(([key, value]) => {
@@ -350,7 +372,7 @@ describe('messages/admin/ru.json', () => {
 
   it('names every section and landing image of the texts editor, and labels only existing texts', () => {
     const { sections, images, labels } = adminRu.admin.siteTexts;
-    expect(Object.keys(sections).sort()).toEqual(CONTENT_SECTIONS.map(section => section.id).sort());
+    expect(Object.keys(sections).sort()).toEqual([...SITE_TEXT_SECTIONS].sort());
     expect(Object.keys(flattenMessages(images)).sort()).toEqual([...IMAGE_KEYS].sort());
     const stale = Object.keys(flattenMessages(labels)).filter(key => !isMessageKey(key));
     expect(stale).toEqual([]);

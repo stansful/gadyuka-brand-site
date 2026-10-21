@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 
 import { defaultLocale, localeNames, type Locale } from '@/i18n/locales';
 import type { FieldErrors } from '@/lib/admin/action-result';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { LocalizedText } from '@/lib/localized-text';
 
 import type { ReactElement, ReactNode } from 'react';
 

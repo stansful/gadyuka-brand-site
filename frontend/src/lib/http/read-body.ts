@@ -42,13 +42,3 @@ export async function readBodyBytes(request: Request, maxBytes: number): Promise
 export async function readBodyText(request: Request, maxBytes: number): Promise<string> {
   return new TextDecoder('utf-8').decode(await readBodyBytes(request, maxBytes));
 }
-
-/**
- * Parses a multipart/form-data (or urlencoded) body read with a hard byte limit.
- * Throws BodyTooLargeError (limit) or TypeError (malformed body).
- */
-export async function readFormData(request: Request, maxBytes: number): Promise<FormData> {
-  const bytes = await readBodyBytes(request, maxBytes);
-  const contentType = request.headers.get('content-type') ?? '';
-  return new Response(bytes, { headers: { 'content-type': contentType } }).formData();
-}

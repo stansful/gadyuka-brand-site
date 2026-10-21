@@ -1,0 +1,10 @@
+# Git runs hooks from the repository root. lint-staged (installed in backend/) finds every config of
+# the repository and runs each with its own folder as the working directory:
+#   backend/.lintstagedrc.json  → backend/**             (backend's oxfmt + oxlint)
+#   .lintstagedrc.json (root)   → frontend/**, shared/** (frontend's / backend's tools via lib/run-in-package.sh)
+lint_staged=backend/node_modules/.bin/lint-staged
+if [ ! -x "$lint_staged" ]; then
+  echo "husky pre-commit: $lint_staged not found — run \`npm ci\` in backend/" >&2
+  exit 1
+fi
+"$lint_staged"

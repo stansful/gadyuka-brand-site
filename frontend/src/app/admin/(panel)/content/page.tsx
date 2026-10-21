@@ -10,9 +10,8 @@ import { TextInput } from '@/components/admin/ui/inputs';
 import { EmptyState, PageHeader } from '@/components/admin/ui/layout';
 import type { AdminTranslator } from '@/lib/admin/i18n';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { getSiteTextsPage } from '@/lib/admin/queries';
-import { SITE_TEXT_QUERY_MAX_LENGTH } from '@/lib/admin/site-texts';
-import type { SiteTextSectionSummary } from '@/lib/admin/types';
+import { getSiteTextsPage } from '@/lib/admin/queries/site-texts';
+import { SITE_TEXT_QUERY_MAX_LENGTH, type SiteTextSectionSummary } from '@/lib/admin/site-texts';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
@@ -26,7 +25,7 @@ function firstParam(value: string | string[] | undefined): string | null {
 }
 
 /**
- * «Тексты сайта»: every UI text of the public site (Message rows, keys = messages/ru.json),
+ * «Тексты сайта»: every UI text of the public site (Message rows, keys = shared/messages/ru.json),
  * by section (?section=hero) or as search results across sections (?q=…).
  */
 export default async function SiteTextsPage({ searchParams }: PageProps<'/admin/content'>): Promise<ReactElement> {
@@ -112,7 +111,7 @@ function SectionTabs({
   active,
   t,
 }: {
-  sections: SiteTextSectionSummary[];
+  sections: readonly SiteTextSectionSummary[];
   active: string | null;
   t: SiteTextsTranslator;
 }): ReactElement {

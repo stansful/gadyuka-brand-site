@@ -1,17 +1,30 @@
 import { notFound } from 'next/navigation';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { MessageRow } from './messages';
+import type { SiteMessagesResponse } from '@shared/contracts/content';
+import adminRu from '@shared/messages/admin/ru.json';
+import en from '@shared/messages/en.json';
+import ru from '@shared/messages/ru.json';
 
-import adminRu from '../../messages/admin/ru.json';
-import en from '../../messages/en.json';
-import ru from '../../messages/ru.json';
-
-// ── mocks: no Next.js request scope, no Postgres ─────────────────────────────
-const findMany = vi.fn(async (_args: unknown): Promise<MessageRow[]> => []);
-vi.mock('@/lib/db', () => ({ db: { message: { findMany } } }));
-vi.mock('next/cache', () => ({ cacheLife: vi.fn(), cacheTag: vi.fn() }));
-vi.mock('@/lib/content/cache', () => ({ CACHE_TAGS: { content: 'content' }, CONTENT_CACHE_LIFE: 'hours' }));
+// ── mocks: no Next.js request scope, no backend ──────────────────────────────
+type Edit = { key: string; locale: 'ru' | 'en'; value: string };
+/** GET /public/messages/:locale as the backend answers it: the defaults with `edits` applied. */
+type MutableTree = { [key: string]: string | MutableTree };
+const backendMessages = (locale: 'ru' | 'en', edits: Edit[]): SiteMessagesResponse => {
+  const tree: MutableTree = structuredClone(locale === 'ru' ? ru : en);
+  for (const edit of edits.filter(item => item.locale === locale)) {
+    const [namespace = '', key = ''] = edit.key.split('.');
+    const branch = tree[namespace];
+    if (typeof branch === 'object') branch[key] = edit.value;
+  }
+  return { locale, messages: tree };
+};
+let edits: Edit[] = [];
+const answerFromBackend = async (path: string): Promise<SiteMessagesResponse> =>
+  backendMessages(path.endsWith('/en') ? 'en' : 'ru', edits);
+const readMessages = vi.fn(answerFromBackend);
+vi.mock('@/lib/api/public', () => ({ cachedPublicRead: readMessages }));
+vi.mock('next/server', () => ({ connection: async (): Promise<void> => undefined }));
 // The request config as written (next-intl's wrapper only registers it).
 vi.mock('next-intl/server', () => ({ getRequestConfig: <T>(create: T): T => create }));
 // Outside the [locale] tree (a Route Handler, /admin): the root param is not available.
@@ -24,7 +37,7 @@ vi.mock('next/root-params', () => ({
 const { loadSiteMessages } = await import('./site-messages');
 const { default: requestConfig } = await import('./request');
 
-const dbDown = (): Promise<never> => Promise.reject(new Error('connect ECONNREFUSED 127.0.0.1:5432'));
+const backendDown = (): Promise<never> => Promise.reject(new Error('Backend request failed: unavailable: network'));
 
 let logged: { error: ReturnType<typeof vi.spyOn> };
 
@@ -33,7 +46,8 @@ let clock = 0;
 const FALLBACK_LOG_INTERVAL_MS = 60_000;
 
 beforeEach(() => {
-  findMany.mockReset().mockResolvedValue([]);
+  edits = [];
+  readMessages.mockReset().mockImplementation(answerFromBackend);
   logged = { error: vi.spyOn(console, 'error').mockImplementation(() => undefined) };
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   // Every test starts well past the log interval of the previous one (the module keeps its state).
@@ -46,28 +60,39 @@ afterEach(() => {
 });
 
 describe('loadSiteMessages', () => {
-  it('serves the DB rows over the JSON defaults while the database is up', async () => {
-    findMany.mockResolvedValueOnce([{ key: 'error.title', locale: 'ru', value: 'Сбой' }]);
+  it('serves the backend messages (admin edits over the defaults) while the backend is up', async () => {
+    edits = [{ key: 'error.title', locale: 'ru', value: 'Сбой' }];
     const messages = await loadSiteMessages('ru');
     expect(messages.error.title).toBe('Сбой');
     expect(messages.error.retry).toBe(ru.error.retry);
     expect(logged.error).not.toHaveBeenCalled();
   });
 
-  it('falls back to the bundled defaults when the database is down, not memoizing the fallback', async () => {
-    findMany.mockImplementation(dbDown);
+  it('falls back to the bundled defaults when the backend is down, not memoizing the fallback', async () => {
+    readMessages.mockImplementationOnce(backendDown).mockImplementationOnce(backendDown);
     await expect(loadSiteMessages('en')).resolves.toEqual(en);
     await expect(loadSiteMessages('en')).resolves.toEqual(en);
-    expect(findMany).toHaveBeenCalledTimes(2); // every read tries the DB again
+    expect(readMessages).toHaveBeenCalledTimes(2); // every read tries the backend again
     expect(logged.error).toHaveBeenCalledOnce();
 
-    // The database is back: the edited copy returns on the next read.
-    findMany.mockReset().mockResolvedValue([{ key: 'error.title', locale: 'en', value: 'Oops' }]);
+    // The backend is back: the edited copy returns on the next read.
+    edits = [{ key: 'error.title', locale: 'en', value: 'Oops' }];
     expect((await loadSiteMessages('en')).error.title).toBe('Oops');
   });
 
+  it('keeps every key of the bundled messages and ignores keys the frontend does not know', async () => {
+    readMessages.mockResolvedValueOnce({
+      locale: 'ru',
+      messages: { error: { title: 'Сбой', extra: 'x' }, removed: 'y' },
+    });
+    const messages = await loadSiteMessages('ru');
+    expect(messages.error.title).toBe('Сбой');
+    expect(messages.hero).toEqual(ru.hero);
+    expect(messages).not.toHaveProperty('removed');
+  });
+
   it('logs an outage once per locale and interval, even when cache hits succeed in between', async () => {
-    findMany.mockImplementation(dbDown);
+    readMessages.mockImplementation(backendDown);
     await loadSiteMessages('ru');
     await loadSiteMessages('en');
     expect(logged.error).toHaveBeenCalledTimes(2); // one line per locale
@@ -75,7 +100,7 @@ describe('loadSiteMessages', () => {
     // A render served by a cache entry from before the outage succeeds; the next uncached one
     // fails again. Still the same outage: no new line (this used to log on every such flip).
     clock += 1_000;
-    findMany.mockResolvedValueOnce([]);
+    readMessages.mockResolvedValueOnce(backendMessages('ru', []));
     await loadSiteMessages('ru');
     await loadSiteMessages('ru');
     expect(logged.error).toHaveBeenCalledTimes(2);
@@ -90,16 +115,16 @@ describe('loadSiteMessages', () => {
     );
   });
 
-  it('lets Next.js control flow through (it is not a database failure)', async () => {
-    findMany.mockImplementation(async () => notFound());
+  it('lets Next.js control flow through (it is not a backend failure)', async () => {
+    readMessages.mockImplementationOnce(async () => notFound());
     await expect(loadSiteMessages('ru')).rejects.toThrow();
     expect(logged.error).not.toHaveBeenCalled();
   });
 });
 
 describe('next-intl request config', () => {
-  it('still resolves when the database is down: bundled site defaults + the admin namespace', async () => {
-    findMany.mockImplementation(dbDown);
+  it('still resolves when the backend is down: bundled site defaults + the admin namespace', async () => {
+    readMessages.mockImplementationOnce(backendDown);
     const config = await requestConfig({ locale: 'en', requestLocale: Promise.resolve(undefined) });
     expect(config.locale).toBe('en');
     // What POST /api/leads needs for its JSON errors, and the admin (login included) for its copy.
@@ -109,9 +134,17 @@ describe('next-intl request config', () => {
     });
   });
 
-  it('uses the default locale outside the [locale] tree', async () => {
+  it('uses the default locale and the bundled site messages outside the [locale] tree (no backend call)', async () => {
+    edits = [{ key: 'error.title', locale: 'ru', value: 'Сбой' }];
     const config = await requestConfig({ requestLocale: Promise.resolve(undefined) });
     expect(config.locale).toBe('ru');
     expect(config.messages).toMatchObject({ error: ru.error, admin: adminRu.admin });
+    expect(readMessages).not.toHaveBeenCalled();
+  });
+
+  it('reads the edited site messages for an explicit locale (Route Handlers, Server Actions)', async () => {
+    edits = [{ key: 'error.title', locale: 'en', value: 'Oops' }];
+    const config = await requestConfig({ locale: 'en', requestLocale: Promise.resolve(undefined) });
+    expect(config.messages).toMatchObject({ error: { title: 'Oops' } });
   });
 });

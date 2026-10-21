@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 
 import { localeNames, type Locale } from '@/i18n/locales';
 import { deleteItem } from '@/lib/admin/actions/entities';
-import type { PublishableEntity } from '@/lib/admin/schemas';
+import type { PublishableEntityKind } from '@shared/contracts/entities';
 
 import { LocaleTabs, useFocusLocaleWithErrors } from '../i18n/LocaleTabs';
 import { Button } from '../ui/Button';
@@ -44,7 +44,7 @@ export function EntityFormShell({
   siteLinks?: SiteLink[];
   /** Delete button (existing rows only); confirmations name it admin.entities.accusative.<entity>. */
   remove?: {
-    entity: PublishableEntity;
+    entity: PublishableEntityKind;
     id: string;
     listHref: string;
     warning?: string;

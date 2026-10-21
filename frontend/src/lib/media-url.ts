@@ -2,14 +2,12 @@
  * Public asset URL conventions (isomorphic — safe in client components).
  *
  * - Media (uploads + seed images) live in S3 / MinIO; their public link is stored in Media.url
- *   ("/media/<admin|user>/<ownerId>/<uuid>/image.webp", served by src/app/media/[...key]/route.ts).
- *   Keys and URLs are built in src/lib/storage/keys.ts (re-exported here).
+ *   ("/media/<admin|user>/<ownerId>/<uuid>/image.webp", built by the backend, served by
+ *   src/app/media/[...key]/route.ts) — the site and the admin use it as is.
  * - Static brand assets (SVG logo, wordmark, art) live in public/brand → "/brand/...",
  *   with the file's content hash as `?v=…` (taken at build time, next.config.ts) — such URLs are
  *   cached for good. Not for next/image (its localPatterns allow /brand without a query).
  */
-export { MEDIA_URL_PREFIX, mediaPublicUrl } from '@/lib/storage/keys';
-
 export const BRAND_URL_PREFIX = '/brand';
 
 /** File name → content hash of public/brand/*.svg (next.config.ts inlines it at build). */

@@ -6,8 +6,9 @@ import { useState, type ReactElement } from 'react';
 
 import { errorFor } from '@/lib/admin/action-result';
 import { savePartner } from '@/lib/admin/actions/partners';
-import type { AdminMediaRef, PartnerFormData } from '@/lib/admin/types';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { LocalizedText } from '@/lib/localized-text';
+import type { MediaRef } from '@shared/contracts/common';
+import type { AdminPartnerDetails } from '@shared/contracts/content-entities';
 
 import { EditLocaleProvider, localesWithErrors, translationGaps } from '../i18n/LocaleTabs';
 import { LocalizedField } from '../i18n/LocalizedField';
@@ -22,7 +23,7 @@ import { siteLinksFor } from './site-links';
 
 const LOCALIZED = ['description'] as const;
 
-export function PartnerForm({ initial }: { initial: PartnerFormData | null }): ReactElement {
+export function PartnerForm({ initial }: { initial: AdminPartnerDetails | null }): ReactElement {
   return (
     <EditLocaleProvider>
       <PartnerFormInner initial={initial} />
@@ -30,13 +31,13 @@ export function PartnerForm({ initial }: { initial: PartnerFormData | null }): R
   );
 }
 
-function PartnerFormInner({ initial }: { initial: PartnerFormData | null }): ReactElement {
+function PartnerFormInner({ initial }: { initial: AdminPartnerDetails | null }): ReactElement {
   const t = useTranslations('admin');
   const router = useRouter();
   const [name, setName] = useState(initial?.name ?? '');
   const [url, setUrl] = useState(initial?.url ?? '');
   const [description, setDescription] = useState<LocalizedText>(initial?.description ?? {});
-  const [logo, setLogo] = useState<AdminMediaRef | null>(initial?.logo ?? null);
+  const [logo, setLogo] = useState<MediaRef | null>(initial?.logo ?? null);
   const [published, setPublished] = useState(initial?.published ?? false);
   const { pending, fieldErrors, run } = useActionSubmit();
 

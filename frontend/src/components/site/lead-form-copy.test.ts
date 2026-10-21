@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { locales } from '@/i18n/locales';
 import { DEFAULT_MESSAGES, defaultMessage, siteTextsFromMessages } from '@/i18n/messages';
-import { isRequiredKey, TEXT_KEYS, type TextKey } from '@/lib/content/registry';
+import { TEXT_KEYS, type TextKey } from '@/lib/content/registry';
 import { LEAD_TOPICS } from '@/lib/lead-form-config';
 
+import { isRequiredKey } from '../../../test/site-text-metadata';
 import { leadFormCopy } from './lead-form-copy';
 
 /** Every text as «key» — shows which message each part of the copy is read from. */

@@ -6,13 +6,13 @@ import {
   LEAD_SUBJECT_MAX,
   LEAD_TOPICS,
   LEAD_TYPES,
-  leadApiResponseSchema,
   leadFieldsFor,
   leadIntentFromSearch,
   leadIntentHref,
   leadLocaleOf,
   leadSubject,
   normalizePhone,
+  parseLeadApiResponse,
   parseLeadIntent,
   validateLeadInput,
 } from './leads';
@@ -178,6 +178,33 @@ describe('validateLeadInput — envelope', () => {
   });
 });
 
+describe('validateLeadInput — malformed values (API payloads)', () => {
+  it('reports the first failed check per field', () => {
+    expect(errorsOf({ ...base, type: 'CONTACT', name: 42, email: 'a@b.co' })).toEqual({ name: { code: 'required' } });
+    expect(errorsOf({ ...base, type: 'CONTACT', email: `${'a'.repeat(250)}@b.co` })).toEqual({
+      email: { code: 'tooLong', max: LEAD_LIMITS.emailMax },
+    });
+    expect(errorsOf({ ...base, type: 'TAILORING', phone: '1'.repeat(33) })).toEqual({
+      phone: { code: 'tooLong', max: LEAD_LIMITS.phoneMax },
+    });
+    expect(errorsOf({ ...base, type: 'CONTACT', email: 'a@b.co', message: 5 })).toEqual({
+      message: { code: 'invalid' },
+    });
+  });
+
+  it('treats a non-text e-mail as missing where it is required and as invalid where it is optional', () => {
+    expect(errorsOf({ ...base, type: 'CONTACT', email: 42 })).toEqual({ email: { code: 'required' } });
+    expect(errorsOf({ ...base, type: 'PARTNERSHIP', email: 42 })).toEqual({ email: { code: 'invalidEmail' } });
+    expect(errorsOf({ ...base, type: 'TAILORING', phone: 79001234567 })).toEqual({ phone: { code: 'invalidPhone' } });
+  });
+
+  it('reports every failing field at once, in the order of the form', () => {
+    const errors = errorsOf({ type: 'TAILORING', name: 'И', message: 'я'.repeat(2001), hp: null });
+    expect(Object.keys(errors)).toEqual(['name', 'message', 'consent', 'type', 'contact']);
+    expect(errors.type).toEqual({ code: 'invalid' });
+  });
+});
+
 describe('form configuration', () => {
   it('shows the email first and requires it in the contact form', () => {
     expect(LEAD_FORM_FIELDS.CONTACT[0]).toEqual({ name: 'email', required: true });
@@ -230,17 +257,53 @@ describe('lead intents', () => {
   });
 });
 
-describe('leadApiResponseSchema', () => {
+describe('parseLeadApiResponse', () => {
   it('parses success and failure bodies', () => {
-    expect(leadApiResponseSchema.safeParse({ ok: true, id: 'abc' }).success).toBe(true);
+    expect(parseLeadApiResponse({ ok: true, id: 'abc' })).toEqual({ ok: true, id: 'abc' });
     expect(
-      leadApiResponseSchema.safeParse({
+      parseLeadApiResponse({
         ok: false,
         error: 'invalid_form',
         message: 'Проверьте поля формы',
         fieldErrors: { email: 'Укажите корректный e-mail' },
-      }).success,
-    ).toBe(true);
-    expect(leadApiResponseSchema.safeParse({ ok: false, error: 'teapot', message: '?' }).success).toBe(false);
+      }),
+    ).toEqual({
+      ok: false,
+      error: 'invalid_form',
+      message: 'Проверьте поля формы',
+      fieldErrors: { email: 'Укажите корректный e-mail' },
+    });
+    expect(parseLeadApiResponse({ ok: false, error: 'rate_limited', message: 'Подождите', retryAfter: 30 })).toEqual({
+      ok: false,
+      error: 'rate_limited',
+      message: 'Подождите',
+      retryAfter: 30,
+    });
+  });
+
+  it('keeps only the known properties', () => {
+    expect(parseLeadApiResponse({ ok: true, id: 'abc', debug: 1 })).toEqual({ ok: true, id: 'abc' });
+    expect(parseLeadApiResponse({ ok: false, error: 'server_error', message: 'm', stack: 'x' })).toEqual({
+      ok: false,
+      error: 'server_error',
+      message: 'm',
+    });
+  });
+
+  it.each([
+    null,
+    'not json',
+    [],
+    { ok: true },
+    { ok: true, id: 1 },
+    { ok: 'false', error: 'server_error', message: 'm' },
+    { ok: false, error: 'teapot', message: '?' },
+    { ok: false, error: 'server_error' },
+    { ok: false, error: 'invalid_form', message: 'm', fieldErrors: { nope: 'x' } },
+    { ok: false, error: 'invalid_form', message: 'm', fieldErrors: { email: 1 } },
+    { ok: false, error: 'invalid_form', message: 'm', fieldErrors: null },
+    { ok: false, error: 'rate_limited', message: 'm', retryAfter: '30' },
+  ])('rejects %j', body => {
+    expect(parseLeadApiResponse(body)).toBeNull();
   });
 });

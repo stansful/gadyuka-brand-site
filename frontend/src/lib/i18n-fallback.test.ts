@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { locales } from '@/i18n/locales';
+import en from '@shared/messages/en.json';
+import ru from '@shared/messages/ru.json';
 
-import en from '../../messages/en.json';
-import ru from '../../messages/ru.json';
-import { missingLocales, readOptionalText, readText } from './i18n-text';
+import { missingLocales, readText } from './localized-text';
 
 /** Localization fallbacks the lead forms / SEO rely on (content in ru, en may be missing). */
 describe('LocalizedText fallback to ru', () => {
@@ -22,7 +22,7 @@ describe('LocalizedText fallback to ru', () => {
 
   it('returns empty values when nothing is filled in (form labels then use messages)', () => {
     expect(readText({}, 'en')).toBe('');
-    expect(readOptionalText({ en: '' }, 'ru')).toBeNull();
+    expect(readText({ en: '' }, 'ru')).toBe('');
     expect(readText(undefined, 'ru')).toBe('');
   });
 });

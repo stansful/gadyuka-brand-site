@@ -1,0 +1,21 @@
+model Collection {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  /// URL slug (CHECK in the migration)
+  slug        String    @unique
+  /// LocalizedText
+  title       Json
+  /// LocalizedText
+  description Json      @default("{}")
+  coverId     String?   @map("cover_id") @db.Uuid
+  cover       Media?    @relation("CollectionCover", fields: [coverId], references: [id], onDelete: SetNull)
+  order       Int       @default(0)
+  published   Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@index([published, order])
+  @@index([coverId])
+  @@map("collections")
+}

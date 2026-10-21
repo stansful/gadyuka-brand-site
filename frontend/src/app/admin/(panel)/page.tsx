@@ -7,7 +7,7 @@ import { buttonClasses } from '@/components/admin/ui/Button';
 import { Card, EmptyState, PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
 import { formatDateTimeRu } from '@/lib/admin/labels';
-import { getDashboardData } from '@/lib/admin/queries';
+import { getDashboardData } from '@/lib/admin/queries/dashboard';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
@@ -25,7 +25,7 @@ export default async function DashboardPage(): Promise<ReactElement> {
         title={t('title')}
         description={t('description')}
         actions={
-          <a href="/frontend/public" target="_blank" rel="noreferrer" className={buttonClasses('outline', 'md')}>
+          <a href="/" target="_blank" rel="noreferrer" className={buttonClasses('outline', 'md')}>
             {t('openSite')}
             <ArrowUpRight className="size-4" aria-hidden />
           </a>

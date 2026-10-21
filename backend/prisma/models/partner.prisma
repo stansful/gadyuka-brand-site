@@ -1,0 +1,17 @@
+model Partner {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name        String
+  url         String?
+  logoId      String?  @map("logo_id") @db.Uuid
+  logo        Media?   @relation("PartnerLogo", fields: [logoId], references: [id], onDelete: SetNull)
+  /// LocalizedText
+  description Json     @default("{}")
+  order       Int      @default(0)
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([published, order])
+  @@index([logoId])
+  @@map("partners")
+}

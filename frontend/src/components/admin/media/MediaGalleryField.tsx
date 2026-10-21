@@ -8,7 +8,7 @@ import { GripVertical, ImagePlus, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useId, useState, type ReactElement, type ReactNode } from 'react';
 
-import type { AdminMediaRef } from '@/lib/admin/types';
+import type { AdminMediaRef } from './media-types';
 
 import { moveId, useDndAccessibility, useSortableSensors } from '../lists/dnd';
 import { Button } from '../ui/Button';

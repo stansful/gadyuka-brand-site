@@ -6,8 +6,9 @@ import { useState, type ReactElement } from 'react';
 
 import { errorFor } from '@/lib/admin/action-result';
 import { saveGalleryItem } from '@/lib/admin/actions/gallery';
-import type { AdminMediaRef, GalleryFormData } from '@/lib/admin/types';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { LocalizedText } from '@/lib/localized-text';
+import type { MediaRef } from '@shared/contracts/common';
+import type { AdminGalleryItemDetails } from '@shared/contracts/content-entities';
 
 import { EditLocaleProvider, localesWithErrors, translationGaps } from '../i18n/LocaleTabs';
 import { LocalizedField } from '../i18n/LocalizedField';
@@ -20,7 +21,7 @@ import { siteLinksFor } from './site-links';
 
 const LOCALIZED = ['caption'] as const;
 
-export function GalleryForm({ initial }: { initial: GalleryFormData | null }): ReactElement {
+export function GalleryForm({ initial }: { initial: AdminGalleryItemDetails | null }): ReactElement {
   return (
     <EditLocaleProvider>
       <GalleryFormInner initial={initial} />
@@ -28,10 +29,10 @@ export function GalleryForm({ initial }: { initial: GalleryFormData | null }): R
   );
 }
 
-function GalleryFormInner({ initial }: { initial: GalleryFormData | null }): ReactElement {
+function GalleryFormInner({ initial }: { initial: AdminGalleryItemDetails | null }): ReactElement {
   const t = useTranslations('admin');
   const router = useRouter();
-  const [media, setMedia] = useState<AdminMediaRef | null>(initial?.media ?? null);
+  const [media, setMedia] = useState<MediaRef | null>(initial?.media ?? null);
   const [caption, setCaption] = useState<LocalizedText>(initial?.caption ?? {});
   const [published, setPublished] = useState(initial?.published ?? true);
   const { pending, fieldErrors, setFieldErrors, run } = useActionSubmit();

@@ -1,0 +1,6 @@
+{
+  "*.{js,mjs,cjs,ts,json,jsonc}": [
+    "oxfmt --disable-nested-config --write --no-error-on-unmatched-pattern",
+    "oxlint --disable-nested-config --fix"
+  ]
+}

@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { CollectionForm } from '@/components/admin/forms/CollectionForm';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { getCollectionForm } from '@/lib/admin/queries';
+import { getCollectionForm } from '@/lib/admin/queries/catalog';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

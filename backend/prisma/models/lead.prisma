@@ -1,0 +1,27 @@
+/// Requests sent from the site forms. The owner is notified in Telegram.
+model Lead {
+  id            String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  type          LeadType
+  name          String
+  email         String?
+  phone         String?
+  message       String     @db.Text
+  /// Locale of the page the form was sent from (CHECK in the migration)
+  locale        String
+  status        LeadStatus @default(NEW)
+  telegramSent  Boolean    @default(false) @map("telegram_sent")
+  telegramError String?    @map("telegram_error") @db.Text
+  /// sha256(ip + IP_HASH_SALT), for rate limiting
+  ipHash        String?    @map("ip_hash")
+  /// Extra form data (user agent, referer, product slug …)
+  meta          Json?
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  @@index([createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
+  @@index([ipHash, createdAt])
+  @@index([telegramSent])
+  @@map("leads")
+}

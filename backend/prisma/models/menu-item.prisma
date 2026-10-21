@@ -1,0 +1,17 @@
+/// Site menu (header and/or footer). The admin can add, reorder, hide and remove items.
+model MenuItem {
+  id           String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  /// LocalizedText
+  label        Json
+  /// "#catalog" (landing anchor), "/catalog/<slug>" (localized site path), "https://…", "mailto:", "tel:"
+  href         String
+  showInHeader Boolean  @default(true) @map("show_in_header")
+  showInFooter Boolean  @default(true) @map("show_in_footer")
+  order        Int      @default(0)
+  published    Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([published, order])
+  @@map("menu_items")
+}

@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "unicorn", "oxc", "react", "nextjs", "jsx-a11y", "import"],
-  "ignorePatterns": ["src/generated/**", "concepts/**", "assets/**", "next-env.d.ts"],
+  "ignorePatterns": ["concepts/**", "assets/**", "next-env.d.ts"],
   "rules": {
     "unicorn/prefer-number-properties": "off",
     "typescript/no-non-null-assertion": "off",

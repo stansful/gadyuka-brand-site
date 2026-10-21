@@ -1,27 +1,14 @@
-import type { LeadStatus, LeadType } from '@/generated/prisma/enums';
-import type { SocialType } from '@/lib/content/social';
+import type { LeadStatus } from '@shared/contracts/leads';
 
 /**
  * Enum lists and ru-only formatters of the admin (isomorphic). The enum NAMES are admin copy:
- * admin.leads.types / admin.leads.statuses / admin.socials.types in messages/admin/ru.json;
- * counts with plural forms are ICU plurals there too.
+ * admin.leads.types / admin.leads.statuses in shared/messages/admin/ru.json (the unions are the
+ * API's, shared/contracts/leads.ts); counts with plural forms are ICU plurals there too.
  */
 
-export const LEAD_TYPES: readonly LeadType[] = ['TAILORING', 'PARTNERSHIP', 'CONTACT'];
+/** The lead types in display order (the site's list, src/lib/lead-intent.ts). */
+export { LEAD_TYPES } from '@/lib/lead-intent';
 export const LEAD_STATUSES: readonly LeadStatus[] = ['NEW', 'IN_PROGRESS', 'DONE', 'SPAM'];
-
-/** Example link per social type (placeholder of the URL field). */
-export const SOCIAL_URL_PLACEHOLDERS: Readonly<Record<SocialType, string>> = {
-  TELEGRAM: 'https://t.me/…',
-  VK: 'https://vk.com/…',
-  INSTAGRAM: 'https://instagram.com/…',
-  WHATSAPP: 'https://wa.me/79000000000',
-  YOUTUBE: 'https://youtube.com/@…',
-  TIKTOK: 'https://tiktok.com/@…',
-  PINTEREST: 'https://pinterest.com/…',
-  WEBSITE: 'https://…',
-  OTHER: 'https://…',
-};
 
 /** "★★★★☆" — `rating` filled stars of `max` (the rating is clamped to the scale). */
 export function formatStars(rating: number, max: number): string {
@@ -39,21 +26,9 @@ const DATE_TIME = new Intl.DateTimeFormat('ru-RU', {
   timeZone: 'Europe/Moscow',
 });
 
-const DATE_ONLY = new Intl.DateTimeFormat('ru-RU', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'Europe/Moscow',
-});
-
 /** "16.10.2026, 23:41" (Moscow time) */
 export function formatDateTimeRu(iso: string): string {
   return DATE_TIME.format(new Date(iso));
-}
-
-/** "16 октября 2026" (Moscow time) */
-export function formatDateRu(iso: string): string {
-  return DATE_ONLY.format(new Date(iso));
 }
 
 /**

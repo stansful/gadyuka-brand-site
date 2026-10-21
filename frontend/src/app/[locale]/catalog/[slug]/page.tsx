@@ -9,7 +9,7 @@ import { CatalogScene } from '@/components/site/scenes/CatalogScene';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { SiteHeader } from '@/components/site/SiteHeader';
 import { toLocale } from '@/i18n/locales';
-import { getCollectionBySlug, getLanding, getPublishedCollectionSlugs, SECTION_ANCHORS } from '@/lib/content';
+import { getCollectionBySlug, getLanding, SECTION_ANCHORS } from '@/lib/content';
 import { getBrandCopy } from '@/lib/seo/brand-copy';
 import { collectionPageJsonLd } from '@/lib/seo/json-ld';
 import { JsonLd } from '@/lib/seo/JsonLd';
@@ -30,19 +30,20 @@ import type { ReactElement } from 'react';
 
 /**
  * Collection pages are reached by full document navigations (plain <a> links from the landing,
- * the sitemap, search engines) and are prerendered per slug, so the page may block on its
- * `slug` param: opt out of the dev-time instant-navigation validation for this segment.
+ * the sitemap, search engines) and render on request from request-time cached data (the backend,
+ * src/lib/api/public.ts), so the page may block on its `slug` param: opt out of the dev-time
+ * instant-navigation validation for this segment.
  */
 export const instant = false;
 
-/** Never a real slug (slugs are lowercase latin + digits + "-"); keeps the build valid on an empty DB. */
+/** Never a real slug (slugs are lowercase latin + digits + "-"): the backend refuses it, the page is a 404. */
 const PLACEHOLDER_SLUG = '__none__';
 
-// Published collections are prerendered; new ones render on first request and are cached.
-// Cache Components requires at least one param, hence the placeholder (→ 404) on an empty DB.
-export async function generateStaticParams(): Promise<Array<{ slug: string }>> {
-  const slugs = await getPublishedCollectionSlugs();
-  return (slugs.length > 0 ? slugs : [PLACEHOLDER_SLUG]).map(slug => ({ slug }));
+// Cache Components requires at least one param, and generateStaticParams runs at build time, when
+// the backend is out of reach (src/lib/api/README.md): one placeholder (→ 404). Every real
+// collection renders on its first request and is cached (cacheTag('content')).
+export function generateStaticParams(): Array<{ slug: string }> {
+  return [{ slug: PLACEHOLDER_SLUG }];
 }
 
 export async function generateMetadata({ params }: PageProps<'/[locale]/catalog/[slug]'>): Promise<Metadata> {

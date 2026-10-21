@@ -1,0 +1,12 @@
+{
+  "frontend/**/*.{js,mjs,cjs,ts,tsx}": [
+    "sh backend/.husky/lib/run-in-package.sh frontend oxfmt --write --no-error-on-unmatched-pattern",
+    "sh backend/.husky/lib/run-in-package.sh frontend oxlint --fix"
+  ],
+  "frontend/**/*.{json,jsonc,md}": "sh backend/.husky/lib/run-in-package.sh frontend oxfmt --write --no-error-on-unmatched-pattern",
+  "shared/**/*.ts": [
+    "sh backend/.husky/lib/run-in-package.sh backend oxfmt --disable-nested-config --write --no-error-on-unmatched-pattern",
+    "sh backend/.husky/lib/run-in-package.sh backend oxlint --disable-nested-config --fix"
+  ],
+  "shared/**/*.json": "sh backend/.husky/lib/run-in-package.sh backend oxfmt --disable-nested-config --write --no-error-on-unmatched-pattern"
+}

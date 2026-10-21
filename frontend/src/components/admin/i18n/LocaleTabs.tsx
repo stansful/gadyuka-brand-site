@@ -16,7 +16,7 @@ import {
 
 import { defaultLocale, localeNames, locales, type Locale } from '@/i18n/locales';
 import type { FieldErrors } from '@/lib/admin/action-result';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { LocalizedText } from '@/lib/localized-text';
 
 /**
  * Language tabs of an admin form. Generated from `locales` (src/i18n/locales.ts),

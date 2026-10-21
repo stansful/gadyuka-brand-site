@@ -1,54 +1,38 @@
 import 'server-only';
-import { cacheLife, cacheTag } from 'next/cache';
 import { unstable_rethrow } from 'next/navigation';
+import { connection } from 'next/server';
 
-import { CACHE_TAGS, CONTENT_CACHE_LIFE } from '@/lib/content/cache';
-import { db } from '@/lib/db';
+import { cachedPublicRead } from '@/lib/api/public';
+import type { SiteMessagesResponse } from '@shared/contracts/content';
 
-import { defaultLocale, type Locale } from './locales';
+import { type Locale } from './locales';
 import {
-  MESSAGE_KEYS,
-  resolveMessages,
+  defaultSiteMessages,
+  siteMessagesFromTree,
   siteTextsFromMessages,
   type MessageKey,
-  type MessageRow,
   type SiteMessages,
 } from './messages';
 
 /**
- * Site UI messages — the runtime side (server-only): `Message` rows overlaid on the JSON
- * defaults of ./messages.ts (resolveMessages documents the rules). Used by next-intl
- * (./request.ts → getTranslations / getMessages, fail-soft through loadSiteMessages) and by the
- * landing data (getLanding → texts).
+ * Site UI messages — the runtime side (server-only): the backend's GET /api/v1/public/messages/:locale
+ * (the admin's Message rows over the shared/messages defaults, resolved by the backend), cached like
+ * the rest of the public content ("use cache" + cacheTag('content') + the "hours" profile, see
+ * src/lib/api/public.ts). Used by next-intl (./request.ts → getTranslations / getMessages, fail-soft
+ * through loadSiteMessages) and by the landing data (getLanding → texts).
+ *
+ * This is the example of the request-time rule of public reads (docs/ARCHITECTURE.md, «Данные
+ * сайта»): loadSiteMessages passes connection() first, so `next build` never calls the backend.
  */
 
 /**
- * The resolved message tree of `locale`. Cached like the rest of the public content
- * ("use cache" + cacheTag("content") + the "hours" profile; the locale is part of the cache
- * key), so an admin save that calls revalidateContent() shows up on the next request.
+ * The resolved message tree of `locale` (cached; the locale is part of the cache key), so an admin
+ * save that ends with updateTag('content') shows up on the next request. Throws when the backend
+ * cannot answer (never cached). Usable inside "use cache" (no request-time API in here).
  */
 export async function getSiteMessages(locale: Locale): Promise<SiteMessages> {
-  'use cache';
-  cacheTag(CACHE_TAGS.content);
-  cacheLife(CONTENT_CACHE_LIFE);
-
-  // Another locale also needs the default-locale rows (a blank translation falls back to them).
-  const rows: MessageRow[] = await db.message.findMany({
-    where: { locale: { in: locale === defaultLocale ? [locale] : [locale, defaultLocale] } },
-    select: { key: true, locale: true, value: true },
-  });
-
-  if (process.env.NODE_ENV !== 'production') {
-    const seeded = new Set(rows.filter(row => row.locale === locale).map(row => row.key));
-    const missing = MESSAGE_KEYS.filter(key => !seeded.has(key));
-    if (missing.length > 0) {
-      console.warn(
-        `[messages] ${missing.length} ${locale} message(s) have no DB row (defaults shown), e.g. ${missing.slice(0, 5).join(', ')} — run npm run db:seed`,
-      );
-    }
-  }
-
-  return resolveMessages(locale, rows);
+  const response = await cachedPublicRead<SiteMessagesResponse>(`/api/v1/public/messages/${locale}`);
+  return siteMessagesFromTree(locale, response.messages);
 }
 
 /** At most one fallback log line per locale and interval: an outage is logged, not every render it hits. */
@@ -57,7 +41,7 @@ const FALLBACK_LOG_INTERVAL_MS = 60_000;
 /**
  * When the fallback of each locale was last logged (performance.now(): monotonic, and not a value
  * Cache Components guards). A successful read does not reset it: during an outage, renders that
- * hit a cache entry from before still succeed, so a success does not mean the database is back.
+ * hit a cache entry from before still succeed, so a success does not mean the backend is back.
  */
 const fallbackLoggedAt = new Map<Locale, number>();
 
@@ -70,26 +54,29 @@ function logFallback(locale: Locale, error: unknown): void {
 }
 
 /**
- * getSiteMessages for renders that must survive a database outage: when the messages cannot be
- * read (the DB is down and the cache entry is cold or expired), the bundled defaults of
- * messages/<locale>.json stand in — without the admin's edits, but the page still renders.
- * Used where an error would take down the whole document: next-intl's request config
- * (./request.ts — every t() of the site, the admin and the Route Handlers) and the [locale]
- * root layout, which no error.tsx can catch.
+ * getSiteMessages for renders that must survive a backend outage, at request time only:
+ * - `await connection()` first: prerendering (next build — no backend there) stops here, the page
+ *   renders on request (the [locale] root layout declares `instant = false`);
+ * - when the messages cannot be read (the backend is down and the cache entry is cold or expired),
+ *   the bundled defaults of shared/messages/<locale>.json stand in — without the admin's edits, but
+ *   the page still renders. Used where an error would take down the whole document: next-intl's
+ *   request config (./request.ts — every t() of the site, the admin and the Route Handlers) and the
+ *   [locale] root layout, which no error.tsx can catch.
  *
  * The fallback is decided OUTSIDE the cache on purpose: getSiteMessages never stores it, so the
- * first read after the database is back serves the edited copy again. For the same reason this
- * must not run inside "use cache" (the caller's entry would keep the defaults): cached code reads
+ * first read after the backend is back serves the edited copy again. For the same reason this must
+ * not run inside "use cache" (connection() is not allowed there anyway): cached code reads
  * getSiteMessages / getSiteTexts and fails together with the rest of its data.
  */
 export async function loadSiteMessages(locale: Locale): Promise<SiteMessages> {
+  await connection();
   try {
     return await getSiteMessages(locale);
   } catch (error: unknown) {
-    // Next.js control flow (prerender interruptions, dynamic bail-outs) is not a DB failure.
+    // Next.js control flow (prerender interruptions, dynamic bail-outs) is not a backend failure.
     unstable_rethrow(error);
     logFallback(locale, error);
-    return resolveMessages(locale, []);
+    return defaultSiteMessages(locale);
   }
 }
 

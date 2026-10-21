@@ -1,0 +1,49 @@
+# Repository-wide ignores (frontend/ and backend/ keep their own .gitignore for app-specific output)
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.sublime-workspace
+
+# Dependencies
+node_modules/
+
+# Environment files (secrets) — only the examples are committed
+.env
+.env.*
+!.env.example
+!**/.env.example
+# backend: overrides of .env for `npm test` (no secrets)
+!backend/.env.test
+
+# Build output
+dist/
+build/
+out/
+.next/
+generated/
+*.tsbuildinfo
+
+# Logs and runtime data
+logs/
+*.log
+npm-debug.log*
+*.pid
+*.pid.lock
+
+# Tests
+coverage/
+.nyc_output/
+
+# Local docker data and backups (production keeps them in ~/docker-volumes)
+docker-volumes/
+backups/
+
+# Temporary files
+.tmp/
+.temp/

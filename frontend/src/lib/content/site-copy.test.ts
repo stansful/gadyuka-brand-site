@@ -5,19 +5,19 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { flattenMessages, isMessageKey, MESSAGE_KEYS, type MessageKey } from '@/i18n/messages';
+import ru from '@shared/messages/ru.json';
 
-import ru from '../../../messages/ru.json';
 import { isImageKey } from './registry';
 
 /**
  * Regression guard of the rule «all text of the public site is a message»: every word a visitor
- * (or a screen reader, or the owner's Telegram) gets comes from messages/<locale>.json through the
+ * (or a screen reader, or the owner's Telegram) gets comes from shared/messages/<locale>.json through the
  * DB-backed messages, so the admin can edit it. Parses the site's sources with the TypeScript
  * compiler (comments are not nodes, so they never count) and checks:
  * 1. no Cyrillic in string literals, template literals or JSX text;
  * 2. no words at all in JSX text, in literal JSX children or in literal copy attributes
  *    (aria-label, alt, title, placeholder …) — only aria-hidden glyphs such as → ★ ✂ may stay;
- * 3. every message key the code names exists in messages/ru.json: texts['…'], data-edit="…",
+ * 3. every message key the code names exists in shared/messages/ru.json: texts['…'], data-edit="…",
  *    t('…') of a getTranslations({ namespace }) translator, the telegram.* keys;
  * 4. and the other way round: every message is used somewhere (no dead keys).
  */
@@ -31,7 +31,6 @@ const SITE_SOURCES = [
   'src/app/manifest.ts',
   'src/app/api/leads',
   'src/lib/seo',
-  'src/lib/telegram.ts',
   'src/lib/leads.ts',
   'src/lib/lead-form-config.ts',
   'src/lib/lead-intent.ts',
@@ -60,15 +59,13 @@ const COPY_ATTRIBUTES = new Set([
 /**
  * Keys read through an object or a computed key rather than a literal, so the scan below cannot
  * see them: forms.* (the whole namespace goes to LeadForm as `labels`; errors by code),
- * social.<TYPE> (by the link's type), telegram.leadTypes.<TYPE> (by the lead's type).
+ * social.<TYPE> (by the link's type); telegram.* is read by the backend (the owner's notifications,
+ * backend/src/module/telegram — its TelegramMessageKey test checks those keys).
  */
-const DYNAMIC_PREFIXES = ['forms.', 'social.', 'telegram.leadTypes.'];
+const DYNAMIC_PREFIXES = ['forms.', 'social.', 'telegram.'];
 
 /** Files whose translator is bound to a namespace without a getTranslations call in the file. */
-const IMPLICIT_NAMESPACES: Readonly<Record<string, { namespace: string; callees: readonly string[] }>> = {
-  // t: TelegramText (loadTelegramText — getTranslations({ namespace: 'telegram' })), label(): its <b> wrapper
-  'src/lib/telegram.ts': { namespace: 'telegram', callees: ['t', 'label'] },
-};
+const IMPLICIT_NAMESPACES: Readonly<Record<string, { namespace: string; callees: readonly string[] }>> = {};
 
 function filesUnder(relative: string): string[] {
   const absolute = path.join(ROOT, relative);
@@ -258,7 +255,7 @@ describe('public site copy lives in the messages', () => {
 
   const references = referencedKeys();
 
-  it('only names message keys that exist in messages/ru.json', () => {
+  it('only names message keys that exist in shared/messages/ru.json', () => {
     const unknown = references
       .filter(({ key }) => !isMessageKey(key) && !isImageKey(key))
       .map(({ key, at }) => `${at} ${key}`);

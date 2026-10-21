@@ -7,7 +7,7 @@ import { GalleryBulkAdd } from '@/components/admin/lists/GalleryBulkAdd';
 import { buttonClasses } from '@/components/admin/ui/Button';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { listGalleryAdmin } from '@/lib/admin/queries';
+import { listGalleryAdmin } from '@/lib/admin/queries/content';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

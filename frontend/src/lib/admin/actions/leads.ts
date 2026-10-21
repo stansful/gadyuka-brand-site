@@ -2,40 +2,55 @@
 
 import { refresh } from 'next/cache';
 
-import type { LeadStatus } from '@/generated/prisma/enums';
-import { db } from '@/lib/db';
-import { resendLeadToTelegram } from '@/lib/telegram';
+import { adminApiAction } from '@/lib/api/admin-action';
+import type { ApiResult } from '@/lib/api/api-result';
+import { resendLeadToTelegram, saveLeadStatus } from '@/lib/api/leads';
+import type { LeadStatus } from '@shared/contracts/leads';
 
-import { adminAction, errorFailure } from '../action-helpers';
 import { actionFail, actionOk, type ActionResult } from '../action-result';
 import { getAdminTranslations } from '../i18n-server';
-import { idSchema, leadStatusSchema } from '../schemas';
 
-/** Leads are not public content: no cache tag to invalidate, only the admin view is refreshed. */
+/**
+ * Lead status and the Telegram re-send, through the backend (/api/v1/admin/leads/:id/…). Leads are
+ * not public content: no cache tag to invalidate, only the admin view is refreshed.
+ */
 
 export async function setLeadStatus(id: string, status: LeadStatus): Promise<ActionResult> {
-  return adminAction('setLeadStatus', async () => {
-    const rowId = idSchema.safeParse(id);
-    const nextStatus = leadStatusSchema.safeParse(status);
-    if (!rowId.success || !nextStatus.success) return errorFailure('invalidRequest');
-    await db.lead.update({ where: { id: rowId.data }, data: { status: nextStatus.data }, select: { id: true } });
-    refresh();
-    const t = await getAdminTranslations('admin.leads');
-    return actionOk(null, t('statusSaved', { status: t(`statuses.${nextStatus.data}`) }));
+  return adminApiAction('setLeadStatus', () => asInvalidRequest(saveLeadStatus(id, status)), {
+    onSuccess: async data => {
+      refresh();
+      const t = await getAdminTranslations('admin.leads');
+      return actionOk(null, t('statusSaved', { status: t(`statuses.${data.status}`) }));
+    },
   });
 }
 
-/** «Отправить в Telegram повторно» — delegates to src/lib/telegram.ts (dry-run in dev/tests). */
+/** «Отправить в Telegram повторно» — the backend sends it (dry run in dev / tests) and stores the outcome. */
 export async function resendLead(id: string): Promise<ActionResult> {
-  return adminAction('resendLead', async () => {
-    const rowId = idSchema.safeParse(id);
-    if (!rowId.success) return errorFailure('invalidRequest');
-    const t = await getAdminTranslations('admin.leads');
-    const exists = await db.lead.findUnique({ where: { id: rowId.data }, select: { id: true } });
-    if (!exists) return actionFail(t('notFound'));
-    const result = await resendLeadToTelegram(rowId.data);
-    refresh();
-    if (!result.ok) return actionFail(t('resendFailed', { error: result.error ?? t('resendFailedUnknown') }));
-    return actionOk(null, t('resent'));
+  return adminApiAction('resendLead', () => asInvalidRequest(resendLeadToTelegram(id)), {
+    onSuccess: async data => {
+      refresh();
+      const t = await getAdminTranslations('admin.leads');
+      if (data.telegramSent) return actionOk(null, t('resent'));
+      return actionFail(t('resendFailed', { error: data.telegramError ?? t('resendFailedUnknown') }));
+    },
   });
+}
+
+/**
+ * These actions have no form: a request the backend refuses as invalid (a stale or tampered id or
+ * status) shows «Некорректный запрос», as before, instead of «Проверьте поля формы» with field errors.
+ */
+async function asInvalidRequest<T>(request: Promise<ApiResult<T>>): Promise<ApiResult<T>> {
+  const result = await request;
+  if (result.ok || result.failure.kind !== 'validation') return result;
+  return {
+    ok: false,
+    failure: {
+      kind: 'domain',
+      status: result.failure.status,
+      error: 'badRequest',
+      message: { key: 'admin.errors.invalidRequest' },
+    },
+  };
 }

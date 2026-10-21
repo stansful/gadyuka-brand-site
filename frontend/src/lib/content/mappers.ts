@@ -1,44 +1,54 @@
-import 'server-only';
-import type { Prisma } from '@/generated/prisma/client';
-import { defaultLocale, type Locale } from '@/i18n/locales';
-import { readText } from '@/lib/i18n-text';
+import { defaultMessage, MESSAGE_KEYS } from '@/i18n/messages';
+import type { LandingResponse, PublicCollection, PublicSettings } from '@shared/contracts/content';
 
-import type { ImageRef } from './types';
+import type { CollectionView, LandingContent, SettingsView } from './types';
 
-/** Prisma `select` for every media relation the read layer exposes. */
-export const mediaSelect = {
-  id: true,
-  url: true,
-  width: true,
-  height: true,
-  mime: true,
-  alt: true,
-} as const satisfies Prisma.MediaSelect;
+import { IMAGE_KEYS } from './registry';
 
-export type MediaRow = Prisma.MediaGetPayload<{ select: typeof mediaSelect }>;
+/**
+ * Backend answers (shared/contracts/content.ts, already localized) → the view models the site
+ * components render (./types.ts). The shapes match field for field; the mapping fills what the
+ * components rely on: every message key and every landing image slot present, mutable arrays.
+ */
 
-export function toImageRef(media: MediaRow | null | undefined, locale: Locale): ImageRef | null {
-  if (!media) return null;
+/**
+ * The landing for the components. `now`: the moment the cache entry is made (the footer's year).
+ * - texts: every key of shared/messages/ru.json — the backend's value, else the bundled default (a
+ *   key the backend does not know yet); keys the frontend does not know are dropped;
+ * - images: every slot of the registry (CONTENT_IMAGES) — null when the backend has no picture for it.
+ */
+export function toLandingContent(response: LandingResponse, now: Date): LandingContent {
+  const { locale } = response;
   return {
-    id: media.id,
-    // Media.url: the public link stored at upload time ("/media/<key>", src/lib/storage/keys.ts).
-    src: media.url,
-    width: media.width,
-    height: media.height,
-    mime: media.mime,
-    // No fallback here: a localized title passed as `fallbackAlt` must win over the Russian alt
-    // on /en; the default-locale alt is kept separately as the last resort.
-    alt: readText(media.alt, locale, { fallback: false }),
-    altDefault: readText(media.alt, defaultLocale),
+    locale,
+    texts: recordFromKeys(MESSAGE_KEYS, key => response.texts[key] ?? defaultMessage(key, locale)),
+    images: recordFromKeys(IMAGE_KEYS, key => response.images[key] ?? null),
+    menu: [...response.menu],
+    socials: [...response.socials],
+    collections: response.collections.map(toCollectionView),
+    reviews: [...response.reviews],
+    news: [...response.news],
+    gallery: [...response.gallery],
+    offers: [...response.offers],
+    partners: [...response.partners],
+    settings: toSettingsView(response.settings),
+    year: now.getFullYear(),
   };
 }
 
-/** Split a multi-line text into trimmed, non-empty lines. */
-export function toLines(text: string): string[] {
-  return text
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(line => line.length > 0);
+export function toCollectionView(collection: PublicCollection): CollectionView {
+  return {
+    ...collection,
+    products: collection.products.map(product => ({
+      ...product,
+      details: [...product.details],
+      images: [...product.images],
+    })),
+  };
+}
+
+export function toSettingsView(settings: PublicSettings): SettingsView {
+  return { ...settings };
 }
 
 /** Build a fully-populated record from a key list. */

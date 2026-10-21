@@ -1,0 +1,18 @@
+/// One translation of one site UI string. `key` is the dotted path in shared/messages/<locale>.json
+/// (e.g. "hero.title", "forms.errors.required"). Rows are seeded from the JSON files; the JSON value
+/// is also the fallback when a row is missing.
+model Message {
+  key       String
+  /// Locale code ("ru", "en"; CHECK in the migration)
+  locale    String
+  value     String    @db.Text
+  /// null = value came from the seed (a re-seed may update it to a newer default);
+  /// set = edited in the admin (the seed never touches it again unless SEED_OVERWRITE=1)
+  editedAt  DateTime? @map("edited_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@id([key, locale])
+  @@index([locale])
+  @@map("messages")
+}

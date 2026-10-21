@@ -6,7 +6,7 @@ import { EntityList } from '@/components/admin/lists/EntityList';
 import { buttonClasses } from '@/components/admin/ui/Button';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { listCollectionsAdmin } from '@/lib/admin/queries';
+import { listCollectionsAdmin } from '@/lib/admin/queries/catalog';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

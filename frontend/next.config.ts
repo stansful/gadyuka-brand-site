@@ -6,19 +6,19 @@ import createNextIntlPlugin from 'next-intl/plugin';
 
 import type { NextConfig } from 'next';
 
-import { LOCALE_FALLBACK_REWRITE } from '@/i18n/locale-fallback';
+import { LOCALE_FALLBACK_REWRITE } from './src/i18n/locale-fallback';
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 /**
- * Baseline security headers for every page, the admin and the API — mirrored in the
- * Caddyfile (Caddy overwrites them with identical values in production). Keeping them here
- * too means `next start` without Caddy is not left without any protection.
+ * Baseline security headers for every page, the admin and the API — mirrored by the reverse
+ * proxy (it overwrites them with identical values in production, docs/COMPRESSION.md). Keeping them
+ * here too means `next start` without the proxy is not left without any protection.
  *
  * CSP baseline (no script-src yet — tighten with nonces later, starting with /admin):
  * no <base> hijacking, no plugins, no framing by other sites, forms post only to us.
- * /media/* is excluded: those responses carry their own, stricter sandbox CSP
- * (src/app/media/[...key]/route.ts).
+ * /media/* is excluded: those responses carry their own, stricter sandbox CSP (set by the backend,
+ * passed through by src/app/media/[...key]/route.ts).
  */
 const BASELINE_CSP = "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'";
 
@@ -28,7 +28,7 @@ const securityHeaders = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
-  // Ignored by browsers over plain HTTP (local dev); includeSubDomains — see DEPLOY.md.
+  // Ignored by browsers over plain HTTP (local dev); add includeSubDomains only once every subdomain is HTTPS.
   ...(process.env.NODE_ENV === 'production' ? [{ key: 'Strict-Transport-Security', value: 'max-age=31536000' }] : []),
 ];
 
@@ -61,8 +61,19 @@ const BRAND_CACHE_VERSIONED = 'public, max-age=31536000, immutable';
 /** public/brand/* without a version (the admin's wordmark, an outdated page): revalidated on every use. */
 const BRAND_CACHE_UNVERSIONED = 'public, max-age=0, must-revalidate';
 
+/**
+ * The repository root: the app imports ../shared (messages, API contracts — tsconfig paths
+ * "@shared/*"), and Turbopack resolves nothing outside its root. Output file tracing uses the same
+ * root, so the standalone output mirrors the repository layout: the server is
+ * .next/standalone/frontend/server.js with its traced dependencies in .next/standalone/frontend/node_modules
+ * (its static files go to .next/standalone/frontend/.next/static and .next/standalone/frontend/public).
+ */
+const REPOSITORY_ROOT = path.join(__dirname, '..');
+
 const nextConfig: NextConfig = {
   output: 'standalone',
+  turbopack: { root: REPOSITORY_ROOT },
+  outputFileTracingRoot: REPOSITORY_ROOT,
   // Cache Components model: data is cached with "use cache" + cacheTag/cacheLife
   // (see src/lib/content/cache.ts), invalidated with updateTag/revalidateTag.
   cacheComponents: true,
@@ -74,7 +85,25 @@ const nextConfig: NextConfig = {
   // halved. The public site uses plain <a> links, so visitors gained nothing from it.
   // Re-check before the next major (the feature becomes the default there).
   partialPrefetching: false,
+  // Blocking metadata for every visitor, not only Next's list of HTML-limited bots. The public
+  // pages render at request time (backend data), and with streamed metadata the first bytes go out
+  // before a page can call notFound(): an unknown path or collection then answered 200 + noindex
+  // instead of 404 (browsers, Googlebot, link checkers). Blocking, the status is known before the
+  // body starts, as it was with the prerendered pages. Cost measured (/, /en, catalog; warm cache,
+  // local, also with 60 ms RTT): TTFB +11–17 ms, FCP / LCP / DCL / load unchanged within ±8 ms —
+  // the documents block on the same cached reads anyway.
+  htmlLimitedBots: /.*/,
   poweredByHeader: false,
+  // Next's own on-the-fly gzip stays ON — it is the fallback for anything that reaches the app
+  // directly: `next start` / the standalone server without a proxy (local runs, a health check, a
+  // misconfigured proxy). Gzip is all it has (no brotli / zstd), and with a page's HTML carrying
+  // its RSC payload twice brotli/zstd pay off most there (landing: gzip 47 KB vs brotli ~28 KB).
+  // In production the reverse proxy owns compression (docs/COMPRESSION.md): it serves
+  // /_next/static and public/ precompressed from disk (.br / .zst / .gz written by
+  // scripts/precompress.mjs after `next build`) and compresses the dynamic HTML / RSC itself, and
+  // it forwards requests WITHOUT Accept-Encoding — Next then sends identity (verified: no
+  // Accept-Encoding → no Content-Encoding) and never spends event-loop time gzipping behind it.
+  compress: true,
   env: {
     BRAND_ASSET_VERSIONS: brandAssetVersions(),
   },
@@ -88,9 +117,9 @@ const nextConfig: NextConfig = {
   },
   images: {
     // Only first-party files may go through the optimizer:
-    //  /media/**  — admin uploads + seed media (Media.url: S3 / MinIO, streamed by the
-    //               src/app/media/[...key] route handler — same origin, so no remotePatterns
-    //               and no dangerouslyAllowLocalIP for the private MinIO host)
+    //  /media/**  — admin uploads + seed media (Media.url: the backend's bucket, streamed by the
+    //               src/app/media/[...key] route handler from ${BACKEND_URL}/media/** — same origin,
+    //               so no remotePatterns and no dangerouslyAllowLocalIP for the private backend)
     //  /brand/**  — static brand assets in public/brand
     localPatterns: [
       { pathname: '/media/**', search: '' },

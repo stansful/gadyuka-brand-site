@@ -1,49 +1,28 @@
 'use server';
 
-import { revalidateContent } from '@/lib/content/cache';
-import { db } from '@/lib/db';
+import { adminApiAction } from '@/lib/api/admin-action';
+import { translateAdminMessage } from '@/lib/api/admin-messages';
+import { saveContentEntity } from '@/lib/api/content-entities';
+import type { AdminNewsInput } from '@shared/contracts/content-entities';
 
-import { adminAction, errorFailure, missingMediaFailure } from '../action-helpers';
-import { actionFail, actionOk, type ActionResult } from '../action-result';
-import { getAdminTranslations } from '../i18n-server';
-import { idSchema, newsDateFromInput, newsInputSchema, type NewsInput } from '../schemas';
-import { parseInput } from '../validation';
+import { actionOk, type ActionResult } from '../action-result';
 
-/** Create (id = null) or update a news item. News are ordered by date (newest first). */
-export async function saveNews(id: string | null, input: NewsInput): Promise<ActionResult<{ id: string }>> {
-  return adminAction('saveNews', async () => {
-    const parsedId = id === null ? null : idSchema.safeParse(id);
-    if (parsedId && !parsedId.success) return errorFailure('invalidId');
-    const parsed = await parseInput(newsInputSchema, input);
-    if (!parsed.success) return actionFail(parsed.message, parsed.fieldErrors);
-    const data = parsed.data;
-    const currentId = parsedId?.data ?? null;
-
-    const slugTaken = await db.newsItem.findFirst({
-      where: { slug: data.slug, ...(currentId ? { NOT: { id: currentId } } : {}) },
-      select: { id: true },
-    });
-    const t = await getAdminTranslations('admin.news');
-    if (slugTaken)
-      return actionFail((await getAdminTranslations('admin.errors'))('slugTaken'), { slug: t('slugTaken') });
-    const missingMedia = await missingMediaFailure([data.imageId], ['imageId']);
-    if (missingMedia) return missingMedia;
-
-    const fields = {
-      slug: data.slug,
-      title: data.title,
-      excerpt: data.excerpt,
-      body: data.body,
-      date: newsDateFromInput(data.date),
-      imageId: data.imageId,
-      published: data.published,
-    };
-
-    const savedId = currentId
-      ? (await db.newsItem.update({ where: { id: currentId }, data: fields, select: { id: true } })).id
-      : (await db.newsItem.create({ data: fields, select: { id: true } })).id;
-
-    revalidateContent();
-    return actionOk({ id: savedId }, t(currentId ? 'saved' : 'created'));
+/**
+ * Create (id = null) or update a news item (POST /admin/news, PUT /admin/news/:id). News are ordered
+ * by date (newest first); the backend validates, stores the day as noon Moscow time and refuses a
+ * slug another news item has (shown on the slug field) or a picture that no longer exists.
+ */
+export async function saveNews(id: string | null, input: AdminNewsInput): Promise<ActionResult<{ id: string }>> {
+  return adminApiAction('saveNews', () => saveContentEntity('/api/v1/admin/news', id, input), {
+    revalidatesContent: true,
+    fieldErrors: {
+      'admin.errors.slugTaken': { field: 'slug', key: 'admin.news.slugTaken' },
+      'admin.errors.missingMedia': { field: 'imageId' },
+    },
+    onSuccess: async data =>
+      actionOk(
+        { id: data.id },
+        await translateAdminMessage({ key: id === null ? 'admin.news.created' : 'admin.news.saved' }),
+      ),
   });
 }

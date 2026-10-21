@@ -1,0 +1,123 @@
+# ГАДЮКА — Caddy (docker-compose.caddy.yml). DOMAIN / WWW_REDIRECT come from .env.
+# Automatic HTTPS: Let's Encrypt (ZeroSSL as a fallback) for a public domain, Caddy's own local CA for
+# DOMAIN=localhost (local tests). Requirements behind each block: frontend/docs/COMPRESSION.md.
+#
+#   /_next/static/*, /brand/*  → files from /srv/static (published by the frontend container at start),
+#                                precompressed .br/.zst/.gz chosen by Accept-Encoding; a missing file
+#                                goes to Next
+#   /media/*                   → backend:4000 (images: ETag / 304, Range, immutable — passed through as is)
+#   everything else            → frontend:3000, compressed here (zstd / gzip); Next gets no Accept-Encoding
+#
+# Check after an edit:  docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile
+# then:                 docker compose restart caddy
+{
+	# The local CA (DOMAIN=localhost) cannot be installed into a trust store inside a container.
+	skip_install_trust
+}
+
+{$DOMAIN} {
+	# Security headers on every response. Deferred, so they replace the identical copies that
+	# next.config.ts and the backend set instead of duplicating them.
+	# HSTS: add `; includeSubDomains` only once EVERY subdomain is served over HTTPS (browsers keep it a year).
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		-Server
+		-X-Powered-By
+		defer
+	}
+
+	# Baseline CSP for pages, the admin and the API. /media/* keeps the backend's stricter sandbox CSP.
+	@notMedia not path /media/*
+	header @notMedia {
+		Content-Security-Policy "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'"
+		defer
+	}
+
+	# The admin is never indexed (in addition to robots.txt and the noindex meta).
+	header /admin* X-Robots-Tag "noindex, nofollow"
+
+	# Request body limits: only the admin media upload takes large bodies (15 MB file + multipart
+	# overhead); Server Actions (Next limit 1 MB) and the lead API (16 KB) stay small.
+	@mediaUpload path /admin/api/media /admin/api/media/*
+	request_body @mediaUpload {
+		max_size 16MiB
+	}
+	@notMediaUpload not path /admin/api/media /admin/api/media/*
+	request_body @notMediaUpload {
+		max_size 2MiB
+	}
+
+	# 1. Build files from disk. Only when the file exists — otherwise the request falls through to Next.
+	@static {
+		path /_next/static/* /brand/*
+		file {
+			root /srv/static
+		}
+	}
+	handle @static {
+		root * /srv/static
+		# Content-hashed names / ?v=<hash> URLs never change: cached for a year. A brand file without
+		# a version is revalidated on every use (the same rules as next.config.ts → headers()).
+		@versionedBrand {
+			path /brand/*
+			query v=*
+		}
+		@unversionedBrand {
+			path /brand/*
+			not query v=*
+		}
+		header /_next/static/* Cache-Control "public, max-age=31536000, immutable"
+		header @versionedBrand Cache-Control "public, max-age=31536000, immutable"
+		header @unversionedBrand Cache-Control "public, max-age=0, must-revalidate"
+		# br is the smallest (quality 11), then zstd (19), then gzip (9); files < 1 KB have no copies.
+		file_server {
+			precompressed br zstd gzip
+		}
+	}
+
+	# 2. Media straight from the backend (never compressed here: WebP / AVIF / JPEG). Only /media/* of
+	#    the backend is public — its API needs the internal key and is not routed at all.
+	handle /media/* {
+		reverse_proxy backend:4000 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# 3. Everything else: Next.js. Dynamic HTML / RSC / JSON compressed here — zstd at its "better"
+	#    level (about zstd -7) for browsers that accept it, gzip 6 for the rest; tiny responses as they are.
+	handle {
+		encode {
+			zstd better
+			gzip 6
+			minimum_length 256
+			match {
+				header Content-Type text/*
+				header Content-Type application/json*
+				header Content-Type application/javascript*
+				header Content-Type application/xml*
+				header Content-Type application/manifest+json*
+				header Content-Type application/rss+xml*
+				header Content-Type image/svg+xml*
+			}
+		}
+		reverse_proxy frontend:3000 {
+			# Next would gzip by itself and the proxy does not compress twice: it gets identity.
+			header_up -Accept-Encoding
+			# The app trusts X-Real-IP (lead limits, admin login throttle): always the TCP peer, a
+			# client-supplied value is overwritten. X-Forwarded-For is set by Caddy the same way.
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# www.<DOMAIN> → apex, when WWW_REDIRECT=1 in .env (www-1.caddy); www-0.caddy is empty.
+import www-{$WWW_REDIRECT:0}.caddy

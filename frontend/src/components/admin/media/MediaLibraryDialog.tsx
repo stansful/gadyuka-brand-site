@@ -7,7 +7,8 @@ import Image from 'next/image';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 
 import { fileSizeParts } from '@/lib/admin/labels';
-import type { AdminMedia } from '@/lib/admin/types';
+
+import type { AdminMedia } from './media-types';
 
 import { Button } from '../ui/Button';
 import { TextInput } from '../ui/inputs';

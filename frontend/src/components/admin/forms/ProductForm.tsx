@@ -6,10 +6,12 @@ import { useState, type ReactElement } from 'react';
 
 import { errorFor } from '@/lib/admin/action-result';
 import { saveProduct } from '@/lib/admin/actions/products';
-import { PRICE_MAX } from '@/lib/admin/schemas';
+import type { CollectionOption } from '@/lib/admin/catalog-view';
+import { PRICE_MAX } from '@/lib/admin/limits';
 import { slugify } from '@/lib/admin/slug';
-import type { AdminMediaRef, CollectionOption, ProductFormData } from '@/lib/admin/types';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { LocalizedText } from '@/lib/localized-text';
+import type { AdminProductDetailsResponse } from '@shared/contracts/catalog';
+import type { MediaRef } from '@shared/contracts/common';
 
 import { EditLocaleProvider, localesWithErrors, translationGaps } from '../i18n/LocaleTabs';
 import { LocalizedField } from '../i18n/LocalizedField';
@@ -30,7 +32,7 @@ export function ProductForm({
   collections,
   defaultCollectionId,
 }: {
-  initial: ProductFormData | null;
+  initial: AdminProductDetailsResponse | null;
   collections: CollectionOption[];
   defaultCollectionId?: string;
 }): ReactElement {
@@ -53,7 +55,7 @@ function ProductFormInner({
   collections,
   defaultCollectionId,
 }: {
-  initial: ProductFormData | null;
+  initial: AdminProductDetailsResponse | null;
   collections: CollectionOption[];
   defaultCollectionId?: string;
 }): ReactElement {
@@ -70,7 +72,7 @@ function ProductFormInner({
   const [price, setPrice] = useState(
     initial?.price === null || initial?.price === undefined ? '' : String(initial.price),
   );
-  const [images, setImages] = useState<AdminMediaRef[]>(initial?.images ?? []);
+  const [images, setImages] = useState<MediaRef[]>(() => [...(initial?.images ?? [])]);
   const [published, setPublished] = useState(initial?.published ?? false);
   const { pending, fieldErrors, setFieldErrors, run } = useActionSubmit();
 

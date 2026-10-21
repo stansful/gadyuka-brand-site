@@ -1,204 +1,242 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { defaultMessage, isMessageKey, type MessageKey } from '@/i18n/messages';
-
-import type { SiteTextsInput } from '../schemas';
+import type { ApiResult } from '@/lib/api/api-result';
+import type { ApiRequestOptions } from '@/lib/api/client';
 
 /**
- * saveSiteTexts / resetSiteText against an in-memory Message / ContentImage table: the
- * optimistic concurrency of «Тексты сайта» end to end (payload → lock → conflict check → writes).
+ * saveSiteTexts / resetSiteText against a stubbed backend: what the editor gets for every answer of
+ * PUT /api/v1/admin/site-texts and POST …/reset (the backend side is tested end to end in
+ * backend/src/usecases/admin/site-texts).
  */
 
-type MessageRow = { key: string; locale: string; value: string; editedAt: Date | null };
-type ImageRow = { key: string; mediaId: string | null };
-
-const messages = new Map<string, MessageRow>();
-const images = new Map<string, ImageRow>();
-/** The order of the DB calls inside the transaction ("lock", "read", "write"). */
-const calls: string[] = [];
-
-const rowId = (key: string, locale: string): string => `${locale}\u0000${key}`;
-
-const tx = {
-  $executeRaw: vi.fn(async () => {
-    calls.push('lock');
-    return 1;
-  }),
-  message: {
-    findMany: vi.fn(async ({ where }: { where: { key: { in: string[] }; locale: { in: string[] } } }) => {
-      calls.push('read');
-      return [...messages.values()].filter(
-        row => where.key.in.includes(row.key) && where.locale.in.includes(row.locale),
-      );
-    }),
-    upsert: vi.fn(
-      async ({
-        create,
-        update,
-      }: {
-        create: MessageRow;
-        update: Pick<MessageRow, 'value' | 'editedAt'>;
-      }): Promise<{ key: string }> => {
-        calls.push('write');
-        const id = rowId(create.key, create.locale);
-        const existing = messages.get(id);
-        messages.set(id, existing ? { ...existing, ...update } : { ...create });
-        return { key: create.key };
-      },
-    ),
-  },
-  contentImage: {
-    findMany: vi.fn(async ({ where }: { where: { key: { in: string[] } } }) =>
-      [...images.values()].filter(row => where.key.in.includes(row.key)),
-    ),
-    upsert: vi.fn(async ({ create }: { create: ImageRow }): Promise<{ key: string }> => {
-      calls.push('write');
-      images.set(create.key, { ...create });
-      return { key: create.key };
-    }),
-  },
-};
-
-const db = {
-  $transaction: vi.fn(async <T>(work: (client: typeof tx) => Promise<T>): Promise<T> => work(tx)),
-  media: {
-    findMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) => where.id.in.map(id => ({ id }))),
-  },
-};
-
-vi.mock('@/lib/db', () => ({ db }));
-vi.mock('../auth', () => ({
-  AdminAuthError: class AdminAuthError extends Error {},
-  requireAdminAction: async () => ({ allowed: true }),
-}));
+const adminRequest = vi.fn<(path: string, options?: ApiRequestOptions) => Promise<ApiResult<unknown>>>();
+vi.mock('@/lib/api/admin', () => ({ adminRequest }));
 const revalidateContent = vi.fn();
-vi.mock('@/lib/content/cache', () => ({ revalidateContent }));
+const markContentStale = vi.fn();
+vi.mock('@/lib/content/cache', () => ({ revalidateContent, markContentStale }));
 vi.mock('next-intl/server', async () => (await import('../../../../test/admin-intl')).nextIntlServerMock);
 
 const { resetSiteText, saveSiteTexts } = await import('./content');
 
-function messageKey(key: string): MessageKey {
-  if (!isMessageKey(key)) throw new Error(`messages/ru.json has no ${key}`);
-  return key;
-}
+const SLOGAN = 'hero.slogan';
+const entries = [{ key: SLOGAN, values: { ru: { value: ' Новый слоган ', base: 'Меня запомнят' } } }];
 
-const TITLE = messageKey('hero.title');
-const SLOGAN = messageKey('hero.slogan');
-const EDITED_AT = new Date('2026-10-20T10:00:00.000Z');
-
-function store(key: MessageKey, locale: 'ru' | 'en', value: string, editedAt: Date | null = null): void {
-  messages.set(rowId(key, locale), { key, locale, value, editedAt });
-}
-
-function stored(key: MessageKey, locale: 'ru' | 'en'): MessageRow | undefined {
-  return messages.get(rowId(key, locale));
-}
-
-function save(entries: SiteTextsInput['entries'], pictures: SiteTextsInput['images'] = []) {
-  return saveSiteTexts({ entries, images: pictures });
+function failing(failure: Extract<ApiResult<unknown>, { ok: false }>['failure']): ApiResult<unknown> {
+  return { ok: false, failure };
 }
 
 beforeEach(() => {
-  messages.clear();
-  images.clear();
-  calls.length = 0;
-  vi.clearAllMocks();
-  for (const key of [TITLE, SLOGAN]) {
-    for (const locale of ['ru', 'en'] as const) store(key, locale, defaultMessage(key, locale));
-  }
+  adminRequest.mockReset();
+  revalidateContent.mockReset();
+  markContentStale.mockReset();
 });
 
-describe('saveSiteTexts: a stale tab never overwrites a newer text', () => {
-  it('refuses an edit of a text changed in another tab, names it and writes nothing', async () => {
-    // Tab 2 saves «ГАДЮКА 2.0» while tab 1 still shows the default title.
-    store(TITLE, 'ru', 'ГАДЮКА 2.0', EDITED_AT);
-    const result = await save([
-      { key: SLOGAN, values: { ru: { value: 'Новый слоган', base: defaultMessage(SLOGAN, 'ru') } } },
-      { key: TITLE, values: { ru: { value: 'Моя правка', base: defaultMessage(TITLE, 'ru') } } },
-    ]);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error).toMatch(/^Ничего не сохранено/);
-    expect(result.error).toContain('(RU)');
-    expect(result.fieldErrors?.[`${TITLE}.ru`]).toContain('«ГАДЮКА 2.0»');
-    expect(stored(TITLE, 'ru')?.value).toBe('ГАДЮКА 2.0');
-    expect(stored(SLOGAN, 'ru')?.value).toBe(defaultMessage(SLOGAN, 'ru'));
-    expect(tx.message.upsert).not.toHaveBeenCalled();
-    expect(revalidateContent).not.toHaveBeenCalled();
-  });
+/** The backend's transaction may take 35 s (site-texts.store.ts): the client waits longer than its default 10 s. */
+const WRITE_TIMEOUT_MS = 45_000;
 
-  it('saves the edits of the stale tab that do not collide, leaving the newer text alone', async () => {
-    store(TITLE, 'ru', 'ГАДЮКА 2.0', EDITED_AT);
-    const result = await save([
-      { key: SLOGAN, values: { ru: { value: ' Новый слоган ', base: defaultMessage(SLOGAN, 'ru') } } },
-    ]);
-    expect(result).toEqual({
+describe('saveSiteTexts', () => {
+  it('sends the changes with PUT and refreshes the site when something was written', async () => {
+    adminRequest.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      data: { saved: 1, values: { [SLOGAN]: { ru: 'Новый слоган' } } },
+    });
+    expect(await saveSiteTexts({ entries, images: [] })).toEqual({
       ok: true,
       data: { saved: 1, values: { [SLOGAN]: { ru: 'Новый слоган' } } },
       message: 'Тексты сохранены — сайт обновлён',
     });
-    expect(stored(SLOGAN, 'ru')).toMatchObject({ value: 'Новый слоган', editedAt: expect.any(Date) });
-    expect(stored(TITLE, 'ru')?.value).toBe('ГАДЮКА 2.0');
-    expect(revalidateContent).toHaveBeenCalledTimes(1);
-  });
-
-  it('checks and writes under the «Тексты сайта» lock, inside one transaction', async () => {
-    await save([{ key: SLOGAN, values: { ru: { value: 'Новый слоган', base: defaultMessage(SLOGAN, 'ru') } } }]);
-    expect(db.$transaction).toHaveBeenCalledTimes(1);
-    expect(calls).toEqual(['lock', 'read', 'write']);
-  });
-
-  it('creates a missing row with the default and never writes a resent text over a row', async () => {
-    messages.delete(rowId(TITLE, 'en'));
-    store(TITLE, 'ru', 'ГАДЮКА 2.0', EDITED_AT);
-    const ru = defaultMessage(TITLE, 'ru');
-    const result = await save([
-      { key: TITLE, values: { ru: { value: ru, base: ru }, en: { value: 'Outdated', base: 'Outdated' } } },
-    ]);
-    expect(result.ok && result.data).toEqual({
-      saved: 1,
-      values: { [TITLE]: { ru: 'ГАДЮКА 2.0', en: defaultMessage(TITLE, 'en') } },
+    expect(adminRequest).toHaveBeenCalledWith('/api/v1/admin/site-texts', {
+      method: 'PUT',
+      body: { entries, images: [] },
+      timeoutMs: WRITE_TIMEOUT_MS,
     });
-    expect(stored(TITLE, 'en')).toEqual({
-      key: TITLE,
-      locale: 'en',
-      value: defaultMessage(TITLE, 'en'),
-      editedAt: null,
+    expect(revalidateContent).toHaveBeenCalledOnce();
+    expect(markContentStale).not.toHaveBeenCalled();
+  });
+
+  it('reports «no changes» without refreshing the site', async () => {
+    adminRequest.mockResolvedValueOnce({ ok: true, status: 200, data: { saved: 0, values: {} } });
+    expect(await saveSiteTexts({ entries: [], images: [] })).toEqual({
+      ok: true,
+      data: { saved: 0, values: {} },
+      message: 'Изменений нет — всё уже сохранено',
     });
-    expect(stored(TITLE, 'ru')?.value).toBe('ГАДЮКА 2.0');
+    expect(revalidateContent).not.toHaveBeenCalled();
   });
 
-  it('reports «no changes» without a transaction when nothing was sent', async () => {
-    const result = await save([]);
-    expect(result).toEqual({ ok: true, data: { saved: 0, values: {} }, message: 'Изменений нет — всё уже сохранено' });
-    expect(db.$transaction).not.toHaveBeenCalled();
-  });
-
-  it('refuses an image replaced in another tab meanwhile', async () => {
-    images.set('about.image', { key: 'about.image', mediaId: 'm3' });
-    const result = await save([], [{ key: 'about.image', mediaId: 'm2', base: 'm1' }]);
+  it('names the texts and images changed in another tab (409) with the stored text per field', async () => {
+    adminRequest.mockResolvedValueOnce(
+      failing({
+        kind: 'domain',
+        status: 409,
+        error: 'conflict',
+        message: { key: 'admin.siteTexts.errors.conflict' },
+        details: { 'hero.title.ru': 'ГАДЮКА 2.0', 'about.image': true },
+      }),
+    );
+    const result = await saveSiteTexts({ entries, images: [] });
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain('картинку «Фото»');
-      expect(result.fieldErrors?.['about.image']).toMatch(/обновите страницу/);
+    if (result.ok) return;
+    expect(result.error).toMatch(/^Ничего не сохранено/);
+    expect(result.error).toContain('(RU)');
+    expect(result.error).toContain('картинку «Фото»');
+    expect(result.fieldErrors?.['hero.title.ru']).toContain('«ГАДЮКА 2.0»');
+    expect(result.fieldErrors?.['about.image']).toMatch(/обновите страницу/);
+    expect(revalidateContent).not.toHaveBeenCalled();
+  });
+
+  it('shows «Исправьте ошибки в текстах» with the error of every text ("<key>.<locale>")', async () => {
+    adminRequest.mockResolvedValueOnce(
+      failing({
+        kind: 'validation',
+        status: 400,
+        fields: {
+          '': { key: 'admin.siteTexts.errors.fixErrors' },
+          'hero.title.ru': { key: 'admin.siteTexts.errors.required' },
+          'catalog.models.en': {
+            key: 'admin.siteTexts.errors.unknownArgument',
+            values: { token: '{total}', allowed: '{count}' },
+          },
+        },
+      }),
+    );
+    expect(await saveSiteTexts({ entries, images: [] })).toEqual({
+      ok: false,
+      error: 'Исправьте ошибки в текстах',
+      fieldErrors: {
+        'hero.title.ru': expect.stringMatching(/^Обязательный текст/),
+        'catalog.models.en': 'Неизвестная подстановка {total} — в этом тексте доступны: {count}',
+      },
+    });
+  });
+
+  it('shows «Проверьте поля формы» for a request refused by shape (the editor re-keys the indexes)', async () => {
+    adminRequest.mockResolvedValueOnce(
+      failing({
+        kind: 'validation',
+        status: 400,
+        fields: { 'entries.0.values.ru.value': { key: 'admin.validation.tooLong', values: { max: 10_000 } } },
+      }),
+    );
+    const result = await saveSiteTexts({ entries, images: [] });
+    expect(result).toEqual({
+      ok: false,
+      error: 'Проверьте поля формы — есть ошибки',
+      fieldErrors: { 'entries.0.values.ru.value': expect.stringContaining('10') },
+    });
+  });
+
+  it('shows the missing media on the image and as the message', async () => {
+    adminRequest.mockResolvedValueOnce(
+      failing({
+        kind: 'validation',
+        status: 400,
+        fields: { '': { key: 'admin.errors.missingMedia' }, 'about.image': { key: 'admin.errors.missingMedia' } },
+      }),
+    );
+    const missing = 'Выбранное изображение не найдено в медиатеке — выберите другое.';
+    expect(await saveSiteTexts({ entries: [], images: [] })).toEqual({
+      ok: false,
+      error: missing,
+      fieldErrors: { 'about.image': missing },
+    });
+  });
+
+  it('answers «Не удалось выполнить действие» when the backend is unreachable and «Сессия истекла» on 401', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    adminRequest.mockResolvedValueOnce(failing({ kind: 'unavailable', status: null, reason: 'network' }));
+    expect(await saveSiteTexts({ entries, images: [] })).toEqual({
+      ok: false,
+      error: 'Не удалось выполнить действие. Попробуйте ещё раз.',
+    });
+    adminRequest.mockRejectedValueOnce(new Error('boom'));
+    expect((await saveSiteTexts({ entries, images: [] })).ok).toBe(false);
+    error.mockRestore();
+    adminRequest.mockResolvedValueOnce(
+      failing({ kind: 'domain', status: 401, error: 'unauthorized', message: { key: 'admin.auth.sessionRequired' } }),
+    );
+    expect(await saveSiteTexts({ entries, images: [] })).toEqual({
+      ok: false,
+      error: 'Сессия истекла. Обновите страницу и войдите снова.',
+    });
+  });
+
+  it('marks the site stale when the save may have landed: no usable answer, a 5xx, a throw — not a refusal', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const unknownOutcomes = [
+      failing({ kind: 'unavailable', status: null, reason: 'timeout' }),
+      failing({ kind: 'unavailable', status: null, reason: 'network' }),
+      failing({ kind: 'unavailable', status: 502, reason: 'badResponse' }),
+      failing({ kind: 'domain', status: 500, error: 'internal', message: { key: 'admin.errors.actionFailed' } }),
+    ];
+    for (const outcome of unknownOutcomes) adminRequest.mockResolvedValueOnce(outcome);
+    adminRequest.mockRejectedValueOnce(new Error('boom'));
+    for (let call = 0; call <= unknownOutcomes.length; call += 1) {
+      expect((await saveSiteTexts({ entries, images: [] })).ok).toBe(false);
     }
-    expect(images.get('about.image')?.mediaId).toBe('m3');
-  });
+    expect(markContentStale).toHaveBeenCalledTimes(unknownOutcomes.length + 1);
+    expect(revalidateContent).not.toHaveBeenCalled();
 
-  it('still validates every edited value (keyed "<key>.<locale>")', async () => {
-    const result = await save([{ key: TITLE, values: { ru: { value: '', base: defaultMessage(TITLE, 'ru') } } }]);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.fieldErrors?.[`${TITLE}.ru`]).toMatch(/^Обязательный текст/);
-    expect(db.$transaction).not.toHaveBeenCalled();
+    markContentStale.mockReset();
+    adminRequest.mockResolvedValueOnce(failing({ kind: 'unavailable', status: null, reason: 'config' }));
+    adminRequest.mockResolvedValueOnce(
+      failing({ kind: 'domain', status: 409, error: 'conflict', message: { key: 'admin.siteTexts.errors.conflict' } }),
+    );
+    adminRequest.mockResolvedValueOnce(
+      failing({ kind: 'validation', status: 400, fields: { '': { key: 'admin.siteTexts.errors.fixErrors' } } }),
+    );
+    for (let call = 0; call < 3; call += 1) await saveSiteTexts({ entries, images: [] });
+    expect(markContentStale).not.toHaveBeenCalled();
+    error.mockRestore();
   });
 });
 
 describe('resetSiteText', () => {
-  it('stores the defaults under the same lock', async () => {
-    store(TITLE, 'ru', 'ГАДЮКА 2.0', EDITED_AT);
-    const result = await resetSiteText(TITLE);
-    expect(result.ok && result.data.values.ru).toBe(defaultMessage(TITLE, 'ru'));
-    expect(calls).toEqual(['lock', 'write', 'write']);
-    expect(stored(TITLE, 'ru')).toMatchObject({ value: defaultMessage(TITLE, 'ru'), editedAt: null });
+  it('restores the defaults with POST …/reset and refreshes the site', async () => {
+    const values = { ru: 'Меня запомнят', en: 'They will remember me' };
+    adminRequest.mockResolvedValueOnce({ ok: true, status: 200, data: { key: SLOGAN, values } });
+    expect(await resetSiteText(SLOGAN)).toEqual({
+      ok: true,
+      data: { values },
+      message: 'Текст по умолчанию восстановлен',
+    });
+    expect(adminRequest).toHaveBeenCalledWith('/api/v1/admin/site-texts/reset', {
+      method: 'POST',
+      body: { key: SLOGAN },
+      timeoutMs: WRITE_TIMEOUT_MS,
+    });
+    expect(revalidateContent).toHaveBeenCalledOnce();
+  });
+
+  it('says the text is no longer on the site (404, or a request without a key)', async () => {
+    const unknown = 'Этого текста больше нет на сайте — обновите страницу';
+    adminRequest.mockResolvedValueOnce(
+      failing({
+        kind: 'domain',
+        status: 404,
+        error: 'notFound',
+        message: { key: 'admin.siteTexts.errors.unknownKey' },
+      }),
+    );
+    expect(await resetSiteText('zzz.removed')).toEqual({ ok: false, error: unknown });
+    adminRequest.mockResolvedValueOnce(
+      failing({ kind: 'validation', status: 400, fields: { key: { key: 'admin.siteTexts.errors.unknownKey' } } }),
+    );
+    expect(await resetSiteText('')).toEqual({ ok: false, error: unknown });
+    expect(revalidateContent).not.toHaveBeenCalled();
+    expect(markContentStale).not.toHaveBeenCalled();
+  });
+
+  it('marks the site stale when the reset may have landed (timeout)', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    adminRequest.mockResolvedValueOnce(failing({ kind: 'unavailable', status: null, reason: 'timeout' }));
+    expect(await resetSiteText(SLOGAN)).toEqual({
+      ok: false,
+      error: 'Не удалось выполнить действие. Попробуйте ещё раз.',
+    });
+    expect(markContentStale).toHaveBeenCalledOnce();
+    expect(revalidateContent).not.toHaveBeenCalled();
+    error.mockRestore();
   });
 });

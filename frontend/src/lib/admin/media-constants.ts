@@ -1,6 +1,6 @@
 /**
- * Upload limits shared by the server pipeline (src/lib/media.ts) and the admin
- * upload UI (isomorphic, no Node imports).
+ * Upload limits as the admin upload UI shows and pre-checks them (isomorphic, no Node imports).
+ * The backend enforces the same limits (backend/src/core/media/media.constants.ts); keep both in step.
  */
 
 /** 15 MB per file. */

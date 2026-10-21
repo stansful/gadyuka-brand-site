@@ -1,22 +1,23 @@
 # ГАДЮКА — сайт и админка
 
 Лендинг бренда уличной одежды ГАДЮКА (Краснодар) со встроенной админкой.
-Next.js 16 · PostgreSQL 17 + Prisma 7 · MinIO (S3) для картинок · next-intl (ru/en) · TypeScript strict · oxlint + oxfmt.
+Next.js 16 — только отображение — поверх NestJS-бэкенда `../backend` (данные, правила, валидация, картинки, заявки, вход) · next-intl (ru/en) · TypeScript strict · oxlint + oxfmt.
+Тексты — `../shared/messages`, типы API — `../shared/contracts`.
 
 ![Главная](docs/screenshots/site-home.png)
 
 ## Запуск локально
 
 ```bash
-cp .env.example .env    # dev-значения уже подходят; TELEGRAM_* — по желанию
-npm install             # postinstall → prisma generate
-npm run db:up           # Postgres + MinIO в docker (бакет gadyuka-media создаётся сам)
-npm run db:deploy       # применить миграции
-npm run db:seed         # тексты из messages/*.json, картинки → MinIO, демо-контент
-npm run dev             # http://localhost:3000
+# 1. бэкенд (../backend/README.md): npm ci, .env, docker compose up -d, npm run prisma:deploy, npm run db:seed, npm run start:dev → :4000
+cp .env.example .env    # BACKEND_URL=http://127.0.0.1:4000, INTERNAL_API_KEY = значение из backend/.env
+npm install
+npm run dev             # http://localhost:3000 (next dev; хост — localhost, не 127.0.0.1)
 ```
 
-Проверки: `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test`, `npm run build` (сборке нужна БД).
+Вход в админку — логин и пароль админа бэкенда (`ADMIN_LOGIN` / `ADMIN_PASSWORD` в `backend/.env`, создаётся `npm run db:seed` бэкенда).
+
+Проверки: `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test`, `npm run build` (бэкенд сборке не нужен: данные читаются только во время запроса).
 
 ## Куда идти
 
@@ -30,21 +31,21 @@ npm run dev             # http://localhost:3000
 | Меню / соцсети                         | http://localhost:3000/admin/menu · http://localhost:3000/admin/socials |
 | Настройки (контакты, SEO, шкала звёзд) | http://localhost:3000/admin/settings                                   |
 | Медиатека                              | http://localhost:3000/admin/media                                      |
-| Консоль MinIO                          | http://127.0.0.1:9001 (логин и пароль — `docker-compose.dev.yml`)      |
-| База данных (Prisma Studio)            | `npm run db:studio`                                                    |
+| API бэкенда (Swagger, только dev)      | http://127.0.0.1:4000/api/v1/swagger                                   |
 
-Админка в dev открыта без пароля (жёлтый баннер). Пароль включается переменной `ADMIN_PASSWORD`.
+Все страницы админки — только после входа (аккаунт бэкенда).
 
 ## Что где менять
 
-- **Любой текст сайта** — админка «Тексты сайта». Значения по умолчанию лежат в `messages/ru.json` и `messages`, сид кладёт их в таблицу `Message`. Правки из админки сид не перезаписывает.
+- **Любой текст сайта** — админка «Тексты сайта». Значения по умолчанию лежат в `../shared/messages/ru.json` и `en.json`, сид бэкенда кладёт их в таблицу `Message`. Правки из админки сид не перезаписывает.
 - **Телефон, e-mail, адрес, SEO, шкала звёзд отзывов** — «Настройки».
 - **Пункты меню** (шапка и подвал) — «Меню». **Ссылки на соцсети и мессенджеры** — «Соцсети».
 - **Коллекции, товары, отзывы, новости, галерея, спецпредложения, партнёры** — одноимённые разделы. Новая коллекция появляется на сайте сразу после публикации.
-- **Картинки** — «Медиатека». Файлы хранятся в MinIO по ключу `admin/<id>/<uuid>/image.webp`, ссылка `/media/…` — в таблице `Media`.
-- **Интерфейс админки** — `messages/admin/ru.json`. **Демо-контент сида** — `messages`.
+- **Картинки** — «Медиатека». Файлы хранит бэкенд в MinIO по ключу `admin/<id>/<uuid>/image.webp`, ссылка `/media/…` — в таблице `Media`.
+- **Интерфейс админки** — `../shared/messages/admin/ru.json`. **Демо-контент сида** — `../shared/messages/content/*.json`.
+- **Новая функция** (эндпоинт + экран) — контракт `../shared/contracts` → usecase бэкенда → вызов здесь: `../shared/contracts/README.md`.
 
-Как добавлять новый текст в код — `../.claude`. Правила для агентов — `AGENTS.md`.
+Как добавлять новый текст в код — `../.claude/skills/site-texts/SKILL.md`. Правила для агентов — `AGENTS.md`.
 
 ## Скриншоты
 
@@ -58,7 +59,10 @@ npm run dev             # http://localhost:3000
 
 ## Документация
 
-- `docs/ARCHITECTURE.md` — стек, модель данных, тексты, картинки, админка.
+- `docs/ARCHITECTURE.md` — что во фронтенде и что в бэкенде, тексты, картинки, админка, данные во время запроса.
 - `docs/CONVENTIONS.md` — соглашения по коду (дизайн, анимации, кэш, заявки, доступ к админке …).
-- `DEPLOY.md` — деплой на VPS (Docker Compose: app, Postgres, MinIO, Caddy), бэкапы.
+- `docs/COMPRESSION.md` — сжатие: предсжатые `.br/.zst/.gz` после сборки и что должен делать прокси (+ `/media`, IP посетителя).
+- `src/lib/api/README.md` — клиент бэкенда: публичные чтения, чтения и действия админки, сессия.
+- `../backend/README.md` — бэкенд: API, окружение, сид, тесты.
 - `BRIEF.md` — бриф и исходные тексты.
+- Деплой (корневой docker-compose, Caddy / nginx) — корневой `README.md` репозитория.

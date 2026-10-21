@@ -3,7 +3,7 @@ import type { Messages } from '@/i18n/request';
 
 /**
  * Site messages for the public CLIENT components. They are resolved on the server (DB rows over
- * the messages/*.json defaults — LandingContent.texts / getMessages) and passed down as props,
+ * the shared/messages/*.json defaults — LandingContent.texts / getMessages) and passed down as props,
  * so the public pages ship no next-intl client runtime and no message catalogue. Templates are
  * filled in here with the tiny helpers below (simple {name} placeholders only — the server
  * components use ./message-template, full ICU). Isomorphic and dependency-free.

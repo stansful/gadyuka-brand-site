@@ -3,10 +3,9 @@ import { createElement, isValidElement, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { locales } from '@/i18n/locales';
-import { validateMessageValue } from '@/i18n/message-format';
 import { DEFAULT_MESSAGES, MESSAGE_KEYS, defaultMessage, type MessageKey } from '@/i18n/messages';
-import { messageKind } from '@/lib/content/registry';
 
+import { kindOverride } from '../../../test/site-text-metadata';
 import { fill, splitLanguageTemplate, splitTemplate } from './labels';
 import { formatNodes, formatText } from './message-template';
 
@@ -97,38 +96,44 @@ const CLIENT_TEMPLATES: Readonly<Partial<Record<MessageKey, ClientTemplate>>> = 
   },
 };
 
-/** Edits an owner might try; the admin accepts some of them (syntax "template"). */
-const EDITS: Readonly<Partial<Record<MessageKey, readonly string[]>>> = {
-  'gallery.counter': ['Фото {current} из {total}', '{current} из {total, number}', '{ current } / {total}'],
+/**
+ * Edits of the "template" texts. The backend validates admin edits of these keys with its template
+ * rules (backend/src/module/messages, `MessageSyntax.TEMPLATE`; its tests use the same samples):
+ * ACCEPTED pass them, SHOWN_RAW are refused — a plain replace would show their syntax to visitors.
+ */
+const ACCEPTED: Readonly<Partial<Record<MessageKey, readonly string[]>>> = {
+  'gallery.counter': ['Фото {current} из {total}'],
+  'forms.errors.tooShort': ['Минимум символов: {min}', "Don’t, can't — {min}"],
+  'forms.errors.tooLong': ['Не больше {max} знаков'],
+  'contacts.form.subjectLine': ['{subject} — тема', '{subject} — тема письма'],
+  'common.switchLanguageTo': ['Язык: <lang>{language}</lang>!'],
+};
+
+const SHOWN_RAW: Readonly<Partial<Record<MessageKey, readonly string[]>>> = {
+  'gallery.counter': ['{current} из {total, number}', '{ current } / {total}'],
   'forms.errors.tooShort': [
-    'Минимум символов: {min}',
     'Слишком коротко — минимум {min, plural, one {# символ} few {# символа} other {# символов}}',
     "It''s {min}",
   ],
-  'forms.errors.tooLong': ['Не больше {max} знаков', 'максимум {max, number, ::currency/XY}'],
-  'contacts.form.subjectLine': ['{subject} — тема', 'Re: {subject} ({subject})', 'Re: {subject, select, other {x}}'],
-  'common.switchLanguageTo': [
-    'Язык: <lang>{language}</lang>!',
-    'Язык: <lang>{ language }</lang>',
-    'Переключить язык на <lang>«{language}»</lang>',
-  ],
+  'forms.errors.tooLong': ['максимум {max, number, ::currency/XY}'],
+  'contacts.form.subjectLine': ['Re: {subject} ({subject})', 'Re: {subject, select, other {x}}'],
+  'common.switchLanguageTo': ['Язык: <lang>{ language }</lang>', 'Переключить язык на <lang>«{language}»</lang>'],
 };
 
 describe('"template" texts (filled in by the client components)', () => {
-  it('are exactly the texts the client helpers fill in', () => {
-    expect(MESSAGE_KEYS.filter(key => messageKind(key) === 'template').sort()).toEqual(
+  it('are exactly the texts the metadata marks as templates (the backend validates them as such)', () => {
+    expect(MESSAGE_KEYS.filter(key => kindOverride(key) === 'template').sort()).toEqual(
       Object.keys(CLIENT_TEMPLATES).sort(),
     );
   });
 
-  it('render every value the admin accepts exactly like ICU', () => {
+  it('render the defaults and every accepted edit exactly like ICU', () => {
     const differ: string[] = [];
-    let accepted = 0;
+    let checked = 0;
     for (const [key, template] of Object.entries(CLIENT_TEMPLATES) as Array<[MessageKey, ClientTemplate]>) {
-      const values = [...locales.map(locale => defaultMessage(key, locale)), ...(EDITS[key] ?? [])];
+      const values = [...locales.map(locale => defaultMessage(key, locale)), ...(ACCEPTED[key] ?? [])];
       for (const value of values) {
-        if (validateMessageValue(key, value, { syntax: 'template' }).length > 0) continue;
-        accepted += 1;
+        checked += 1;
         const icu = new IntlMessageFormat(value, 'ru-RU').format<string>({
           ...template.values,
           lang: (chunks: ReadonlyArray<string>) => `[${chunks.join('')}]`,
@@ -137,22 +142,17 @@ describe('"template" texts (filled in by the client components)', () => {
       }
     }
     expect(differ).toEqual([]);
-    expect(accepted).toBeGreaterThan(10);
+    expect(checked).toBeGreaterThan(15);
   });
 
-  it('refuses the edits the client helpers would show raw', () => {
-    const shownRaw = Object.entries(EDITS).flatMap(([key, values]) =>
-      (values ?? []).filter(value => {
+  it('would show the refused edits raw (why the backend refuses them)', () => {
+    const rendered = Object.entries(SHOWN_RAW).flatMap(([key, values]) =>
+      (values ?? []).map(value => {
         const template = CLIENT_TEMPLATES[key as MessageKey];
-        return template !== undefined && /[{}<>']/.test(template.client(value).replace(/\[[^\]]*\]/g, ''));
+        return template ? template.client(value).replace(/\[[^\]]*\]/g, '') : value;
       }),
     );
-    expect(shownRaw.length).toBeGreaterThan(5);
-    for (const [key, values] of Object.entries(EDITS)) {
-      for (const value of values ?? []) {
-        if (!shownRaw.includes(value)) continue;
-        expect(validateMessageValue(key as MessageKey, value, { syntax: 'template' }), value).not.toEqual([]);
-      }
-    }
+    expect(rendered.length).toBeGreaterThan(5);
+    for (const text of rendered) expect(text, text).toMatch(/[{}<>']/);
   });
 });

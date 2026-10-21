@@ -128,8 +128,8 @@ export type SettingsView = {
 export type LandingContent = {
   locale: Locale;
   /**
-   * Every site message for this locale (DB rows over the messages/<locale>.json defaults, see
-   * resolveMessageValues in src/i18n/messages.ts); "" only when emptied on purpose.
+   * Every site message for this locale (the admin's edits over the shared/messages/<locale>.json
+   * defaults, resolved by the backend); "" only when emptied on purpose.
    */
   texts: Record<TextKey, string>;
   /** ContentImage images; null when no media is assigned. */

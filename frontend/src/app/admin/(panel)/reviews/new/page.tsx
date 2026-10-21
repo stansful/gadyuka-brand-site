@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { ReviewForm } from '@/components/admin/forms/ReviewForm';
 import { PageHeader } from '@/components/admin/ui/layout';
 import { adminPageMetadata } from '@/lib/admin/i18n-server';
-import { getReviewRatingMax } from '@/lib/admin/queries';
+import { getReviewRatingMax } from '@/lib/admin/queries/catalog';
 
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

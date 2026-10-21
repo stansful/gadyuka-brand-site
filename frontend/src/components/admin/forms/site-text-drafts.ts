@@ -1,6 +1,6 @@
 import { locales, mapLocales, type Locale } from '@/i18n/locales';
-import type { AdminMediaRef } from '@/lib/admin/types';
-import type { LocalizedText } from '@/lib/i18n-text';
+import type { LocalizedText } from '@/lib/localized-text';
+import type { MediaRef } from '@shared/contracts/common';
 
 /**
  * Local state of the «Тексты сайта» editor (SiteTextsForm) — pure, unit-tested.
@@ -23,7 +23,7 @@ export type Draft<T> = { value: T; base: T; seen: T };
 type Same<T> = (a: T, b: T) => boolean;
 
 const sameText: Same<string> = (a, b) => a === b;
-const sameMedia: Same<AdminMediaRef | null> = (a, b) => (a?.id ?? null) === (b?.id ?? null);
+const sameMedia: Same<MediaRef | null> = (a, b) => (a?.id ?? null) === (b?.id ?? null);
 
 /** A draft without an edit, outdated by a newer page: the field follows the page. */
 function follows<T>(draft: Draft<T>, stored: T, same: Same<T>): boolean {
@@ -88,7 +88,7 @@ export function editText(drafts: TextDrafts, entry: StoredText, next: LocalizedT
   return changed ? { ...drafts, [entry.key]: own } : drafts;
 }
 
-/** One text of the save payload (siteTextsInputSchema). */
+/** One text of the save payload (SiteTextChangeRequest, PUT /api/v1/admin/site-texts). */
 export type TextChange = { key: string; values: Partial<Record<Locale, { value: string; base: string }>> };
 
 /**
@@ -139,21 +139,21 @@ export function settleTexts(
 
 // ── landing images ────────────────────────────────────────────────────────────
 
-export type ImageDrafts = Readonly<Record<string, Draft<AdminMediaRef | null>>>;
+export type ImageDrafts = Readonly<Record<string, Draft<MediaRef | null>>>;
 
 /** A landing image as the page passes it (SiteImageEntry). */
-type StoredImage = { key: string; media: AdminMediaRef | null };
+type StoredImage = { key: string; media: MediaRef | null };
 
-export function shownImage(drafts: ImageDrafts, image: StoredImage): AdminMediaRef | null {
+export function shownImage(drafts: ImageDrafts, image: StoredImage): MediaRef | null {
   return shown(drafts[image.key], image.media, sameMedia);
 }
 
-export function editImage(drafts: ImageDrafts, image: StoredImage, media: AdminMediaRef | null): ImageDrafts {
+export function editImage(drafts: ImageDrafts, image: StoredImage, media: MediaRef | null): ImageDrafts {
   return { ...drafts, [image.key]: edit(drafts[image.key], image.media, media, sameMedia) };
 }
 
 /** One landing image of the save: the picked media and the stored one it replaces. */
-export type ImageChange = { key: string; media: AdminMediaRef | null; base: AdminMediaRef | null };
+export type ImageChange = { key: string; media: MediaRef | null; base: MediaRef | null };
 
 /** The images to send: only the ones the owner changed. */
 export function imageChanges(drafts: ImageDrafts, images: readonly StoredImage[]): ImageChange[] {
@@ -168,7 +168,7 @@ export function imageChanges(drafts: ImageDrafts, images: readonly StoredImage[]
 export function settleImages(
   drafts: ImageDrafts,
   sent: readonly ImageChange[],
-  seen: Readonly<Record<string, AdminMediaRef | null>>,
+  seen: Readonly<Record<string, MediaRef | null>>,
 ): ImageDrafts {
   const next = { ...drafts };
   for (const change of sent) {

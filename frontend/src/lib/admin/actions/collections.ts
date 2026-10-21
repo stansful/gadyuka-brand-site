@@ -1,55 +1,40 @@
 'use server';
 
-import { revalidateContent } from '@/lib/content/cache';
-import { db } from '@/lib/db';
+import { adminRequest } from '@/lib/api/admin';
+import { adminApiAction, type DomainFieldErrors } from '@/lib/api/admin-action';
+import { translateAdminMessage } from '@/lib/api/admin-messages';
+import type { AdminCatalogRowSaved, AdminCollectionSaveRequest } from '@shared/contracts/catalog';
 
-import { adminAction, errorFailure, missingMediaFailure } from '../action-helpers';
-import { actionFail, actionOk, type ActionResult } from '../action-result';
-import { getAdminTranslations } from '../i18n-server';
-import { collectionInputSchema, idSchema, type CollectionInput } from '../schemas';
-import { parseInput } from '../validation';
+import { actionOk, type ActionResult } from '../action-result';
 
-/** Create (id = null) or update a collection. */
-export async function saveCollection(id: string | null, input: CollectionInput): Promise<ActionResult<{ id: string }>> {
-  return adminAction('saveCollection', async () => {
-    const parsedId = id === null ? null : idSchema.safeParse(id);
-    if (parsedId && !parsedId.success) return errorFailure('invalidId');
-    const parsed = await parseInput(collectionInputSchema, input);
-    if (!parsed.success) return actionFail(parsed.message, parsed.fieldErrors);
-    const data = parsed.data;
-    const currentId = parsedId?.data ?? null;
+/** Refusals of the backend shown at their field too (as the old action did). */
+const REFUSALS: DomainFieldErrors = {
+  'admin.errors.slugTaken': { field: 'slug', key: 'admin.collections.slugTaken' },
+  'admin.errors.missingMedia': { field: 'coverId', key: 'admin.errors.missingMedia' },
+};
 
-    const slugTaken = await db.collection.findFirst({
-      where: { slug: data.slug, ...(currentId ? { NOT: { id: currentId } } : {}) },
-      select: { id: true },
-    });
-    const t = await getAdminTranslations('admin.collections');
-    if (slugTaken)
-      return actionFail((await getAdminTranslations('admin.errors'))('slugTaken'), { slug: t('slugTaken') });
-    const missingMedia = await missingMediaFailure([data.coverId], ['coverId']);
-    if (missingMedia) return missingMedia;
-
-    const fields = {
-      slug: data.slug,
-      title: data.title,
-      description: data.description,
-      coverId: data.coverId,
-      published: data.published,
-    };
-
-    let savedId: string;
-    if (currentId) {
-      const row = await db.collection.update({ where: { id: currentId }, data: fields, select: { id: true } });
-      savedId = row.id;
-    } else {
-      const last = await db.collection.aggregate({ _max: { order: true } });
-      const row = await db.collection.create({
-        data: { ...fields, order: (last._max.order ?? -1) + 1 },
-        select: { id: true },
-      });
-      savedId = row.id;
-    }
-    revalidateContent();
-    return actionOk({ id: savedId }, t(currentId ? 'saved' : 'created'));
-  });
+/** Create (id = null) or update a collection: POST /admin/collections, PUT /admin/collections/:id. */
+export async function saveCollection(
+  id: string | null,
+  input: AdminCollectionSaveRequest,
+): Promise<ActionResult<{ id: string }>> {
+  return adminApiAction(
+    'saveCollection',
+    () =>
+      id === null
+        ? adminRequest<AdminCatalogRowSaved>('/api/v1/admin/collections', { method: 'POST', body: input })
+        : adminRequest<AdminCatalogRowSaved>(`/api/v1/admin/collections/${encodeURIComponent(id)}`, {
+            method: 'PUT',
+            body: input,
+          }),
+    {
+      fieldErrors: REFUSALS,
+      revalidatesContent: true,
+      onSuccess: async data =>
+        actionOk(
+          { id: data.id },
+          await translateAdminMessage({ key: id === null ? 'admin.collections.created' : 'admin.collections.saved' }),
+        ),
+    },
+  );
 }

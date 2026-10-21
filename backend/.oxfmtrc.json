@@ -1,0 +1,67 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": true,
+  "singleQuote": true,
+  "useTabs": false,
+  "tabWidth": 2,
+  "trailingComma": "all",
+  "bracketSpacing": true,
+  "arrowParens": "avoid",
+  "endOfLine": "lf",
+  "printWidth": 120,
+  "ignorePatterns": [
+    "package-lock.json",
+    "dist/**",
+    ".build/**",
+    "generated/**",
+    "docs/**",
+    "_templates/**",
+    "prisma/migrations/**"
+  ],
+  "overrides": [
+    {
+      "files": ["**/*.json"],
+      "options": {
+        "trailingComma": "none"
+      }
+    }
+  ],
+  "sortPackageJson": true,
+  "sortImports": {
+    "newlinesBetween": true,
+    "partitionByNewline": false,
+    "ignoreCase": true,
+    "internalPattern": ["~"],
+    "customGroups": [
+      {
+        "groupName": "nestjs",
+        "selector": "external",
+        "elementNamePattern": ["@nestjs/*"]
+      },
+      {
+        "groupName": "prisma",
+        "selector": "external",
+        "elementNamePattern": ["@prisma/*"]
+      },
+      {
+        "groupName": "ts-path-alias",
+        "selector": "internal",
+        "elementNamePattern": ["~"]
+      }
+    ],
+    "groups": [
+      "value-builtin",
+      "nestjs",
+      "prisma",
+      "value-external",
+      "ts-path-alias",
+      "type-internal",
+      "type-import",
+      "value-internal",
+      ["type-parent", "type-sibling", "type-index"],
+      ["value-parent", "value-sibling", "value-index"],
+      "unknown"
+    ],
+    "order": "asc"
+  }
+}

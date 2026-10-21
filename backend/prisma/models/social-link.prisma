@@ -1,0 +1,15 @@
+/// Social / messenger links shown in the contacts section and JSON-LD sameAs.
+model SocialLink {
+  id        String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  type      SocialType
+  /// LocalizedText; empty = the default label from messages (social.<type>)
+  label     Json       @default("{}")
+  url       String
+  order     Int        @default(0)
+  published Boolean    @default(true)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  @@index([published, order])
+  @@map("social_links")
+}
