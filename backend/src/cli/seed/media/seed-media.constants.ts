@@ -3,7 +3,7 @@
  * settings of src/core/media/media.constants.ts: the seed keeps its own, so its uuids stay stable).
  */
 export const SEED_MAX_DIMENSION = 2400;
-export const SEED_WEBP_QUALITY = 84;
+export const SEED_WEBP_QUALITY = 95;
 export const SEED_WEBP_EFFORT = 5;
 
 /**
