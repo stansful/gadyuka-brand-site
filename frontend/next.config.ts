@@ -114,6 +114,14 @@ const nextConfig: NextConfig = {
     // FCP 0.90 s / LCP 3.45 s / perf 91 vs 1.15 s / 3.67 s / 90 inlined; /en and the catalog page
     // are equal or better too.
     inlineCss: false,
+    // Kept OFF on purpose (on by default in 16.4.2). With it the server reports which params a
+    // segment read, and the client router keys its cached segment by those params only. The report
+    // closes after the static stage, but the params of a route without generateStaticParams resolve
+    // later (runtime stage): every /admin/<section>/[id] page reported "reads no params", so all
+    // rows of a list were cached under ONE key and the last prefetch to arrive won — clicking
+    // «Знак» opened «Голова» (the last row). Off: segments are keyed by their concrete params.
+    // Re-check after upgrading Next (client/components/segment-cache/cache.js, "re-key").
+    varyParams: false,
   },
   images: {
     // Only first-party files may go through the optimizer:
