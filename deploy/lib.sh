@@ -602,9 +602,30 @@ compose_up() {
     print_generated_password
     die "the image build failed (messages above). Out of memory? Add swap (README.md). Then run the same script again"
   fi
+  sync_db_owner_password
   log "starting: postgres → migrate → minio → minio-init → seed → backend → frontend → ${PROXY}"
   compose up -d --remove-orphans --wait --wait-timeout "${WAIT_TIMEOUT:-600}" || show_failure
   docker image prune -f >/dev/null 2>&1 || true
+}
+
+# POSTGRES_PASSWORD only applies when postgres initialises an EMPTY data folder: an existing database keeps
+# the password it was created with. A re-created .env (new generated POSTGRES_PASS) or an edited one would
+# then lock migrate / seed / backend out ("password authentication failed"). So .env stays the source of
+# truth: start postgres alone and set the owner's password over the container's local socket (trusted
+# by the official image — no password needed there). psql variables keep any password safely quoted.
+sync_db_owner_password() {
+  compose up -d --wait --wait-timeout "${WAIT_TIMEOUT:-600}" postgres || show_failure
+  if compose exec -T postgres sh -s >/dev/null 2>&1 <<'SH'
+psql -v ON_ERROR_STOP=1 -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v owner="$POSTGRES_USER" -v pw="$POSTGRES_PASSWORD" <<'SQL'
+ALTER ROLE :"owner" PASSWORD :'pw';
+SQL
+SH
+  then
+    log "database owner password matches .env"
+    return 0
+  fi
+  print_generated_password
+  die "cannot log in to the database in $(env_get VOLUMES_DIR)/postgres as $(env_get POSTGRES_USER) (database $(env_get POSTGRES_NAME)): it was created with other POSTGRES_USER / POSTGRES_NAME values (an earlier .env). Put those values back into ${ENV_FILE}, or — only for a test install without real data — remove that folder and run the script again"
 }
 
 print_summary() {
