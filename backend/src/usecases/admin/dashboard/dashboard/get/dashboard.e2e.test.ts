@@ -123,6 +123,42 @@ describe('[e2e] GET /api/v1/admin/dashboard', () => {
     }
   });
 
+  it('counts unique visits for today and yesterday', async () => {
+    await app.database.client.visit.deleteMany({});
+    const today = new Date();
+    today.setUTCHours(12, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+    const [todayVisit, yesterdayVisit] = await Promise.all([
+      app.database.client.visit.create({
+        data: {
+          hourBucket: today,
+          ipHash: 'today-hash',
+          firstAt: today,
+          lastAt: today,
+        },
+      }),
+      app.database.client.visit.create({
+        data: {
+          hourBucket: yesterday,
+          ipHash: 'yesterday-hash',
+          firstAt: yesterday,
+          lastAt: yesterday,
+        },
+      }),
+    ]);
+    try {
+      const { visits } = await dashboard();
+      strictEqual(visits.today, 1);
+      strictEqual(visits.yesterday, 1);
+    } finally {
+      await app.database.client.visit.deleteMany({
+        where: { id: { in: [todayVisit.id, yesterdayVisit.id] } },
+      });
+    }
+  });
+
   it('counts the site texts like the tabs of «Тексты сайта»', async () => {
     const compare = async () => {
       const [{ texts }, page] = await Promise.all([

@@ -4,6 +4,7 @@ import type {
   DashboardLeadsSummary,
   DashboardResponse as DashboardResponseContract,
   DashboardTextsSummary,
+  DashboardVisitsSummary,
 } from '~shared/contracts/dashboard';
 
 import { EntityKind } from '~core/entities/entity-kind.enum';
@@ -18,6 +19,7 @@ export interface DashboardFigures {
   readonly media: number;
   readonly texts: SiteTextCounters;
   readonly leads: LeadCounts;
+  readonly visits: DashboardVisitsSummary;
   readonly latestLeads: readonly DashboardLeadRow[];
 }
 
@@ -49,6 +51,13 @@ export class DashboardResponse implements DashboardResponseContract {
   })
   leads: DashboardLeadsSummary;
 
+  @ApiProperty({
+    type: 'object',
+    description: 'Visits today and yesterday',
+    properties: { today: COUNT, yesterday: COUNT },
+  })
+  visits: DashboardVisitsSummary;
+
   @ApiProperty({ type: () => [DashboardLeadResponse], description: 'The newest leads first' })
   latestLeads: DashboardLeadResponse[];
 
@@ -59,6 +68,7 @@ export class DashboardResponse implements DashboardResponseContract {
       media: figures.media,
       texts: { total, edited, gaps, unsaved },
       leads: { ...figures.leads },
+      visits: figures.visits,
       latestLeads: figures.latestLeads.map(row => DashboardLeadResponse.of(row)),
     });
   }

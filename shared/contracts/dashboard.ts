@@ -46,6 +46,11 @@ export interface DashboardLeadItem {
   readonly createdAt: IsoDateTime;
 }
 
+export interface DashboardVisitsSummary {
+  readonly today: number;
+  readonly yesterday: number;
+}
+
 export interface DashboardResponse {
   /** Every admin list with a publish toggle */
   readonly entities: Readonly<Record<PublishableEntityKind, DashboardEntityCount>>;
@@ -53,6 +58,7 @@ export interface DashboardResponse {
   readonly media: number;
   readonly texts: DashboardTextsSummary;
   readonly leads: DashboardLeadsSummary;
+  readonly visits: DashboardVisitsSummary;
   /** The 5 newest leads, newest first */
   readonly latestLeads: readonly DashboardLeadItem[];
 }
