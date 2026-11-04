@@ -3,10 +3,10 @@
  * The backend enforces the same limits (backend/src/core/media/media.constants.ts); keep both in step.
  */
 
-/** 15 MB per file. */
-export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+/** 50 MB per file. */
+export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
-/** The same limit in whole megabytes, for messages («Файл больше 15 МБ»). */
+/** The same limit in whole megabytes, for messages («Файл больше 50 МБ»). */
 export const MAX_UPLOAD_MEGABYTES = Math.round(MAX_UPLOAD_BYTES / 1024 / 1024);
 
 /** Longest side after processing (px). Smaller images are never upscaled. */

@@ -22,7 +22,7 @@ const MEDIA_PATH = '/api/v1/admin/media' satisfies ApiPath;
 export const MAX_UPLOAD_BODY_BYTES = MAX_UPLOAD_BYTES + 512 * 1024;
 
 /**
- * An upload streams at the visitor's pace (the backend reads while the browser sends): 15 MB over a
+ * An upload streams at the visitor's pace (the backend reads while the browser sends): 50 MB over a
  * slow mobile link takes minutes. The visitor going away aborts it earlier.
  */
 const UPLOAD_TIMEOUT_MS = 15 * 60 * 1000;

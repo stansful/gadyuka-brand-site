@@ -126,7 +126,7 @@ describe('uploadMediaStream', () => {
       ok: false,
       failure: expect.objectContaining({
         status: 413,
-        message: { key: 'admin.media.errors.tooLarge', values: { size: 15 } },
+        message: { key: 'admin.media.errors.tooLarge', values: { size: 50 } },
       }),
     };
     const declared = await uploadMediaStream({

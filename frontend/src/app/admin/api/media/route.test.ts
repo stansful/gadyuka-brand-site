@@ -116,9 +116,11 @@ describe('POST /admin/api/media', () => {
       400,
       { error: 'Не удалось прочитать файл из запроса' },
     ]);
-    expect(await answer(await POST(upload('x', { ...MULTIPART, 'content-length': String(16 * 1024 * 1024) })))).toEqual(
-      [413, { error: 'Файл больше 15 МБ' }],
-    );
+    expect(
+      await answer(
+        await POST(upload('x', { ...MULTIPART, 'content-length': String(50 * 1024 * 1024 + 512 * 1024 + 1) })),
+      ),
+    ).toEqual([413, { error: 'Файл больше 50 МБ' }]);
     expect(uploadMediaStream).not.toHaveBeenCalled();
   });
 
