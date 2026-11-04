@@ -2,6 +2,7 @@
 
 import { clsx } from 'clsx';
 import {
+  Activity,
   BadgePercent,
   ExternalLink,
   FileText,
@@ -46,6 +47,7 @@ export const ADMIN_NAV: readonly NavItem[] = [
   { href: '/admin/socials', key: 'socials', icon: Share2 },
   { href: '/admin/media', key: 'media', icon: Library },
   { href: '/admin/leads', key: 'leads', icon: Inbox },
+  { href: '/admin/server-metrics', key: 'serverMetrics', icon: Activity },
   { href: '/admin/settings', key: 'settings', icon: Settings },
 ];
 

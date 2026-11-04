@@ -10,4 +10,5 @@ export type * from './health';
 export type * from './http';
 export type * from './leads';
 export type * from './media';
+export type * from './server-metrics';
 export type * from './site-texts';
