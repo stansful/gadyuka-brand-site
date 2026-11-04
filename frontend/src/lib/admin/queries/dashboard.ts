@@ -15,6 +15,7 @@ import { getAdminTranslations } from '../i18n-server';
 export type DashboardData = {
   counts: Array<{ label: string; href: string; total: number; published?: number; note?: string }>;
   leads: { total: number; fresh: number; telegramFailed: number };
+  visits: { today: number; yesterday: number };
   latestLeads: readonly DashboardLeadItem[];
 };
 
@@ -57,6 +58,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       { label: nav('media'), href: '/admin/media', total: media },
     ],
     leads: { ...leads },
+    visits: dashboard.visits,
     latestLeads,
   };
 }

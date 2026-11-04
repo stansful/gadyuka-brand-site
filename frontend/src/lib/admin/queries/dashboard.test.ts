@@ -29,6 +29,7 @@ const DASHBOARD: DashboardResponse = {
   media: 12,
   texts: { total: 213, edited: 4, gaps: 2, unsaved: 0 },
   leads: { total: 9, fresh: 3, telegramFailed: 1 },
+  visits: { today: 7, yesterday: 4 },
   latestLeads: [
     {
       id: 'l1',
@@ -71,6 +72,7 @@ describe('admin dashboard (backend → the cards of the home page)', () => {
     ]);
     expect(data.counts[0]).toMatchObject({ label: 'Тексты сайта', note: 'изменено: 4 · без перевода: 2' });
     expect(data.leads).toEqual({ total: 9, fresh: 3, telegramFailed: 1 });
+    expect(data.visits).toEqual({ today: 7, yesterday: 4 });
     expect(data.latestLeads).toEqual(DASHBOARD.latestLeads);
   });
 
