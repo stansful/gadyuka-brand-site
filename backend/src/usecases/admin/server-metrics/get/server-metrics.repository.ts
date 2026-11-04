@@ -3,8 +3,9 @@ import * as os from 'node:os';
 
 import { Injectable, Logger } from '@nestjs/common';
 
-import type { ConfigService } from '~config';
 import type { ServerMetricsResponse } from '~shared/contracts/server-metrics';
+
+import { ConfigService } from '~config';
 
 interface MetricSample {
   readonly name: string;
