@@ -1,14 +1,13 @@
 import { Controller, Get, Param, Req, Res, StreamableFile } from '@nestjs/common';
+import { NodeRequest, NodeResponse } from '@nestjs/platform-node';
 import { ApiExcludeController } from '@nestjs/swagger';
-
-import { FastifyReply, FastifyRequest } from 'fastify';
 
 import { NoInternalKey, Public } from '~decorator';
 
 import { MEDIA_KEY_PARAM, MEDIA_ROUTE } from './media.route';
 import { MediaUsecase } from './media.usecase';
 
-/** GET|HEAD /media/<key> (Fastify answers HEAD with the GET route, without the body). */
+/** GET|HEAD /media/<key> (HEAD uses the GET route, without the body). */
 @ApiExcludeController()
 @Controller()
 export class MediaController {
@@ -18,10 +17,10 @@ export class MediaController {
   @Public()
   @Get(MEDIA_ROUTE)
   async execute(
-    @Param(MEDIA_KEY_PARAM) path: string,
-    @Req() request: FastifyRequest,
-    @Res({ passthrough: true }) reply: FastifyReply,
+    @Param(MEDIA_KEY_PARAM) segments: string[] | undefined,
+    @Req() request: NodeRequest,
+    @Res({ passthrough: true }) reply: NodeResponse,
   ): Promise<StreamableFile | undefined> {
-    return this.usecase.execute({ path, http: { request, reply } });
+    return this.usecase.execute({ path: (segments ?? []).join('/'), http: { request, reply } });
   }
 }

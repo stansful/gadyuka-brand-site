@@ -85,7 +85,7 @@ describe('[e2e] POST /api/v1/auth/login', () => {
     });
   });
 
-  it('answers a malformed JSON body with 400 badRequest (Fastify parser errors go through the filter)', async () => {
+  it('answers a malformed JSON body with 400 badRequest (Node parser errors go through the filter)', async () => {
     const response = await app.api.post<ApiErrorResponse>(LOGIN_ROUTE, { rawBody: '{"login": ' });
     strictEqual(response.status, 400);
     deepStrictEqual(response.body, { statusCode: 400, error: 'badRequest', key: 'admin.errors.invalidRequest' });

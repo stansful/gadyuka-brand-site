@@ -118,7 +118,7 @@ describe('[e2e] POST /api/v1/admin/media', () => {
     deepStrictEqual([response.status, response.body.key], [400, 'admin.media.errors.processingFailed']);
   });
 
-  it('refuses a file over 15 MB with 413 tooLarge { size: 15 } while streaming', async () => {
+  it('refuses a file over 50 MB with 413 tooLarge { size: 50 } while streaming', async () => {
     const response = await upload(formWith(new Uint8Array(MAX_UPLOAD_BYTES + 1), 'huge.jpg'));
     deepStrictEqual(
       [response.status, response.body.key, response.body.values],

@@ -74,7 +74,7 @@ public/brand/**                         — статичная бренд-гра
 
 ## Картинки
 
-- Загрузка: медиатека → `POST /admin/api/media` (route handler пересылает поток на `POST /api/v1/admin/media`, без буферизации) → бэкенд проверяет формат по сигнатуре (JPEG, PNG, WebP, AVIF, GIF; без SVG), ≤ 15 МБ → `sharp` → WebP → MinIO → строка `Media`. Лимиты в `src/lib/admin/media-constants.ts` — только подсказка до отправки, совпадают с бэкендом.
+- Загрузка: медиатека → `POST /admin/api/media` (route handler пересылает поток на `POST /api/v1/admin/media`, без буферизации) → бэкенд проверяет формат по сигнатуре (JPEG, PNG, WebP, AVIF, GIF; без SVG), ≤ 50 МБ → `sharp` → WebP → MinIO → строка `Media`. Лимиты в `src/lib/admin/media-constants.ts` — только подсказка до отправки, совпадают с бэкендом.
 - Отдача: бэкенд (`GET|HEAD /media/<key>`: `Cache-Control: immutable`, ETag/304, Range, `nosniff`, CSP `sandbox`); `src/app/media/[...key]/route.ts` (`src/lib/api/media-proxy.ts`) стримит с того же домена, пробрасывая `If-None-Match` / `Range` и заголовки ответа, — он же источник для `/_next/image`. В production прокси может отправлять `/media/*` прямо на бэкенд (`docs/COMPRESSION.md`). Бакет приватный, MinIO и бэкенд наружу не открыты.
 - Удаление — только если картинка нигде не используется (бэкенд проверяет все связи, админка показывает, где она используется).
 

@@ -1,4 +1,5 @@
 import { Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-node';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -11,7 +12,8 @@ import {
   ApiUnsupportedMediaTypeResponse,
 } from '@nestjs/swagger';
 
-import { FileInterceptor, UploadedMultipartFile } from '@nestjs/platform-fastify/multipart';
+// Loads the global Express.Multer.File type without a runtime Express dependency.
+import type {} from 'multer';
 
 import { MEDIA_UPLOAD_FIELD } from '~core/media/media-library.constants';
 import { UserRole } from '~core/users/user-role';
@@ -45,7 +47,7 @@ export class MediaUploadController {
   @UseInterceptors(MediaUploadErrorInterceptor, FileInterceptor(MEDIA_UPLOAD_FIELD, MediaUploadOptions.MULTIPART))
   @Post(MEDIA_UPLOAD_ROUTE)
   async execute(
-    @UploadedFile() file: UploadedMultipartFile | undefined,
+    @UploadedFile() file: Express.Multer.File | undefined,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<MediaItemResponse> {
     return this.usecase.execute({

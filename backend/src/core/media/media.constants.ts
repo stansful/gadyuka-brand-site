@@ -42,9 +42,9 @@ export const MAX_MEDIA_KEY_SEGMENTS = 8;
 export const MAX_MEDIA_KEY_SEGMENT_LENGTH = 255;
 export const MAX_MEDIA_KEY_LENGTH = 1024;
 
-/** 15 MB per uploaded file. */
-export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
-/** The same limit in whole megabytes, for messages («Файл больше 15 МБ»). */
+/** 50 MB per uploaded file. */
+export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+/** The same limit in whole megabytes, for messages («Файл больше 50 МБ»). */
 export const MAX_UPLOAD_MEGABYTES = Math.round(MAX_UPLOAD_BYTES / 1024 / 1024);
 /** Longest side after processing (px). Smaller images are never upscaled. */
 export const MAX_IMAGE_DIMENSION = 2400;

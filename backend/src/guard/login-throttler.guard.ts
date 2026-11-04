@@ -1,7 +1,6 @@
 import { ExecutionContext, Injectable } from '@nestjs/common';
+import { NodeRequest } from '@nestjs/platform-node';
 import { ThrottlerGuard, ThrottlerLimitDetail } from '@nestjs/throttler';
-
-import { FastifyRequest } from 'fastify';
 
 import { TooManyAttemptsException } from '~exception';
 import { ClientIpResolver } from '~module/common';
@@ -16,7 +15,7 @@ export class LoginThrottlerGuard extends ThrottlerGuard {
   private static readonly SECONDS_PER_MINUTE = 60;
   private readonly clientIp = new ClientIpResolver();
 
-  protected override async getTracker(request: FastifyRequest): Promise<string> {
+  protected override async getTracker(request: NodeRequest): Promise<string> {
     return `${this.clientIp.resolve(request)}|${this.loginOf(request.body)}`;
   }
 

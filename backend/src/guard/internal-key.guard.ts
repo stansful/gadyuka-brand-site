@@ -2,8 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-
-import { FastifyRequest } from 'fastify';
+import { NodeRequest } from '@nestjs/platform-node';
 
 import { ConfigService } from '~config';
 import { RequestHeader } from '~core/constants/request-header.enum';
@@ -29,7 +28,7 @@ export class InternalKeyGuard implements CanActivate {
     if (this.reflector.getAllAndOverride(NoInternalKey, [context.getHandler(), context.getClass()])) {
       return true;
     }
-    const header = context.switchToHttp().getRequest<FastifyRequest>().headers[RequestHeader.INTERNAL_KEY];
+    const header = context.switchToHttp().getRequest<NodeRequest>().headers[RequestHeader.INTERNAL_KEY];
     if (typeof header !== 'string' || !timingSafeEqual(this.digest(header), this.expectedDigest)) {
       throw new InternalKeyRequiredException();
     }

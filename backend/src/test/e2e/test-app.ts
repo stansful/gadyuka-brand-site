@@ -1,6 +1,6 @@
 import { Type } from '@nestjs/common';
 import { ModulesContainer } from '@nestjs/core';
-import { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { NestNodeApplication } from '@nestjs/platform-node';
 import { StorageDisk, getDiskToken } from '@nestjs/storage';
 
 import { ConfigService } from '~config';
@@ -11,12 +11,12 @@ import { AppFactory } from '../../app.factory';
 import { ApiClient } from './api-client';
 
 /**
- * The real application (AppFactory: Fastify, guards, pipes, filters) on a random local port, against
+ * The real application (AppFactory: NodeAdapter, guards, pipes, filters) on a random local port, against
  * the dev Postgres (database of .env.test) and MinIO. One per e2e file.
  */
 export class TestApp {
   private constructor(
-    private readonly app: NestFastifyApplication,
+    private readonly app: NestNodeApplication,
     readonly api: ApiClient,
   ) {}
 

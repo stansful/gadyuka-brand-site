@@ -2,7 +2,7 @@ import { deepStrictEqual, ok } from 'node:assert';
 import { after, before, describe, it } from 'node:test';
 
 import { ModulesContainer } from '@nestjs/core';
-import { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { NestNodeApplication } from '@nestjs/platform-node';
 import { OpenAPIObject } from '@nestjs/swagger';
 
 import { ApiRoute, RouteInventory } from '~test/e2e/route-inventory';
@@ -16,7 +16,7 @@ import { SwaggerSetup } from './swagger.setup';
  */
 describe('[e2e] Swagger document of the app', () => {
   const PATH_PARAMETER = /:([A-Za-z0-9_]+)/g;
-  let app: NestFastifyApplication;
+  let app: NestNodeApplication;
   let document: OpenAPIObject;
   let routes: ApiRoute[];
 

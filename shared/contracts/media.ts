@@ -20,7 +20,7 @@ export interface MediaItem extends MediaRef {
 
 /**
  * POST /api/v1/admin/media — multipart/form-data with ONE image in the field `file` (JPEG, PNG,
- * WebP, AVIF or GIF by its bytes, at most 15 MB). Stored as WebP fitted inside 2400×2400 at
+ * WebP, AVIF or GIF by its bytes, at most 50 MB). Stored as WebP fitted inside 2400×2400 at
  * "admin/<admin id>/<uuid>/image.webp" → 201 MediaItem.
  * Errors (`key` of shared/messages/admin): 400 admin.media.errors.noFile / unreadable / empty /
  * processingFailed, 413 admin.media.errors.tooLarge { size }, 415 admin.media.errors.unsupported

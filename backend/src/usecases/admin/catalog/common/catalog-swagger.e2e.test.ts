@@ -1,7 +1,7 @@
 import { deepStrictEqual, ok } from 'node:assert';
 import { after, before, describe, it } from 'node:test';
 
-import { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { NestNodeApplication } from '@nestjs/platform-node';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 
 import { CatalogModule } from '~usecases/admin/catalog/catalog.module';
@@ -13,7 +13,7 @@ import { AppFactory } from '../../../../app.factory';
  * schema — e.g. a runtime-built DTO without property types — would show up only there).
  */
 describe('[e2e] Swagger document of the catalog routes', () => {
-  let app: NestFastifyApplication;
+  let app: NestNodeApplication;
   let document: OpenAPIObject;
 
   before(async () => {

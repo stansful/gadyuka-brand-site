@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# ГАДЮКА backend (NestJS 12 + Fastify + Prisma 7) — production images. Build context = the REPOSITORY ROOT
+# ГАДЮКА backend (NestJS 12 + NodeAdapter + Prisma 7) — production images. Build context = the REPOSITORY ROOT
 # (the backend compiles ../shared/contracts and reads ../shared/messages); the root .dockerignore applies.
 #
 #   docker compose build backend migrate      (root docker-compose.yml; see the root README.md)

@@ -70,7 +70,7 @@ import { AdminCommonModule } from '~usecases/admin/common/admin-common.module';
     ProductDetailsController,
     ProductCreateController,
     ProductUpdateController,
-    // The static /reviews/rating-scale before /reviews/:id (Fastify prefers static segments anyway).
+    // The static /reviews/rating-scale before /reviews/:id (the Node router prefers static segments anyway).
     ReviewScaleController,
     ReviewListController,
     ReviewDetailsController,

@@ -10,13 +10,13 @@ import { AdminMessageKey } from '~core/constants/admin-message-key.enum';
 import { ApiErrorCode } from '~core/constants/api-error-code.enum';
 import { ApiExceptionFilter, DomainErrorKind, DomainException } from '~exception';
 
-/** What the filter sent: the parts of a Fastify reply it uses. */
+/** What the filter sent: the parts of a Node response it uses. */
 class RecordingReply {
   private sentStatus: number | undefined;
   private sentBody: unknown;
   private readonly sentHeaders = new Map<string, string>();
 
-  constructor(readonly sent = false) {}
+  constructor(readonly headersSent = false) {}
 
   get statusCode(): number | undefined {
     return this.sentStatus;
@@ -35,7 +35,7 @@ class RecordingReply {
     return this;
   }
 
-  header(name: string, value: string): this {
+  set(name: string, value: string): this {
     this.sentHeaders.set(name, value);
     return this;
   }

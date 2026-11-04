@@ -1,6 +1,5 @@
 import { ExecutionContext } from '@nestjs/common';
-
-import { FastifyRequest } from 'fastify';
+import { NodeRequest } from '@nestjs/platform-node';
 
 import type { AuthenticatedUser } from '~module/auth-token';
 
@@ -8,7 +7,7 @@ import { RequestHeader } from '~core/constants/request-header.enum';
 import { ClientIpResolver } from '~module/common';
 
 /** A request with the user AuthGuard attached. */
-export interface AuthenticatedRequest extends FastifyRequest {
+export interface AuthenticatedRequest extends NodeRequest {
   user?: AuthenticatedUser;
 }
 
@@ -21,7 +20,7 @@ export class RequestContext {
   }
 
   static clientIpOf(_data: unknown, context: ExecutionContext): string {
-    return RequestContext.clientIp.resolve(context.switchToHttp().getRequest<FastifyRequest>());
+    return RequestContext.clientIp.resolve(context.switchToHttp().getRequest<NodeRequest>());
   }
 
   /**
@@ -29,7 +28,7 @@ export class RequestContext {
    * request's own User-Agent is the site server's HTTP client (Node's fetch sends "node"), not the visitor.
    */
   static userAgentOf(_data: unknown, context: ExecutionContext): string | undefined {
-    const value = context.switchToHttp().getRequest<FastifyRequest>().headers[RequestHeader.CLIENT_USER_AGENT];
+    const value = context.switchToHttp().getRequest<NodeRequest>().headers[RequestHeader.CLIENT_USER_AGENT];
     return typeof value === 'string' && value.trim() !== '' ? value : undefined;
   }
 }

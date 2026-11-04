@@ -1,8 +1,7 @@
 import { isIP } from 'node:net';
 
 import { Injectable } from '@nestjs/common';
-
-import { FastifyRequest } from 'fastify';
+import { NodeRequest } from '@nestjs/platform-node';
 
 import { RequestHeader } from '~core/constants/request-header.enum';
 
@@ -15,12 +14,12 @@ import { RequestHeader } from '~core/constants/request-header.enum';
 export class ClientIpResolver {
   static readonly UNKNOWN = 'unknown';
 
-  resolve(request: FastifyRequest): string {
+  resolve(request: NodeRequest): string {
     const forwarded = request.headers[RequestHeader.CLIENT_IP];
     const candidate = typeof forwarded === 'string' ? forwarded.trim() : '';
     if (isIP(candidate) !== 0) {
       return candidate;
     }
-    return isIP(request.ip) !== 0 ? request.ip : ClientIpResolver.UNKNOWN;
+    return request.ip !== undefined && isIP(request.ip) !== 0 ? request.ip : ClientIpResolver.UNKNOWN;
   }
 }

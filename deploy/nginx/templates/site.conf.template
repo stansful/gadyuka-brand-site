@@ -59,14 +59,14 @@ server {
         include /etc/gadyuka-nginx/snippets/security-headers-base.conf;
     }
 
-    # 3. Admin media upload: the only large request body (15 MB file + multipart overhead).
+    # 3. Admin media upload: the only large request body (50 MB file + multipart overhead).
     location = /admin/api/media {
-        client_max_body_size 16m;
+        client_max_body_size 55m;
         include /etc/gadyuka-nginx/snippets/proxy-admin.conf;
     }
 
     location ^~ /admin/api/media/ {
-        client_max_body_size 16m;
+        client_max_body_size 55m;
         include /etc/gadyuka-nginx/snippets/proxy-admin.conf;
     }
 

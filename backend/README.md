@@ -1,6 +1,6 @@
 # ГАДЮКА — backend
 
-NestJS 12 (Fastify) API of the site: content, media, leads and the admin. Only the Next.js server
+NestJS 12 (`@nestjs/platform-node`) API of the site: content, media, leads and the admin. Only the Next.js server
 (`frontend/`) calls it — the backend is never exposed publicly; browsers reach it only through
 `/media/*`, which the site rewrites here.
 
@@ -118,7 +118,7 @@ database `gadyuka_test` (created by `prisma migrate deploy` on first use).
 | `PATCH /api/v1/admin/entities/:kind/:id/published`          | ADMIN                   | `{ published }` → `{ id, published }` (publish toggle of an admin list row)                       |
 | `POST /api/v1/admin/entities/:kind/reorder`                 | ADMIN                   | `{ ids }` → 204 (`ids[i]` gets order i; products only within one collection)                      |
 | `DELETE /api/v1/admin/entities/:kind/:id`                   | ADMIN                   | 204 (media files stay; a collection goes with its products)                                       |
-| `GET\|POST /api/v1/admin/media`                             | ADMIN                   | the library (`?cursor=&q=`, 60 per page) / upload (multipart `file`, ≤ 15 MB → WebP)              |
+| `GET\|POST /api/v1/admin/media`                             | ADMIN                   | the library (`?cursor=&q=`, 60 per page) / upload (multipart `file`, ≤ 50 MB → WebP)              |
 | `GET\|DELETE /api/v1/admin/media/:id`                       | ADMIN                   | details with every place that uses the file / delete (409 `inUse` while it is used)               |
 | `PATCH /api/v1/admin/media/:id/alt`                         | ADMIN                   | `{ alt }` → the alt texts (trimmed, ≤ 300 per language)                                           |
 | `GET /api/v1/admin/leads`                                   | ADMIN                   | `?type&status&page` — 25 per page, newest first                                                   |

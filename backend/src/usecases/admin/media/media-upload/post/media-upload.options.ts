@@ -1,4 +1,4 @@
-import { MultipartOptions } from '@nestjs/platform-fastify/multipart';
+import { MulterModuleOptions } from '@nestjs/platform-node';
 
 import { MAX_MEDIA_UPLOAD_FIELDS, MAX_MEDIA_UPLOAD_FIELD_BYTES } from '~core/media/media-library.constants';
 import { MAX_UPLOAD_BYTES } from '~core/media/media.constants';
@@ -9,7 +9,7 @@ import { MAX_UPLOAD_BYTES } from '~core/media/media.constants';
  * fields, UTF-8 file names (browsers send them unencoded; busboy's default is latin1).
  */
 export class MediaUploadOptions {
-  static readonly MULTIPART: MultipartOptions = {
+  static readonly MULTIPART: MulterModuleOptions = {
     limits: {
       fileSize: MAX_UPLOAD_BYTES,
       files: 1,

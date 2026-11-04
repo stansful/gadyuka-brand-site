@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import { NestNodeApplication, NodeAdapter } from '@nestjs/platform-node';
 
 import { MAX_MEDIA_KEY_LENGTH } from '~core/media/media.constants';
 import { AppLogger } from '~module/logger';
@@ -10,8 +10,8 @@ import { ConfigService, EnvironmentEnum } from './config';
 
 /** Builds the application exactly as it runs (main.ts) — also used by the e2e tests. */
 export class AppFactory {
-  static async create(): Promise<NestFastifyApplication> {
-    const app = await NestFactory.create<NestFastifyApplication>(AppModule, AppFactory.createAdapter(), {
+  static async create(): Promise<NestNodeApplication> {
+    const app = await NestFactory.create<NestNodeApplication>(AppModule, AppFactory.createAdapter(), {
       bufferLogs: true,
     });
     app.useLogger(app.get(AppLogger));
@@ -20,12 +20,12 @@ export class AppFactory {
     return app;
   }
 
-  private static createAdapter(): FastifyAdapter {
+  private static createAdapter(): NodeAdapter {
     // Behind the Next.js server only: the visitor's IP comes in x-client-ip, not X-Forwarded-For.
-    return new FastifyAdapter({ trustProxy: false, routerOptions: { maxParamLength: MAX_MEDIA_KEY_LENGTH } });
+    return new NodeAdapter({ trustProxy: false, maxParamLength: MAX_MEDIA_KEY_LENGTH });
   }
 
-  private static setupSwaggerInDevelopment(app: NestFastifyApplication): void {
+  private static setupSwaggerInDevelopment(app: NestNodeApplication): void {
     if (app.get(ConfigService).getSafety('NODE_ENV') === EnvironmentEnum.dev) {
       new SwaggerSetup().setup(app);
     }

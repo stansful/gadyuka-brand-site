@@ -7,8 +7,8 @@ interface ClientError {
   readonly statusCode: number;
 }
 
-/** Errors of Fastify itself with a 4xx status: malformed JSON, body too large, bad content type. */
-export class FastifyErrorRenderer implements ExceptionRenderer {
+/** HTTP parser errors with a 4xx status: malformed JSON, body too large, bad content type. */
+export class HttpErrorRenderer implements ExceptionRenderer {
   canRender(exception: unknown): boolean {
     if (!(exception instanceof Error) || !('statusCode' in exception)) {
       return false;

@@ -40,11 +40,11 @@
 	# The admin is never indexed (in addition to robots.txt and the noindex meta).
 	header /admin* X-Robots-Tag "noindex, nofollow"
 
-	# Request body limits: only the admin media upload takes large bodies (15 MB file + multipart
+	# Request body limits: only the admin media upload takes large bodies (50 MB file + multipart
 	# overhead); Server Actions (Next limit 1 MB) and the lead API (16 KB) stay small.
 	@mediaUpload path /admin/api/media /admin/api/media/*
 	request_body @mediaUpload {
-		max_size 16MiB
+		max_size 55MiB
 	}
 	@notMediaUpload not path /admin/api/media /admin/api/media/*
 	request_body @notMediaUpload {

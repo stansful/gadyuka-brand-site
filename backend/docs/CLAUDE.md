@@ -6,7 +6,7 @@
 
 ## Стек
 
-- TypeScript (`strict: true`), NestJS 12 на **Fastify**, Node.js (версия — `.nvmrc`), CommonJS-сборка `tsc` + `tsc-alias`.
+- TypeScript (`strict: true`), NestJS 12 на **NodeAdapter (`@nestjs/platform-node`)**, Node.js (версия — `.nvmrc`), CommonJS-сборка `tsc` + `tsc-alias`.
 - PostgreSQL 18 через Prisma 7 (`@prisma/adapter-pg`), схема разбита по файлам в `prisma/models/`.
 - Файлы — `@nestjs/storage` (S3Disk → MinIO), картинки — `sharp`, тексты — `shared/messages` + ICU (`intl-messageformat`).
 - Валидация — `class-validator` + `class-transformer`; Swagger — `@nestjs/swagger` (только `NODE_ENV=dev`).

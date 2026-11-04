@@ -1,7 +1,6 @@
 import { Injectable, StreamableFile } from '@nestjs/common';
+import { NodeRequest, NodeResponse } from '@nestjs/platform-node';
 import { InjectDisk, StorageDisk, serveFile } from '@nestjs/storage';
-
-import { FastifyReply, FastifyRequest } from 'fastify';
 
 import { MEDIA_CACHE_CONTROL, MEDIA_CONTENT_SECURITY_POLICY } from '~core/media/media.constants';
 
@@ -9,8 +8,8 @@ import { MEDIA_DISK } from './storage.constants';
 
 /** The HTTP exchange a file is served into (passed through from the controller untouched). */
 export interface MediaHttpExchange {
-  readonly request: FastifyRequest;
-  readonly reply: FastifyReply;
+  readonly request: NodeRequest;
+  readonly reply: NodeResponse;
 }
 
 /**
@@ -23,7 +22,7 @@ export class MediaFileServer {
   constructor(@InjectDisk(MEDIA_DISK) private readonly disk: StorageDisk) {}
 
   async serve(key: string, { request, reply }: MediaHttpExchange): Promise<StreamableFile | undefined> {
-    reply.header('Content-Security-Policy', MEDIA_CONTENT_SECURITY_POLICY);
+    reply.set('Content-Security-Policy', MEDIA_CONTENT_SECURITY_POLICY);
     return serveFile(this.disk, key, {
       req: request,
       res: reply,
