@@ -72,6 +72,22 @@ export default async function DashboardPage(): Promise<ReactElement> {
         </Link>
       </section>
 
+      <section aria-labelledby="visits-summary" className="mb-6 grid gap-3 sm:grid-cols-3">
+        <h2 id="visits-summary" className="sr-only">
+          {t('visitsSummary')}
+        </h2>
+        <Link
+          href="/admin/visits"
+          className="rounded-xl border border-line bg-panel p-5 transition-colors hover:border-line-strong"
+        >
+          <p className="text-xs font-medium text-muted">{t('visitsToday')}</p>
+          <p className="mt-2 text-3xl font-semibold text-fg">{data.visits.today}</p>
+          <p className="mt-1 text-[11px] text-muted">
+            {t('visitsYesterday')}: {data.visits.yesterday}
+          </p>
+        </Link>
+      </section>
+
       <section aria-labelledby="content-summary" className="mb-8">
         <h2 id="content-summary" className="mb-3 text-sm font-semibold text-fg">
           {t('content')}
