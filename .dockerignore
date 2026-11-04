@@ -41,6 +41,7 @@ deploy/backup/*
 docker-compose*.yml
 .env.example
 README.md
+readme_dev.md
 
 # Not needed by any build
 frontend/concepts

@@ -210,7 +210,7 @@ of `docker-compose.yml` creates it). Tests: `npm run test:slice -- seed` (the e2
 ## Production (Docker)
 
 The whole stack (frontend, backend, PostgreSQL, MinIO, reverse proxy) starts with one script from the
-repository root: [../README.md](../README.md). This folder's part:
+repository root: [../readme_dev.md](../readme_dev.md). This folder's part:
 
 - `Dockerfile` (build context = the repository root). Target `runtime`: compiled `dist` + production
   dependencies + `shared/messages` + `assets`, user `node`, `node dist/backend/src/main.js` — also the image

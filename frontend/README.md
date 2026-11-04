@@ -65,4 +65,4 @@ npm run dev             # http://localhost:3000 (next dev; хост — localhos
 - `src/lib/api/README.md` — клиент бэкенда: публичные чтения, чтения и действия админки, сессия.
 - `../backend/README.md` — бэкенд: API, окружение, сид, тесты.
 - `BRIEF.md` — бриф и исходные тексты.
-- Деплой (корневой docker-compose, Caddy / nginx) — корневой `README.md` репозитория.
+- Деплой (корневой docker-compose, Caddy / nginx) — корневой `readme_dev.md` репозитория.

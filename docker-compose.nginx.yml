@@ -1,5 +1,5 @@
 # ГАДЮКА — reverse proxy variant 2: nginx + certbot (Let's Encrypt, webroot challenge).
-# Used together with docker-compose.yml: `sudo ./deploy/up-nginx.sh` (README.md), afterwards plain
+# Used together with docker-compose.yml: `sudo ./deploy/up-nginx.sh` (readme_dev.md), afterwards plain
 # `docker compose …` (COMPOSE_FILE in .env). Configs and scripts: deploy/nginx/.
 #
 #   nginx    renders its config at start (deploy/nginx/nginx-start.sh): HTTP-only bootstrap (ACME

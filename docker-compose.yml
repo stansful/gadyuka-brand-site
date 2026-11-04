@@ -1,6 +1,6 @@
 # ГАДЮКА — production stack (one VPS). Start it with one of the scripts (they also install Docker,
 # create .env and the data folders): `sudo ./deploy/up-caddy.sh` or `sudo ./deploy/up-nginx.sh`.
-# Details: README.md.
+# Details: readme_dev.md.
 #
 #   Internet → proxy :80/:443 ──► frontend:3000   Next.js standalone (pages, admin, /api/leads)
 #              (docker-compose.caddy.yml  │   └─► backend:4000 (x-internal-key)
@@ -109,7 +109,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
-      # No web console in production (use `mc` inside the container, README.md).
+      # No web console in production (use `mc` inside the container, readme_dev.md).
       MINIO_BROWSER: 'off'
     volumes:
       - ${VOLUMES_DIR:-~/docker-volumes/gadyuka}/minio:/data

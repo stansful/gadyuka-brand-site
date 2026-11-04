@@ -1,5 +1,5 @@
 # ГАДЮКА — reverse proxy variant 1: Caddy (automatic HTTPS from Let's Encrypt, HTTP/3).
-# Used together with docker-compose.yml: `sudo ./deploy/up-caddy.sh` (README.md), afterwards plain
+# Used together with docker-compose.yml: `sudo ./deploy/up-caddy.sh` (readme_dev.md), afterwards plain
 # `docker compose …` (COMPOSE_FILE in .env). Config: deploy/caddy/Caddyfile.
 #
 # The only service with published ports. Data: ${VOLUMES_DIR}/caddy/data (certificates, ACME account)

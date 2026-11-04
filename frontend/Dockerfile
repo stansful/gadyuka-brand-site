@@ -3,7 +3,7 @@
 # ГАДЮКА frontend (Next.js 16, output: standalone) — production image. Build context = the REPOSITORY
 # ROOT (the app imports ../shared at build time); the root .dockerignore applies.
 #
-#   docker compose build frontend      (root docker-compose.yml; see the root README.md)
+#   docker compose build frontend      (root docker-compose.yml; see the root readme_dev.md)
 #
 # `next build` needs neither the backend nor a database (public reads happen per request) and no
 # secrets: nothing secret is passed to the build. Build arguments are public values that end up in

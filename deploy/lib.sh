@@ -259,7 +259,7 @@ first_run_help() {
 No .env yet and no terminal to ask in. Either run the script interactively, or pass the values:
   sudo DOMAIN=example.com ADMIN_LOGIN=admin [ADMIN_PASSWORD=…] [TELEGRAM_BOT_TOKEN=… TELEGRAM_OWNER_ID=…] \\
        $1 $0
-or create .env yourself from .env.example (README.md, «Переменные окружения»).
+or create .env yourself from .env.example (readme_dev.md, «Переменные окружения»).
 EOF
   exit 1
 }
@@ -602,7 +602,7 @@ compose_up() {
   log "building the images (the first build takes 5–10 minutes)"
   if ! compose build migrate backend seed backup || ! compose build frontend; then
     print_generated_password
-    die "the image build failed (messages above). Out of memory? Add swap (README.md). Then run the same script again"
+    die "the image build failed (messages above). Out of memory? Add swap (readme_dev.md). Then run the same script again"
   fi
   sync_db_owner_password
   log "starting: postgres → migrate → minio → minio-init → seed → backend → frontend → backup → ${PROXY}"

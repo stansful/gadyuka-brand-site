@@ -11,7 +11,7 @@
 # ~/docker-volumes/gadyuka with the right owners, builds the images and starts everything (migrations and
 # the seed run before the backend; nginx serves the ACME challenge over HTTP until certbot has the
 # certificate, then switches to HTTPS by itself), then waits until every service is healthy. Safe to run
-# again: that is also the update command after `git pull` (README.md).
+# again: that is also the update command after `git pull` (readme_dev.md).
 #
 # Options (the certificate choice is stored in .env: NGINX_TLS_MODE, LETSENCRYPT_STAGING):
 #   --letsencrypt       trusted Let's Encrypt certificate (the default; also switches back from the two below)

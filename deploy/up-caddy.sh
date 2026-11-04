@@ -8,7 +8,7 @@
 # optionally, the Telegram bot), creates the data folders under ~/docker-volumes/gadyuka with the right
 # owners, builds the images and starts everything (migrations and the seed run before the backend), then
 # waits until every service is healthy. Safe to run again: that is also the update command after
-# `git pull` (README.md).
+# `git pull` (readme_dev.md).
 #
 # Options:
 #   --skip-host-setup   ONLY for a local test on Docker Desktop / OrbStack (macOS, Windows): no
