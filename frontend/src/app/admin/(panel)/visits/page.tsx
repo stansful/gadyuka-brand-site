@@ -14,6 +14,12 @@ import { getVisitsRecent, getVisitsStats } from '@/lib/admin/queries/visits';
 
 import type { Metadata } from 'next';
 
+/**
+ * Reads visits stats and recent entries at request time; the data fetch is not cacheable
+ * during prerendering, so this route must not claim instant navigation.
+ */
+export const instant = false;
+
 export function generateMetadata(): Promise<Metadata> {
   return adminPageMetadata('visits.title');
 }
