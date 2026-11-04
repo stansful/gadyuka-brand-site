@@ -1,0 +1,16 @@
+/// Unique visit of a public page: one row per (hour, hashed visitor network).
+model Visit {
+  id         String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  hourBucket DateTime @map("hour_bucket")
+  ipHash     String   @map("ip_hash")
+  firstAt    DateTime @default(now()) @map("first_at")
+  lastAt     DateTime @default(now()) @map("last_at")
+  userAgent  String?  @map("user_agent") @db.VarChar(512)
+  path       String?  @map("path") @db.VarChar(2048)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([hourBucket, ipHash])
+  @@index([hourBucket(sort: Desc)])
+  @@map("visits")
+}

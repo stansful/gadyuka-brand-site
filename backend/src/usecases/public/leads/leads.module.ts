@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 
 import { Clock } from '~module/common';
+import { VisitorIpHasher } from '~module/common';
 import { LeadNotificationModule } from '~module/lead-notification';
 import { TelegramModule } from '~module/telegram';
 import { DecoyLeadId } from '~usecases/public/leads/lead-submission/post/decoy-lead-id';
 import { LeadSubmissionController } from '~usecases/public/leads/lead-submission/post/lead-submission.controller';
 import { LeadSubmissionRepository } from '~usecases/public/leads/lead-submission/post/lead-submission.repository';
 import { LeadSubmissionUsecase } from '~usecases/public/leads/lead-submission/post/lead-submission.usecase';
-import { VisitorNetworkHasher } from '~usecases/public/leads/lead-submission/post/visitor-network.hasher';
 
 /**
  * Slice S2 (leads, public side): POST /api/v1/public/leads — validation with forms.errors.* keys,
@@ -17,6 +17,6 @@ import { VisitorNetworkHasher } from '~usecases/public/leads/lead-submission/pos
 @Module({
   imports: [TelegramModule, LeadNotificationModule],
   controllers: [LeadSubmissionController],
-  providers: [LeadSubmissionUsecase, LeadSubmissionRepository, VisitorNetworkHasher, DecoyLeadId, Clock],
+  providers: [LeadSubmissionUsecase, LeadSubmissionRepository, VisitorIpHasher, DecoyLeadId, Clock],
 })
 export class LeadsModule {}

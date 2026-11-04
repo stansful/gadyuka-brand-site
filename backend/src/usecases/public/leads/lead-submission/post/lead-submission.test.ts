@@ -4,21 +4,19 @@ import { describe, it } from 'node:test';
 import type { ApiRequestTimeoutMs } from '~shared/contracts/http';
 
 import { ConfigService } from '~config';
+import { VisitorIpHasher } from '~module/common';
 import { TestEnvironment } from '~test/test-environment';
 
 import { DecoyLeadId } from './decoy-lead-id';
 import { LeadSubmissionRepository } from './lead-submission.repository';
-import { VisitorNetworkHasher } from './visitor-network.hasher';
 
 /** shared/contracts/http.ts: how long the site's server waits for the answer. */
 const CLIENT_WAIT_MS: ApiRequestTimeoutMs = 10_000;
 /** Room left outside the transaction: the request checks, the Telegram texts (a read when not cached), the answer. */
 const ROOM_OUTSIDE_TRANSACTION_MS = 3_000;
 
-describe('VisitorNetworkHasher', () => {
-  const hasher = new VisitorNetworkHasher(
-    new ConfigService(TestEnvironment.valid({ IP_HASH_SALT: ' pepper-0123456789 ' })),
-  );
+describe('VisitorIpHasher', () => {
+  const hasher = new VisitorIpHasher(new ConfigService(TestEnvironment.valid({ IP_HASH_SALT: ' pepper-0123456789 ' })));
 
   it('is HMAC-SHA256(key = IP_HASH_SALT, network) in hex', () => {
     // printf '203.0.113.7' | openssl dgst -sha256 -hmac pepper-0123456789

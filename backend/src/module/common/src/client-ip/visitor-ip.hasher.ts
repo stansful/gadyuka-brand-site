@@ -6,13 +6,12 @@ import { ConfigService } from '~config';
 import { IpNetwork } from '~core/leads/ip-network';
 
 /**
- * Lead.ipHash: HMAC-SHA256(key = IP_HASH_SALT, the visitor's network — IpNetwork) in hex. The IP itself
- * is never stored; the secret salt keeps the 2^32 IPv4 space from being brute-forced back. Visitors
- * without a known IP share one bucket. The key is the validated IP_HASH_SALT as is (ConfigService trims it
- * before its minimum length is checked).
+ * Visitor IP hash: HMAC-SHA256(key = IP_HASH_SALT, the visitor's network — IpNetwork) in hex. The IP
+ * itself is never stored; the secret salt keeps the address space from being brute-forced back.
+ * Visitors without a known IP share one bucket. Used for lead rate limiting and visit tracking.
  */
 @Injectable()
-export class VisitorNetworkHasher {
+export class VisitorIpHasher {
   private readonly salt: string;
 
   constructor(config: ConfigService) {

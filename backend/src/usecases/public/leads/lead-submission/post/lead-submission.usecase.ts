@@ -5,6 +5,7 @@ import { LeadMeta, LeadMetaRecord } from '~core/leads/lead-meta';
 import { LeadRateWindow } from '~core/leads/lead-rate-window';
 import { CheckedLeadForm, LeadSubmission } from '~core/leads/lead-submission';
 import { Clock } from '~module/common';
+import { VisitorIpHasher } from '~module/common';
 import { LeadNotificationScheduler } from '~module/lead-notification';
 import { TelegramLead, TelegramMessageKey, TelegramTexts } from '~module/telegram';
 import { Usecase } from '~usecases/usecase.interfaces';
@@ -14,7 +15,6 @@ import { LeadRateLimitedException } from './lead-rate-limited.exception';
 import { LeadSubmissionRepository } from './lead-submission.repository';
 import { LeadSubmissionResponse } from './lead-submission.response';
 import { LockedLeadStore } from './locked-lead.store';
-import { VisitorNetworkHasher } from './visitor-network.hasher';
 
 /** Who sent the form (forwarded by the site's server). */
 export interface LeadVisitor {
@@ -64,7 +64,7 @@ export class LeadSubmissionUsecase implements Usecase<LeadSubmissionCommand, Lea
 
   constructor(
     private readonly repository: LeadSubmissionRepository,
-    private readonly hasher: VisitorNetworkHasher,
+    private readonly hasher: VisitorIpHasher,
     private readonly texts: TelegramTexts,
     private readonly notifications: LeadNotificationScheduler,
     private readonly decoyIds: DecoyLeadId,
