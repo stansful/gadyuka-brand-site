@@ -6,6 +6,7 @@ import { DashboardModule } from '~usecases/admin/dashboard/dashboard.module';
 import { AdminEntitiesModule } from '~usecases/admin/entities/entities.module';
 import { AdminLeadsModule } from '~usecases/admin/leads/admin-leads.module';
 import { AdminMediaModule } from '~usecases/admin/media/admin-media.module';
+import { ServerMetricsModule } from '~usecases/admin/server-metrics/server-metrics.module';
 import { SiteTextsModule } from '~usecases/admin/site-texts/site-texts.module';
 import { VisitsModule } from '~usecases/admin/visits/visits.module';
 
@@ -25,6 +26,7 @@ import { VisitsModule } from '~usecases/admin/visits/visits.module';
     AdminMediaModule,
     AdminLeadsModule,
     VisitsModule,
+    ServerMetricsModule,
   ],
 })
 export class AdminModule {}

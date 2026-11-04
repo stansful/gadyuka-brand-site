@@ -88,6 +88,7 @@
         "media": "Медиатека",
         "leads": "Заявки",
         "visits": "Посещения",
+        "serverMetrics": "Сервер",
         "settings": "Настройки"
       },
       "brand": "ГАДЮКА",
@@ -177,6 +178,19 @@
       "userAgent": "Браузер",
       "time": "Время",
       "uniqueVisitors": "уникальных посетителей"
+    },
+    "serverMetrics": {
+      "title": "Сервер",
+      "description": "CPU, RAM и дисковое пространство хоста.",
+      "cpu": "Процессор",
+      "memory": "Память",
+      "disk": "Диски",
+      "loadAverage": "Загрузка",
+      "cores": "ядер",
+      "used": "занято",
+      "uptime": "Время работы",
+      "noData": "—",
+      "error": "Не удалось обновить метрики. Проверьте, запущён ли node-exporter."
     },
     "form": {
       "create": "Создать",
