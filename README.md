@@ -17,6 +17,7 @@
                                                     │  x-internal-key, внутренняя сеть
                                                     ▼
                                               backend:4000 (NestJS) ──► postgres, minio, api.telegram.org
+                              backup: ежедневно ──► postgres, minio, api.telegram.org
 ```
 
 Наружу открыт только прокси (80/443). Next.js, бэкенд, PostgreSQL и MinIO доступны только внутри
@@ -32,6 +33,7 @@ docker-сетей; у PostgreSQL и MinIO нет даже выхода в инт
 | `postgres`      | PostgreSQL 18                                                                                              |
 | `minio`         | S3-хранилище картинок (веб-консоль выключена)                                                              |
 | `minio-init`    | разово при каждом запуске: бакет и пользователь бэкенда                                                    |
+| `backup`        | ежедневный архив PostgreSQL + MinIO в Telegram; после доставки удаляет его с сервера                       |
 | `migrate`       | разово при каждом запуске: миграции БД и роль бэкенда (только чтение/запись строк)                         |
 | `seed`          | разово при каждом запуске: админ, новые тексты по умолчанию, стартовый контент (правки админки не трогает) |
 
@@ -93,7 +95,8 @@ zstd, есть HTTP/3. nginx — если привычнее он: официа�
 | `DOMAIN`, `SITE_URL`                                          | домен и `https://<домен>` (canonical, sitemap, ссылки в Telegram); после смены — запуск скрипта |
 | `WWW_REDIRECT`                                                | `1` — `www.<домен>` с сертификатом и редиректом на основной (нужна DNS-запись www)              |
 | `ADMIN_LOGIN`, `ADMIN_PASSWORD`                               | вход в админку (пароль ≥ 16 символов)                                                           |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_ID`, `TELEGRAM_DRY_RUN` | заявки в Telegram; `TELEGRAM_DRY_RUN=1` — не отправлять (в админке будет предупреждение)        |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_ID`, `TELEGRAM_DRY_RUN` | заявки и бэкапы в Telegram; `TELEGRAM_DRY_RUN=1` — не отправлять, бэкапы остаются на сервере   |
+| `BACKUP_SCHEDULE`, `BACKUP_TIMEZONE`                          | cron-расписание и часовой пояс; по умолчанию `30 3 * * *`, `Europe/Moscow`                     |
 | `POSTGRES_*`, `APP_DB_*`                                      | БД: владелец (миграции, сид) и роль бэкенда                                                     |
 | `MINIO_ROOT_*`, `S3_*`                                        | MinIO: администратор и пользователь бэкенда с правами только на бакет                           |
 | `INTERNAL_API_KEY`, `AUTH_ACCESS_SECRET`, `IP_HASH_SALT`      | секреты бэкенда (смена `AUTH_ACCESS_SECRET` разлогинивает админа)                               |
@@ -112,6 +115,7 @@ zstd, есть HTTP/3. nginx — если привычнее он: официа�
 | ------------------------------ | --------------------------------------------------------- |
 | `postgres/`                    | база PostgreSQL 18 (`18/docker`)                          |
 | `minio/`                       | картинки (бакет `S3_BUCKET`)                              |
+| `backups/pending/`             | только ещё не доставленные в Telegram архивы и их части   |
 | `backend/logs/`                | `backend.log` — JSON-лог бэкенда (ротация 14 дней)        |
 | `frontend/cache/`              | кэш Next.js (оптимизированные картинки)                   |
 | `frontend/static/`             | статика сборки для прокси (старые сборки хранятся 7 дней) |
@@ -135,25 +139,48 @@ sudo ./deploy/up-caddy.sh      # тот же скрипт, что и при ус
 
 ## Бэкапы и восстановление
 
-```bash
-sudo ./deploy/backup.sh        # backups/db_<дата>.dump (pg_dump) + backups/media/ (копия бакета)
-```
-
-Каждый день в 03:30 (`sudo crontab -e`):
-
-```cron
-30 3 * * * /opt/gadyuka/deploy/backup.sh >> /var/log/gadyuka-backup.log 2>&1
-```
-
-Дампы старше 14 дней удаляются; `backups/media/` только дополняется (у файла один адрес навсегда). В
-дампах — заявки с личными данными: файлы доступны только root. Копии на том же сервере не спасут при его
-потере — забирайте их к себе: `rsync -a root@<IP>:/opt/gadyuka/backups/ ~/gadyuka-backups/`.
-
-Восстановление (тот же сервер или новый после `up-*.sh` со старым `.env`):
+Контейнер `backup` каждый день в 03:30 по Москве (`BACKUP_SCHEDULE`, `BACKUP_TIMEZONE`) создаёт
+`gadyuka-backup_<дата>.tar.gz` с дампом PostgreSQL и всеми медиа MinIO, затем отправляет его в тот же
+Telegram-чат, что и заявки (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_ID`). Файлы больше 45 МиБ делятся на
+нумерованные части. **После подтверждения доставки всех части и архив удаляются с сервера.**
 
 ```bash
-sudo ./deploy/restore.sh backups/db_2026-10-21_033000.dump     # спросит подтверждение
+sudo docker compose logs -f backup
+sudo docker compose run --rm backup /opt/gadyuka-backup/backup-now.sh   # создать и отправить сейчас
 ```
+
+При ошибке доставки файлы остаются в `~/docker-volumes/gadyuka/backups/pending/` (точный корень —
+`VOLUMES_DIR`). Уже принятые части отмечены и повторно не отправляются; остальные будут отправлены при
+следующем запуске. Новый архив всё равно создаётся ежедневно, поэтому при постоянной ошибке следите за
+местом на диске и логами `backup`: неотправленные копии автоматически не удаляются. `TELEGRAM_DRY_RUN=1`
+также оставляет архив локально и не вызывает Telegram.
+
+В архивах есть заявки с персональными данными: защищайте доступ к Telegram-чату и серверу. Локальная папка
+`backups/` создаётся установщиком с правами `700`.
+
+Для восстановления скачайте архив из Telegram. Если он разбит на части, сначала соберите их в один файл
+(суффиксы `.000`, `.001`, …), затем распакуйте и передайте дамп существующему скрипту:
+
+```bash
+# Только для многотомного архива:
+cat gadyuka-backup_2026-11-04_033000.tar.gz.* > gadyuka-backup_2026-11-04_033000.tar.gz
+
+mkdir -p ./gadyuka-restore
+tar -xzf gadyuka-backup_2026-11-04_033000.tar.gz -C ./gadyuka-restore
+sudo ./deploy/restore.sh ./gadyuka-restore/db_2026-11-04_033000.dump
+```
+
+Папка `media/` лежит рядом с дампом в архиве, поэтому `restore.sh` найдёт её автоматически. Восстановление
+заменяет базу после подтверждения и работает как на том же, так и на новом сервере после `up-*.sh`.
+
+Прежний локальный вариант без Telegram остаётся доступен отдельно:
+
+```bash
+sudo ./deploy/backup.sh        # backups/db_<дата>.dump + backups/media/ в корне репозитория
+```
+
+Его дампы старше 14 дней удаляются, а `backups/media/` только дополняется. Для локальных копий по старому
+cron-расписанию используйте `deploy/backup.sh`; для ежедневной отправки в Telegram настраивать cron не нужно.
 
 ## Логи и состояние
 
@@ -161,6 +188,7 @@ sudo ./deploy/restore.sh backups/db_2026-10-21_033000.dump     # спросит 
 cd /opt/gadyuka
 sudo docker compose ps                          # статус и healthcheck всех сервисов
 sudo docker compose logs -f backend frontend    # приложение (заявки, Telegram, ошибки)
+sudo docker compose logs -f backup              # расписание, доставка и причины сохранения архивов
 sudo docker compose logs -f caddy               # или: nginx certbot — HTTPS и сертификаты
 sudo docker compose logs seed migrate           # последний запуск сида и миграций
 sudo docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'   # консоль БД

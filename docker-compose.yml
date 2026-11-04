@@ -8,21 +8,23 @@
 #              /_next/static, /brand ◄── shared static folder (published by frontend at start)
 #              /media/*  ──────────────► backend:4000   NestJS API (only /media/* is public)
 #   backend → postgres:5432, minio:9000, api.telegram.org
+#   backup  → postgres:5432, minio:9000, api.telegram.org (daily archives)
 #
 # This file holds everything but the proxy; the proxy comes from an override file — the scripts write
 # COMPOSE_FILE=docker-compose.yml:docker-compose.<caddy|nginx>.yml into .env, so plain `docker compose …`
 # in this folder addresses the whole stack.
 #
-# - Networks: `edge` (proxy, frontend, backend; outbound internet for Telegram) and `data` (internal: no
-#   internet; backend, postgres, minio and the one-off jobs). No port is published except the proxy's
-#   80/443: Postgres, MinIO, the backend and Next.js are reachable only inside these networks.
+# - Networks: `edge` (proxy, frontend, backend, backup; outbound internet for Telegram) and `data` (internal:
+#   no internet; backend, backup, postgres, minio and the one-off jobs). No port is published except the
+#   proxy's 80/443: Postgres, MinIO, the backend and Next.js are reachable only inside these networks.
 # - Start order on every `up`: postgres → migrate (prisma migrate deploy + the backend's DML-only
 #   database role) → minio → minio-init (bucket + the backend's MinIO user) → seed (idempotent: new
 #   default texts, the admin from ADMIN_LOGIN / ADMIN_PASSWORD; admin edits are kept) → backend →
-#   frontend → proxy. The one-off services run again on every `docker compose up`.
+#   frontend → proxy. Backup waits for postgres + minio-init and runs alongside the app. One-off services
+#   run again on every `docker compose up`.
 # - Data: host folders under ${VOLUMES_DIR} (default ~/docker-volumes/gadyuka — `~` is the home of the
-#   user running compose; the scripts write an absolute path into .env): postgres, minio, backend/logs,
-#   frontend/cache, frontend/static, caddy/{data,config} or nginx/certs + certbot/www.
+#   user running compose; the scripts write an absolute path into .env): postgres, minio, backups,
+#   backend/logs, frontend/cache, frontend/static, caddy/{data,config} or nginx/certs + certbot/www.
 # - Variables: .env next to this file (template: .env.example). Each service gets only the variables it
 #   needs — never `env_file: .env` (it would hand the database / MinIO root passwords to everything).
 #
@@ -173,6 +175,48 @@ services:
     security_opt:
       - 'no-new-privileges:true'
     networks: [data]
+    logging: *logging
+
+  # Daily full backup to the same Telegram chat as the leads. Delivered archives are deleted locally;
+  # failed uploads stay in VOLUMES_DIR/backups/pending and resume on the next run. No Docker socket.
+  backup:
+    build:
+      context: .
+      dockerfile: deploy/backup/Dockerfile
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_NAME: ${POSTGRES_NAME:-gadyuka}
+      POSTGRES_USER: ${POSTGRES_USER:-gadyuka}
+      POSTGRES_PASS: ${POSTGRES_PASS:?Set POSTGRES_PASS in .env}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
+      S3_BUCKET: ${S3_BUCKET:-gadyuka-media}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_OWNER_ID: ${TELEGRAM_OWNER_ID:-}
+      TELEGRAM_DRY_RUN: ${TELEGRAM_DRY_RUN:-0}
+      BACKUP_SCHEDULE: '${BACKUP_SCHEDULE:-30 3 * * *}'
+      BACKUP_TIMEZONE: ${BACKUP_TIMEZONE:-Europe/Moscow}
+    volumes:
+      - ${VOLUMES_DIR:-~/docker-volumes/gadyuka}/backups:/backups
+    security_opt:
+      - 'no-new-privileges:true'
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ['CMD-SHELL', 'pidof crond >/dev/null']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks: [data, edge]
     logging: *logging
 
   # One-off on every `up`: `prisma migrate deploy` as the database owner (POSTGRES_USER), then the

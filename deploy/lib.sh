@@ -9,7 +9,7 @@ ENV_EXAMPLE="${REPO_DIR}/.env.example"
 
 # Variables the scripts accept from the environment on a first run (non-interactive use) — also kept
 # across the sudo re-exec.
-PRESERVED_VARS="DOMAIN LETSENCRYPT_EMAIL ADMIN_LOGIN ADMIN_PASSWORD TELEGRAM_BOT_TOKEN TELEGRAM_OWNER_ID VOLUMES_DIR HTTP_PORT HTTPS_PORT SITE_URL GADYUKA_ENV_FILE BACKUP_DIR COMPOSE_PROJECT_NAME"
+PRESERVED_VARS="DOMAIN LETSENCRYPT_EMAIL ADMIN_LOGIN ADMIN_PASSWORD TELEGRAM_BOT_TOKEN TELEGRAM_OWNER_ID VOLUMES_DIR HTTP_PORT HTTPS_PORT SITE_URL GADYUKA_ENV_FILE BACKUP_DIR BACKUP_SCHEDULE BACKUP_TIMEZONE COMPOSE_PROJECT_NAME"
 
 # Secrets generated on the first run: name and `openssl rand -hex` byte count. Hex only: safe in URLs,
 # shell commands and `mc` without quoting.
@@ -17,7 +17,7 @@ SECRET_SPECS="POSTGRES_PASS:24 APP_DB_PASSWORD:24 MINIO_ROOT_PASSWORD:24 S3_SECR
 
 # uid:gid of the processes that write each data folder (official images: postgres:alpine = 70,
 # node = 1000, minio / caddy / nginx master / certbot = root) and the folder's mode.
-VOLUME_SPECS="postgres:70:70:700 minio:0:0:700 backend/logs:1000:1000:750 frontend/cache:1000:1000:755 frontend/static:1000:1000:755"
+VOLUME_SPECS="postgres:70:70:700 minio:0:0:700 backups:0:0:700 backend/logs:1000:1000:750 frontend/cache:1000:1000:755 frontend/static:1000:1000:755"
 CADDY_VOLUME_SPECS="caddy/data:0:0:700 caddy/config:0:0:700"
 NGINX_VOLUME_SPECS="nginx/certs:0:0:700 certbot/www:0:0:755"
 
@@ -313,8 +313,10 @@ create_env() {
     env_set TELEGRAM_DRY_RUN 0
   else
     env_set TELEGRAM_DRY_RUN 1
-    warn "Telegram is not configured: leads are stored but not sent (TELEGRAM_DRY_RUN=1). Later: set TELEGRAM_BOT_TOKEN, TELEGRAM_OWNER_ID, TELEGRAM_DRY_RUN=0 in .env and run the script again"
+    warn "Telegram is not configured: leads are stored and backups stay local (TELEGRAM_DRY_RUN=1). Later: set TELEGRAM_BOT_TOKEN, TELEGRAM_OWNER_ID, TELEGRAM_DRY_RUN=0 in .env and run the script again"
   fi
+  [ -n "${BACKUP_SCHEDULE:-}" ] && env_set BACKUP_SCHEDULE "${BACKUP_SCHEDULE}"
+  [ -n "${BACKUP_TIMEZONE:-}" ] && env_set BACKUP_TIMEZONE "${BACKUP_TIMEZONE}"
   env_set LETSENCRYPT_EMAIL "${LETSENCRYPT_EMAIL:-}"
   [ -n "${HTTP_PORT:-}" ] && env_set HTTP_PORT "${HTTP_PORT}"
   [ -n "${HTTPS_PORT:-}" ] && env_set HTTPS_PORT "${HTTPS_PORT}"
@@ -598,12 +600,12 @@ check_dns() {
 # until every service is healthy (the one-off jobs must have finished successfully).
 compose_up() {
   log "building the images (the first build takes 5–10 minutes)"
-  if ! compose build migrate backend seed || ! compose build frontend; then
+  if ! compose build migrate backend seed backup || ! compose build frontend; then
     print_generated_password
     die "the image build failed (messages above). Out of memory? Add swap (README.md). Then run the same script again"
   fi
   sync_db_owner_password
-  log "starting: postgres → migrate → minio → minio-init → seed → backend → frontend → ${PROXY}"
+  log "starting: postgres → migrate → minio → minio-init → seed → backend → frontend → backup → ${PROXY}"
   compose up -d --remove-orphans --wait --wait-timeout "${WAIT_TIMEOUT:-600}" || show_failure
   docker image prune -f >/dev/null 2>&1 || true
 }
@@ -647,7 +649,9 @@ EOF
   sudo docker compose ps                         # status / health
   sudo docker compose logs -f backend frontend   # app logs (Ctrl+C to leave)
   sudo docker compose logs -f ${PROXY}$([ "${PROXY}" = nginx ] && echo ' certbot')            # proxy / certificates
-  sudo ./deploy/backup.sh                        # backup now (cron: README.md)
+  sudo docker compose run --rm backup /opt/gadyuka-backup/backup-now.sh   # Telegram backup now
+  sudo docker compose logs -f backup                  # backup schedule / delivery
+  sudo ./deploy/backup.sh                        # local backup (14-day rotation)
 EOF
 }
 
