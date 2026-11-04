@@ -1,14 +1,20 @@
 import { ok, strictEqual } from 'node:assert';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
+import type { ConfigService } from '~config';
+
 import { ServerMetricsRepository } from './server-metrics.repository';
+
+function createConfig(url?: string): ConfigService {
+  return { get: (key: string) => (key === 'NODE_EXPORTER_URL' ? url : undefined) } as unknown as ConfigService;
+}
 
 describe('ServerMetricsRepository', () => {
   let repository: ServerMetricsRepository;
   let originalFetch: typeof fetch;
 
   beforeEach(() => {
-    repository = new ServerMetricsRepository();
+    repository = new ServerMetricsRepository(createConfig());
     originalFetch = global.fetch;
   });
 

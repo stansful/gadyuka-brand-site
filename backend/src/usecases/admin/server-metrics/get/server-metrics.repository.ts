@@ -3,6 +3,7 @@ import * as os from 'node:os';
 
 import { Injectable, Logger } from '@nestjs/common';
 
+import type { ConfigService } from '~config';
 import type { ServerMetricsResponse } from '~shared/contracts/server-metrics';
 
 interface MetricSample {
@@ -29,7 +30,7 @@ interface FilesystemSample {
   avail: number;
 }
 
-const EXPORTER_URL = 'http://node-exporter:9100/metrics';
+const DEFAULT_EXPORTER_URL = 'http://node-exporter:9100/metrics';
 const FETCH_TIMEOUT_MS = 3000;
 const MAX_CPU_SNAPSHOT_AGE_MS = 30_000;
 
@@ -67,7 +68,12 @@ const LABEL_RE = /([a-zA-Z_][a-zA-Z0-9_]*)="((?:[^\\"]|\\.)*)"/g;
 @Injectable()
 export class ServerMetricsRepository {
   private readonly logger = new Logger(ServerMetricsRepository.name);
+  private readonly exporterUrl: string;
   private previousCpuSnapshot: CpuSnapshot | null = null;
+
+  constructor(config: ConfigService) {
+    this.exporterUrl = config.get('NODE_EXPORTER_URL') ?? DEFAULT_EXPORTER_URL;
+  }
 
   async getMetrics(): Promise<ServerMetricsResponse> {
     try {
@@ -83,7 +89,7 @@ export class ServerMetricsRepository {
   }
 
   private async fetchExporterSamples(): Promise<MetricSample[]> {
-    const response = await fetch(EXPORTER_URL, {
+    const response = await fetch(this.exporterUrl, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 

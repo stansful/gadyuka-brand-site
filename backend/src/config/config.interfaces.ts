@@ -61,4 +61,7 @@ export interface Environment {
 
   // Site
   SITE_URL: string;
+
+  // Server metrics sidecar (optional; default is the Docker Compose service name)
+  NODE_EXPORTER_URL?: string;
 }

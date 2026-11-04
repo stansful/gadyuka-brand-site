@@ -146,4 +146,10 @@ export class ConfigEnvironmentValidator implements Environment {
   // Site
   @IsUrl(HTTP_URL)
   SITE_URL: string;
+
+  // Server metrics sidecar (optional; default is the Docker Compose service name)
+  @IsOptional()
+  @IsUrl(HTTP_URL)
+  @Transform(({ value }) => EnvironmentValue.toText(value, 'http://node-exporter:9100/metrics'), { toClassOnly: true })
+  NODE_EXPORTER_URL?: string;
 }
