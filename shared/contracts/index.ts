@@ -11,3 +11,4 @@ export type * from './http';
 export type * from './leads';
 export type * from './media';
 export type * from './site-texts';
+export type * from './visits';
