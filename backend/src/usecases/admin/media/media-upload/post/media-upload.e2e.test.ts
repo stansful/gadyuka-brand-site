@@ -122,7 +122,7 @@ describe('[e2e] POST /api/v1/admin/media', () => {
     const response = await upload(formWith(new Uint8Array(MAX_UPLOAD_BYTES + 1), 'huge.jpg'));
     deepStrictEqual(
       [response.status, response.body.key, response.body.values],
-      [413, 'admin.media.errors.tooLarge', { size: 15 }],
+      [413, 'admin.media.errors.tooLarge', { size: 50 }],
     );
   });
 

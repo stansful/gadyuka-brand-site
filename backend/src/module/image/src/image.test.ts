@@ -64,7 +64,7 @@ describe('ImageProcessor', () => {
   it('answers with admin.media.errors.* keys and their values', () => {
     const tooLarge = new ImageValidationException(ImageValidationCode.TOO_LARGE);
     strictEqual(tooLarge.messageKey, 'admin.media.errors.tooLarge');
-    deepStrictEqual(tooLarge.values, { size: 15 });
+    deepStrictEqual(tooLarge.values, { size: 50 });
     strictEqual(
       new ImageValidationException(ImageValidationCode.UNSUPPORTED).values?.formats,
       'JPEG, PNG, WebP, AVIF, GIF',

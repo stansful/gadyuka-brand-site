@@ -63,7 +63,7 @@ one stops the app with its name (never its value). See `.env.example` for commen
 | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_API_PORT`, `MINIO_CONSOLE_PORT`                           | dev MinIO container only (not read by the app)                              |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | media storage (`@nestjs/storage` S3Disk; MinIO needs path style)            |
 | `INTERNAL_API_KEY`                                                                                         | shared secret of the Next.js server (`x-internal-key`), ≥ 32 characters     |
-| `AUTH_ACCESS_SECRET`, `AUTH_ACCESS_TTL`, `AUTH_REFRESH_TTL`                                                | HS256 secret (≥ 32), access / refresh lifetimes in seconds (900 / 2592000)  |
+| `AUTH_ACCESS_SECRET`, `AUTH_ACCESS_TTL`, `AUTH_REFRESH_TTL`                                                | HS512 secret (≥ 32), access / refresh lifetimes in seconds (900 / 2592000)  |
 | `ADMIN_LOGIN`, `ADMIN_PASSWORD`                                                                            | the admin account the seed creates / updates (not needed by the server)     |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_ID`, `TELEGRAM_DRY_RUN`                                              | lead notifications; dry run = no network, the lead counts as not sent       |
 | `IP_HASH_SALT`                                                                                             | salt of visitor IP hashes (lead rate limits), ≥ 16 characters               |
@@ -149,7 +149,7 @@ first; another flow that needs a status text calls `await telegramTexts.load()` 
 
 ### Admin sessions (own wrapper over `@nestjs/jwt`, no passport)
 
-- **Access token**: HS256 JWT signed with `AUTH_ACCESS_SECRET`, lifetime `AUTH_ACCESS_TTL` (15 min),
+- **Access token**: HS512 JWT signed with `AUTH_ACCESS_SECRET`, lifetime `AUTH_ACCESS_TTL` (15 min),
   issuer `gadyuka-backend`, audience `gadyuka-admin`, claims `{ sub: user id, role, sid: session id }`.
   `AuthGuard` (global) checks the signature and expiry **and** that the session is not revoked — logout
   and reuse detection end access immediately, not after 15 minutes.
@@ -187,7 +187,7 @@ second run changes nothing (the rules of the seed the site had before the backen
    changed default; rows edited in the admin are kept; rows of removed keys / locales (orphans) are
    reported in the log, never deleted. The running server sees the change when its texts cache expires
    (≤ 5 min).
-4. **Seed images** (`SeedMediaSeed`): `assets/{photos,brandbook}/*` → WebP (≤ 2400 px, q84) → MinIO
+4. **Seed images** (`SeedMediaSeed`): `assets/{photos,brandbook}/*` → WebP (≤ 2400 px, q95) → MinIO
    `admin/<adminId>/<uuid>/image.webp` + a `media` row. The uuid is derived from the image name and the
    source bytes (version 8: a re-run finds its row and object; a changed asset gets a new uuid = a new
    immutable URL; an object already in the bucket is reused, a lost one restored). Every image on a full

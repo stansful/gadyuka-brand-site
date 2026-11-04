@@ -9,7 +9,7 @@ export class AuthTokensResponse implements AuthTokensResponseContract {
   @ApiProperty({ enum: ['Bearer'] })
   tokenType: 'Bearer';
 
-  @ApiProperty({ description: 'HS256 JWT for `Authorization: Bearer …`' })
+  @ApiProperty({ description: 'HS512 JWT for `Authorization: Bearer …`' })
   accessToken: string;
 
   @ApiProperty({ description: 'ISO 8601', example: '2026-10-21T12:15:00.000Z' })

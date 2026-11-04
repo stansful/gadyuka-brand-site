@@ -485,7 +485,7 @@ src/usecases/<group>/<feature>/<method>/      npm run gen:usecase
   чтение через основной клиент ждёт соединения пула, которые держат открытые транзакции (взаимоблокировка под нагрузкой).
 - Группы: **public** (`@Public()`: данные сайта без входа), **auth** (вход: login/refresh/logout публичные,
   `me` — с сессией), **admin** (`@Roles([UserRole.ADMIN])` на каждом контроллере).
-- Сессия: `Authorization: Bearer <access JWT>` (HS256, 15 мин, `{ sub, role, sid }`), проверка, что
+- Сессия: `Authorization: Bearer <access JWT>` (HS512, 15 мин, `{ sub, role, sid }`), проверка, что
   сессия `sid` не отозвана — на каждом запросе (`AuthGuard`). Refresh-токен `<id>.<secret>`, в БД — только
   sha256; обмен ровно один раз, повторное предъявление отзывает всю сессию.
 - Типы запросов и ответов — в `shared/contracts/*.ts` (только типы). Класс-ответ бэкенда

@@ -43,13 +43,13 @@ describe('AccessTokenService', () => {
   const service = new AccessTokenService(jwtService());
   const user = { id: ADMIN_ID, role: UserRole.ADMIN, sessionId: randomUUID() };
 
-  it('issues an HS256 token whose claims verify back, expiring after the TTL', () => {
+  it('issues an HS512 token whose claims verify back, expiring after the TTL', () => {
     const before = Date.now();
     const issued = service.issue(user);
     deepStrictEqual(service.verify(issued.token), { sub: user.id, role: UserRole.ADMIN, sid: user.sessionId });
     const lifetime = issued.expiresAt.getTime() - before;
     ok(lifetime > (ACCESS_TTL - 2) * 1000 && lifetime <= (ACCESS_TTL + 1) * 1000, String(lifetime));
-    strictEqual(JSON.parse(Buffer.from(issued.token.split('.')[0] ?? '', 'base64url').toString()).alg, 'HS256');
+    strictEqual(JSON.parse(Buffer.from(issued.token.split('.')[0] ?? '', 'base64url').toString()).alg, 'HS512');
   });
 
   it('refuses expired, foreign, tampered and claim-less tokens', () => {

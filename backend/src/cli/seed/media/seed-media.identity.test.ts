@@ -34,9 +34,9 @@ describe('SeedMediaIdentity (seed media identity)', () => {
   });
 
   it('derives exactly the uuids of the frontend seed (golden values of prisma/seed/media.ts)', () => {
-    strictEqual(SEED_ENCODING_SIGNATURE, 'webp:q84:e5:max2400:rotate:v1');
+    strictEqual(SEED_ENCODING_SIGNATURE, 'webp:q95:e5:max2400:rotate:v1');
     const hash = identity.contentHash(source);
-    strictEqual(hash, 'dc95d25dcac056da500bcf34cc3717de6203db8005e4c51b553bcd0cc7b79530');
-    strictEqual(identity.mediaUuid('hoodieWhiteLogo', hash), '41bda749-928d-8daf-83b6-588e709fa175');
+    strictEqual(hash, 'c991a155e022973af22054d94a1a75c4c35e0b6c2bfd2f87fa489c85d07ec69a');
+    strictEqual(identity.mediaUuid('hoodieWhiteLogo', hash), '631cf436-85ab-846f-ac11-53c92de7f316');
   });
 });

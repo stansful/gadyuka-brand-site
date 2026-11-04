@@ -26,7 +26,7 @@ describe('MediaUploadErrorInterceptor', () => {
   it('answers a file over the multipart limit with the tooLarge key and its size', async () => {
     const error = await errorOf(new PayloadTooLargeException('File too large'));
     ok(error instanceof ImageValidationException);
-    deepStrictEqual([error.messageKey, error.values], ['admin.media.errors.tooLarge', { size: 15 }]);
+    deepStrictEqual([error.messageKey, error.values], ['admin.media.errors.tooLarge', { size: 50 }]);
   });
 
   it('answers an unreadable or cut off multipart body with the unreadable key, and passes anything else through', async () => {

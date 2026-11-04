@@ -1,5 +1,5 @@
 /**
- * Admin sign-in (/api/v1/auth/*). Sessions are a short access token (HS256 JWT, sent as
+ * Admin sign-in (/api/v1/auth/*). Sessions are a short access token (HS512 JWT, sent as
  * `Authorization: Bearer …`) plus a rotating refresh token: every refresh returns a NEW pair and
  * the old refresh token stops working; presenting an already exchanged refresh token again ends
  * the whole session (stolen-token protection) — refresh once, then use the new pair.

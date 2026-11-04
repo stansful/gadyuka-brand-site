@@ -12,7 +12,7 @@ export interface EncodedSeedImage {
   readonly size: number;
 }
 
-/** Source image → WebP: auto-orient, fit inside 2400×2400 (never upscale), quality 84, effort 5. */
+/** Source image → WebP: auto-orient, fit inside 2400×2400 (never upscale), quality 95, effort 5. */
 @Injectable()
 export class SeedImageEncoder {
   async encode(source: Buffer): Promise<EncodedSeedImage> {

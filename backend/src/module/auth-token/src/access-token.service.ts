@@ -7,7 +7,7 @@ import { AccessTokenInvalidException } from '~exception';
 
 import { AccessTokenClaims, AuthenticatedUser, IssuedToken } from './auth-token.interfaces';
 
-/** Short-lived HS256 access tokens over @nestjs/jwt: { sub: user id, role, sid: session id }. */
+/** Short-lived HS512 access tokens over @nestjs/jwt: { sub: user id, role, sid: session id }. */
 @Injectable()
 export class AccessTokenService {
   private static readonly ROLES: ReadonlySet<string> = new Set(Object.values(UserRole));

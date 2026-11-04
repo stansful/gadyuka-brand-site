@@ -5,7 +5,7 @@ import { ConfigService } from '~config';
 
 import { ACCESS_TOKEN_ALGORITHM, ACCESS_TOKEN_AUDIENCE, ACCESS_TOKEN_ISSUER } from './auth-token.constants';
 
-/** Access tokens: HS256 with AUTH_ACCESS_SECRET, AUTH_ACCESS_TTL seconds, fixed issuer and audience. */
+/** Access tokens: HS512 with AUTH_ACCESS_SECRET, AUTH_ACCESS_TTL seconds, fixed issuer and audience. */
 @Injectable()
 export class JwtOptionsFromConfig implements JwtOptionsFactory {
   private static readonly CLAIMS = { issuer: ACCESS_TOKEN_ISSUER, audience: ACCESS_TOKEN_AUDIENCE } as const;
