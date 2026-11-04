@@ -1,12 +1,15 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 
-import { Clock } from '~module/common';
+import { Clock, VisitorIpHasher } from '~module/common';
 import { SiteMessagesModule } from '~module/site-messages';
 import { PublicCollectionPresenter } from '~usecases/public/content/common/public-collection.presenter';
 import { PublicImagePresenter } from '~usecases/public/content/common/public-image.presenter';
 import { PublicSettingsPresenter } from '~usecases/public/content/common/public-settings.presenter';
 import { PublicSettingsRepository } from '~usecases/public/content/common/public-settings.repository';
 import { PublishedCollectionsRepository } from '~usecases/public/content/common/published-collections.repository';
+import { VisitTrackingInterceptor } from '~usecases/public/content/common/visit-tracking.interceptor';
+import { VisitRepository } from '~usecases/public/content/common/visit.repository';
 import { LandingFramePresenter } from '~usecases/public/content/landing/get/landing-frame.presenter';
 import { LandingRowsLoader } from '~usecases/public/content/landing/get/landing-rows.loader';
 import { LandingSectionsPresenter } from '~usecases/public/content/landing/get/landing-sections.presenter';
@@ -63,6 +66,9 @@ import { SitemapUsecase } from '~usecases/public/content/sitemap/get/sitemap.use
     SitemapUsecase,
     SitemapRepository,
     PublicSettingsUsecase,
+    VisitorIpHasher,
+    VisitRepository,
+    { provide: APP_INTERCEPTOR, useClass: VisitTrackingInterceptor },
   ],
 })
 export class PublicContentModule {}
