@@ -9,6 +9,12 @@ import type { ReactElement } from 'react';
 
 import { ServerMetricsClient } from './ServerMetricsClient';
 
+/**
+ * Reads server metrics at request time; the data fetch is not cacheable during prerendering,
+ * so this route must not claim instant navigation.
+ */
+export const instant = false;
+
 export async function generateMetadata(): Promise<Metadata> {
   return adminPageMetadata('serverMetrics.title');
 }

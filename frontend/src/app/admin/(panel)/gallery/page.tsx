@@ -12,6 +12,11 @@ import { listGalleryAdmin } from '@/lib/admin/queries/content';
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
 
+/**
+ * Request-time auth check and data fetch prevent this route from claiming instant navigation.
+ */
+export const instant = false;
+
 export function generateMetadata(): Promise<Metadata> {
   return adminPageMetadata('gallery.title');
 }
