@@ -3,6 +3,7 @@
 import { clsx } from 'clsx';
 import {
   BadgePercent,
+  BarChart3,
   ExternalLink,
   FileText,
   Handshake,
@@ -46,6 +47,7 @@ export const ADMIN_NAV: readonly NavItem[] = [
   { href: '/admin/socials', key: 'socials', icon: Share2 },
   { href: '/admin/media', key: 'media', icon: Library },
   { href: '/admin/leads', key: 'leads', icon: Inbox },
+  { href: '/admin/visits', key: 'visits', icon: BarChart3 },
   { href: '/admin/settings', key: 'settings', icon: Settings },
 ];
 
