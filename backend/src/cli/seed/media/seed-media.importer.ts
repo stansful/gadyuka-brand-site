@@ -70,7 +70,7 @@ export class SeedMediaImporter {
       return current.id;
     }
     const kept = await this.keptRowOfChangedSource[this.options.mode()](image, stats);
-    return kept ?? this.create(image, stats);
+    return kept ?? (await this.create(image, stats));
   }
 
   private async load(request: SeedImageRequest): Promise<SeedImage> {

@@ -168,7 +168,7 @@ async function precompressRoot(root) {
         }
         data ??= await readFile(file);
         const packed = await encoding.compress(data);
-        if (packed.length >= data.length) {
+        if (packed.length >= data?.length) {
           // Not worth a sibling: the proxy sends the file as it is.
           if (targetTime !== null) {
             await rm(target, { force: true });
