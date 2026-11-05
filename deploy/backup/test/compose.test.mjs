@@ -38,6 +38,7 @@ test('compose runs the backup container with only the required access', () => {
   assert.equal(backup.init, true);
   assert.equal(backup.restart, 'unless-stopped');
   assert.deepEqual(backup.cap_drop, ['ALL']);
+  assert.deepEqual(backup.cap_add, ['SETGID']);
   assert.ok(backup.security_opt.includes('no-new-privileges:true'));
   assert.equal(backup.depends_on.postgres.condition, 'service_healthy');
   assert.equal(backup.depends_on['minio-init'].condition, 'service_completed_successfully');
